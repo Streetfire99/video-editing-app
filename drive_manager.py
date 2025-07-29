@@ -35,8 +35,8 @@ def get_drive_service():
             
             credentials_dict = json.loads(credentials_str)
         
-        # Crea le credenziali
-        credentials = Credentials.from_service_account_info(credentials_dict)
+        # Crea le credenziali con gli scope
+        credentials = Credentials.from_service_account_info(credentials_dict, scopes=SCOPES)
         
         # Crea il servizio Drive
         service = build('drive', 'v3', credentials=credentials)
