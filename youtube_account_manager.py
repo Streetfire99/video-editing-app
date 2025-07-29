@@ -5,10 +5,11 @@ from datetime import datetime, timedelta
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload
+from googleapiclient.http import MediaFileUpload, MediaIoBaseUpload
 from googleapiclient.errors import HttpError
 import streamlit as st
 import json
+import io
 
 # Configurazione degli account
 YOUTUBE_ACCOUNTS = [
@@ -21,6 +22,18 @@ YOUTUBE_ACCOUNTS = [
 
 # Scopes necessari per YouTube
 SCOPES = ['https://www.googleapis.com/auth/youtube.upload']
+
+# ID della cartella Google Drive per i token
+TOKENS_FOLDER_ID = "1w9P2oiRfFgsOOj82V7xOruhjnl-APCCi"  # Stessa cartella del CSV
+
+def get_drive_service():
+    """Ottiene il servizio Google Drive"""
+    try:
+        from drive_manager import get_drive_service
+        return get_drive_service()
+    except Exception as e:
+        print(f"❌ Errore nel caricamento del servizio Drive: {e}")
+        return None
 
 def get_client_secrets():
     """Ottiene le credenziali OAuth2 da Streamlit secrets"""
@@ -37,38 +50,116 @@ def get_client_secrets():
         print(f"❌ Errore nel caricamento delle credenziali: {e}")
         return None
 
-def get_token_from_session_state(account):
-    """Ottiene il token da session state"""
-    key = f"youtube_token_{account.replace('@', '_at_').replace('.', '_')}"
-    return st.session_state.get(key)
+def get_token_from_drive(account):
+    """Ottiene il token da Google Drive"""
+    try:
+        service = get_drive_service()
+        if not service:
+            return None
+        
+        filename = f"{account.replace('@', '_at_').replace('.', '_')}.pickle"
+        
+        # Cerca il file su Google Drive
+        query = f"'{TOKENS_FOLDER_ID}' in parents and name='{filename}' and trashed=false"
+        results = service.files().list(q=query).execute()
+        files = results.get('files', [])
+        
+        if files:
+            file_id = files[0]['id']
+            
+            # Scarica il file
+            request = service.files().get_media(fileId=file_id)
+            file_content = io.BytesIO(request.execute())
+            file_content.seek(0)
+            
+            # Carica il token
+            credentials = pickle.load(file_content)
+            print(f"✅ Token caricato per {account}")
+            return credentials
+        else:
+            print(f"❌ Nessun token trovato per {account}")
+            return None
+            
+    except Exception as e:
+        print(f"❌ Errore nel caricamento del token per {account}: {e}")
+        return None
 
-def save_token_to_session_state(account, credentials):
-    """Salva il token in session state"""
-    key = f"youtube_token_{account.replace('@', '_at_').replace('.', '_')}"
-    st.session_state[key] = {
-        'credentials': credentials,
-        'created_at': datetime.now().timestamp()
-    }
+def save_token_to_drive(account, credentials):
+    """Salva il token su Google Drive"""
+    try:
+        service = get_drive_service()
+        if not service:
+            return False
+        
+        filename = f"{account.replace('@', '_at_').replace('.', '_')}.pickle"
+        
+        # Serializza le credenziali
+        token_data = io.BytesIO()
+        pickle.dump(credentials, token_data)
+        token_data.seek(0)
+        
+        # Cerca se il file esiste già
+        query = f"'{TOKENS_FOLDER_ID}' in parents and name='{filename}' and trashed=false"
+        results = service.files().list(q=query).execute()
+        files = results.get('files', [])
+        
+        if files:
+            # Aggiorna il file esistente
+            file_id = files[0]['id']
+            media = MediaIoBaseUpload(
+                token_data,
+                mimetype='application/octet-stream',
+                resumable=True
+            )
+            service.files().update(
+                fileId=file_id,
+                media_body=media
+            ).execute()
+        else:
+            # Crea un nuovo file
+            file_metadata = {
+                'name': filename,
+                'parents': [TOKENS_FOLDER_ID]
+            }
+            media = MediaIoBaseUpload(
+                token_data,
+                mimetype='application/octet-stream',
+                resumable=True
+            )
+            service.files().create(
+                body=file_metadata,
+                media_body=media,
+                fields='id'
+            ).execute()
+        
+        print(f"✅ Token salvato per {account}")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Errore nel salvataggio del token per {account}: {e}")
+        return False
 
-def is_token_expired_session_state(account):
+def is_token_expired(credentials):
     """Controlla se il token è scaduto"""
-    key = f"youtube_token_{account.replace('@', '_at_').replace('.', '_')}"
-    token_data = st.session_state.get(key)
-    
-    if not token_data:
+    if not credentials:
         return True
     
-    created_at = token_data.get('created_at', 0)
-    now = datetime.now().timestamp()
-    return (now - created_at) > 24 * 3600
+    if credentials.expired and credentials.refresh_token:
+        try:
+            credentials.refresh(Request())
+            return False
+        except:
+            return True
+    
+    return credentials.expired
 
 def is_account_authenticated(account):
     """Controlla se un account è autenticato e valido"""
-    token_data = get_token_from_session_state(account)
-    if not token_data:
+    credentials = get_token_from_drive(account)
+    if not credentials:
         return False
     
-    if is_token_expired_session_state(account):
+    if is_token_expired(credentials):
         return False
     
     return True
@@ -134,13 +225,11 @@ def authenticate_with_code(account, auth_code):
         flow.fetch_token(code=auth_code)
         credentials = flow.credentials
         
-        # Salva il token
-        save_token_to_session_state(account, credentials)
-        
-        # Pulisci il file temporaneo
-        os.unlink(client_secrets_file)
-        
-        return True
+        # Salva il token su Google Drive
+        if save_token_to_drive(account, credentials):
+            return True
+        else:
+            return False
         
     except Exception as e:
         print(f"❌ Errore nell'autenticazione: {e}")
@@ -158,21 +247,19 @@ def get_youtube_service(account=None):
     if account is None:
         raise Exception("❌ Nessun account YouTube disponibile")
     
-    token_data = get_token_from_session_state(account)
+    credentials = get_token_from_drive(account)
     
-    if not token_data:
+    if not credentials:
         raise Exception(f"❌ Account {account} non autenticato")
     
-    if is_token_expired_session_state(account):
+    if is_token_expired(credentials):
         raise Exception(f"❌ Token scaduto per {account}")
     
     try:
-        credentials = token_data['credentials']
-        
         # Rinnova il token se necessario
         if credentials.expired and credentials.refresh_token:
             credentials.refresh(Request())
-            save_token_to_session_state(account, credentials)
+            save_token_to_drive(account, credentials)
         
         youtube_service = build('youtube', 'v3', credentials=credentials)
         return youtube_service, account
@@ -310,8 +397,25 @@ def test_account(account):
 
 def delete_account_token(account):
     """Elimina il token di un account"""
-    key = f"youtube_token_{account.replace('@', '_at_').replace('.', '_')}"
-    if key in st.session_state:
-        del st.session_state[key]
-        return True
-    return False 
+    try:
+        service = get_drive_service()
+        if not service:
+            return False
+        
+        filename = f"{account.replace('@', '_at_').replace('.', '_')}.pickle"
+        
+        # Cerca il file su Google Drive
+        query = f"'{TOKENS_FOLDER_ID}' in parents and name='{filename}' and trashed=false"
+        results = service.files().list(q=query).execute()
+        files = results.get('files', [])
+        
+        if files:
+            file_id = files[0]['id']
+            service.files().delete(fileId=file_id).execute()
+            return True
+        
+        return False
+        
+    except Exception as e:
+        print(f"❌ Errore nell'eliminazione del token per {account}: {e}")
+        return False 
