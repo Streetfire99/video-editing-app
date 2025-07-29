@@ -66,6 +66,35 @@ def get_google_sheets_client():
                 print("🔧 DEBUG: After fix - \\n count:", private_key.count('\\n'))
                 print("🔧 DEBUG: After fix - \n count:", private_key.count('\n'))
             
+            # Se la chiave non funziona, ricostruiscila completamente
+            # Ricostruisci la chiave con il formato corretto
+            print("🔧 DEBUG: Rebuilding private_key with correct format")
+            
+            # Estrai il contenuto base64 dalla chiave attuale
+            lines = private_key.split('\n')
+            base64_lines = []
+            in_key = False
+            
+            for line in lines:
+                if '-----BEGIN PRIVATE KEY-----' in line:
+                    in_key = True
+                    continue
+                elif '-----END PRIVATE KEY-----' in line:
+                    break
+                elif in_key and line.strip():
+                    base64_lines.append(line.strip())
+            
+            # Ricostruisci la chiave con il formato corretto
+            rebuilt_key = "-----BEGIN PRIVATE KEY-----\n"
+            # Aggiungi le righe base64
+            for line in base64_lines:
+                rebuilt_key += line + "\n"
+            rebuilt_key += "-----END PRIVATE KEY-----\n"
+            
+            print("🔧 DEBUG: Rebuilt private_key length:", len(rebuilt_key))
+            print("🔧 DEBUG: Rebuilt private_key starts with:", rebuilt_key[:50])
+            credentials_dict['private_key'] = rebuilt_key
+            
             # Verifica che la chiave inizi e finisca correttamente
             if not private_key.startswith('-----BEGIN PRIVATE KEY-----'):
                 print("❌ DEBUG: private_key doesn't start with BEGIN")
