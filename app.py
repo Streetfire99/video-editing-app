@@ -515,6 +515,13 @@ with st.form("youtube_upload_form"):
         else:
             print("❌ DEBUG: YouTube status is not OK")
             st.error("❌ YouTube non configurato correttamente")
+            
+            # Mostra banner di autenticazione se necessario
+            from youtube_account_manager import get_next_account_to_authenticate, show_authentication_banner
+            next_account = get_next_account_to_authenticate()
+            if next_account:
+                st.warning("🔐 **Autenticazione YouTube richiesta**")
+                show_authentication_banner(next_account)
 
 # Sezione per l'upload su Google Drive
 st.subheader("☁️ Carica su Google Drive")

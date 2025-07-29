@@ -52,20 +52,26 @@ def get_client_secrets():
 
 def get_token_from_drive(account):
     """Ottiene il token da Google Drive"""
+    print(f"🔧 DEBUG: Getting token from Drive for {account}")
     try:
         service = get_drive_service()
         if not service:
+            print("❌ DEBUG: Drive service not available")
             return None
         
         filename = f"{account.replace('@', '_at_').replace('.', '_')}.pickle"
+        print(f"🔧 DEBUG: Looking for file: {filename}")
         
         # Cerca il file su Google Drive
         query = f"'{TOKENS_FOLDER_ID}' in parents and name='{filename}' and trashed=false"
+        print(f"🔧 DEBUG: Drive query: {query}")
         results = service.files().list(q=query).execute()
         files = results.get('files', [])
+        print(f"🔧 DEBUG: Found {len(files)} files")
         
         if files:
             file_id = files[0]['id']
+            print(f"🔧 DEBUG: File ID: {file_id}")
             
             # Scarica il file
             request = service.files().get_media(fileId=file_id)
@@ -154,15 +160,24 @@ def is_token_expired(credentials):
     return credentials.expired
 
 def is_account_authenticated(account):
-    """Controlla se un account è autenticato e valido"""
-    credentials = get_token_from_drive(account)
-    if not credentials:
+    """Controlla se un account è autenticato"""
+    print(f"🔧 DEBUG: Checking if account {account} is authenticated")
+    try:
+        credentials = get_token_from_drive(account)
+        if credentials:
+            print(f"🔧 DEBUG: Found credentials for {account}")
+            if is_token_expired(credentials):
+                print(f"❌ DEBUG: Token expired for {account}")
+                return False
+            else:
+                print(f"✅ DEBUG: Account {account} is authenticated")
+                return True
+        else:
+            print(f"❌ DEBUG: No credentials found for {account}")
+            return False
+    except Exception as e:
+        print(f"❌ DEBUG: Error checking authentication for {account}: {e}")
         return False
-    
-    if is_token_expired(credentials):
-        return False
-    
-    return True
 
 def get_next_account_to_authenticate():
     """Trova il prossimo account da autenticare"""
@@ -187,7 +202,7 @@ def create_auth_url(account):
         flow = InstalledAppFlow.from_client_secrets_file(
             client_secrets_file, 
             SCOPES,
-            redirect_uri="https://video-editing-app-streetfire99.streamlit.app"
+            redirect_uri="urn:ietf:wg:oauth:2.0:oob"  # Redirect per app installate
         )
         
         # Genera l'URL di autorizzazione
@@ -218,7 +233,7 @@ def authenticate_with_code(account, auth_code):
         flow = InstalledAppFlow.from_client_secrets_file(
             client_secrets_file, 
             SCOPES,
-            redirect_uri="https://video-editing-app-streetfire99.streamlit.app"
+            redirect_uri="urn:ietf:wg:oauth:2.0:oob"  # Redirect per app installate
         )
         
         # Scambia il codice per i token
