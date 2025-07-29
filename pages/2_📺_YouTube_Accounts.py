@@ -38,12 +38,18 @@ def get_client_secrets():
     try:
         client_secrets = st.secrets.get("YOUTUBE_CLIENT_SECRETS")
         if client_secrets:
+            # Se è una stringa JSON, convertila in dizionario
+            if isinstance(client_secrets, str):
+                import json
+                client_secrets = json.loads(client_secrets)
             return client_secrets
         else:
             st.error("❌ Credenziali YouTube non configurate nei secrets")
             return None
     except Exception as e:
         st.error(f"❌ Errore nel caricamento delle credenziali: {e}")
+        st.error(f"❌ Tipo di errore: {type(e)}")
+        st.error(f"❌ Dettagli: {str(e)}")
         return None
 
 def get_token_from_session_state(account):
@@ -82,17 +88,17 @@ def authenticate_account(account):
         return None
     
     try:
+        # Assicurati che client_secrets sia un dizionario
+        if isinstance(client_secrets, str):
+            import json
+            client_secrets = json.loads(client_secrets)
+        
         # Crea un file temporaneo con le credenziali
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-            # Assicurati che client_secrets sia un dizionario
-            if isinstance(client_secrets, str):
-                import json
-                client_secrets = json.loads(client_secrets)
-            
             json.dump(client_secrets, f)
             client_secrets_file = f.name
         
-        # Configura il flow OAuth2
+        # Configura il flow OAuth2 per web application
         flow = InstalledAppFlow.from_client_secrets_file(
             client_secrets_file, 
             SCOPES,
@@ -103,50 +109,49 @@ def authenticate_account(account):
         auth_url, _ = flow.authorization_url(prompt='consent')
         
         st.markdown(f"""
-        ### 🔗 Passi per l'autenticazione:
+        ### 🔐 Autenticazione per {account}
         
-        1. **Clicca sul link** per autorizzare l'account
-        2. **Accedi** con: `{account}`
-        3. **Copia il codice** di autorizzazione
-        4. **Incolla il codice** nel campo sottostante
+        1. **Clicca sul link qui sotto** per autorizzare l'accesso
+        2. **Accedi con l'account**: {account}
+        3. **Copia il codice di autorizzazione** che appare
+        4. **Incolla il codice** nel campo qui sotto
         
-        **Link di autorizzazione:**
+        [🔗 Autorizza Accesso]({auth_url})
         """)
         
-        st.markdown(f"[🔗 Autorizza Account]({auth_url})")
-        
-        # Campo per il codice di autorizzazione
+        # Campo per inserire il codice di autorizzazione
         auth_code = st.text_input(
-            "📋 Codice di autorizzazione",
-            placeholder="Incolla qui il codice ricevuto",
-            key=f"auth_code_{account}"
+            "📋 Codice di Autorizzazione",
+            key=f"auth_code_{account}",
+            help="Incolla qui il codice di autorizzazione che hai ricevuto"
         )
         
-        if st.button("✅ Conferma Autenticazione", key=f"confirm_{account}"):
-            if auth_code:
-                try:
-                    # Scambia il codice per i token
-                    flow.fetch_token(code=auth_code)
-                    credentials = flow.credentials
-                    
-                    # Salva i token in session state
-                    save_token_to_session_state(account, credentials)
-                    
-                    st.success(f"✅ Token salvato per {account}")
-                    st.rerun()
-                    
-                except Exception as e:
-                    st.error(f"❌ Errore nell'autenticazione: {e}")
-            else:
-                st.warning("⚠️ Inserisci il codice di autorizzazione")
+        if auth_code and st.button("✅ Conferma Autenticazione", key=f"confirm_{account}"):
+            try:
+                # Scambia il codice per i token
+                flow.fetch_token(code=auth_code)
+                credentials = flow.credentials
+                
+                # Salva il token in session state
+                save_token_to_session_state(account, credentials)
+                
+                st.success(f"✅ Autenticazione completata per {account}!")
+                st.rerun()
+                
+            except Exception as e:
+                st.error(f"❌ Errore nell'autenticazione: {e}")
+                st.error("💡 Assicurati che il codice sia corretto e non sia scaduto")
         
         # Pulisci il file temporaneo
-        os.unlink(client_secrets_file)
-        
+        try:
+            os.unlink(client_secrets_file)
+        except:
+            pass
+            
     except Exception as e:
         st.error(f"❌ Errore nella configurazione OAuth2: {e}")
-        st.error(f"❌ Tipo di errore: {type(e)}")
-        st.error(f"❌ Dettagli: {str(e)}")
+        st.error("💡 Verifica che le credenziali nei secrets siano corrette")
+        return None
 
 def get_account_status(account):
     """Ottiene lo stato di un account"""
