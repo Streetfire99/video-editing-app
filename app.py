@@ -39,9 +39,10 @@ st.markdown("---")
 st.sidebar.title("📋 Menu")
 
 # Sezione principale
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "🎬 Elaborazione Video", 
     "📊 Gestione Account YouTube", 
+    "🔑 Gestione Token",
     "🏠 Gestione Appartamenti",
     "📝 Gestione Tipologie Video",
     "📈 Progresso Video"
