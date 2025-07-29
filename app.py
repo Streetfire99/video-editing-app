@@ -1,821 +1,735 @@
 import streamlit as st
 import os
 import tempfile
+from datetime import datetime
+import pandas as pd
+from googleapiclient.errors import HttpError
 import json
-import time
-from pathlib import Path
-import subprocess
-import sys
 
-# Aggiungi il percorso del modulo Elaborazione
-sys.path.append('Elaborazione')
-
-# Importa le funzioni da prova.py
-from prova import (
-    process_video, 
-    get_openai_client, 
-    create_srt_file, 
-    add_subtitles_to_video,
-    format_timestamp,
-    split_text
-)
-
-# Importa le funzioni per YouTube
-from youtube_upload import upload_to_youtube, check_youtube_setup
-
-# Importa le funzioni per la gestione dei dati
+# Import dei moduli personalizzati
 from data_manager import (
-    load_apartments,
-    get_video_types,
-    get_prompt_for_video_type,
-    get_translation_prompt_for_video_type
+    load_apartments, get_video_types, save_progress, load_all_progress,
+    save_custom_apartment, load_custom_apartments,
+    save_custom_video_type, load_custom_video_types
 )
-
-# Importa le funzioni per Google Drive
-from drive_manager import upload_video_to_drive, add_tracking_entry
+from youtube_upload import upload_to_youtube, check_youtube_setup
+from youtube_account_manager import YouTubeAccountManager
+from Elaborazione.prova import process_video
 
 # Configurazione della pagina
 st.set_page_config(
-    page_title="Video Editor con Sottotitoli",
+    page_title="Video Editing App",
     page_icon="🎬",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-# Titolo dell'app
-st.title("🎬 Editing Video")
-st.markdown("Sistema di elaborazione video con sottotitoli automatici per appartamenti")
+# Inizializzazione del gestore account YouTube
+@st.cache_resource
+def get_account_manager():
+    return YouTubeAccountManager()
 
-# Carica gli appartamenti e le tipologie
-apartments = load_apartments()
-video_types = get_video_types()
+account_manager = get_account_manager()
 
-# Sezione di selezione
-st.header("📋 Configurazione Video")
+# Titolo principale
+st.title("🎬 Video Editing App")
+st.markdown("---")
 
-# Selezione appartamento
-selected_apartment = st.selectbox(
-    "🏠 Seleziona Appartamento",
-    options=[""] + apartments,
-    help="Scegli l'appartamento per cui stai creando il video"
-)
-
-# Selezione tipologia video
-selected_video_type = st.selectbox(
-    "🎥 Tipologia Video",
-    options=[""] + video_types,
-    help="Scegli la tipologia di video che stai creando"
-)
-
-# Campo per aggiungere nuove tipologie
-with st.expander("➕ Aggiungi Nuova Tipologia"):
-    new_video_type = st.text_input(
-        "Nuova tipologia",
-        placeholder="es: aspirapolvere",
-        help="Inserisci una nuova tipologia di video"
-    )
-    if st.button("Aggiungi"):
-        if new_video_type and new_video_type not in video_types:
-            video_types.append(new_video_type)
-            video_types.sort()
-            st.success(f"✅ Tipologia '{new_video_type}' aggiunta!")
-            st.rerun()
-
-# Verifica che siano state selezionate entrambe le opzioni
-if not selected_apartment or not selected_video_type:
-    st.warning("⚠️ Seleziona sia l'appartamento che la tipologia di video per procedere")
-    st.stop()
-
-# Mostra il titolo del video
-video_title = f"{selected_apartment} {selected_video_type}"
-st.success(f"📹 Titolo video: **{video_title}**")
-
-# Carica configurazioni
-def load_config():
-    """Carica la configurazione dalle variabili d'ambiente"""
-    config = {}
-    
-    # Carica OpenAI API Key dalle variabili d'ambiente
-    openai_api_key = os.getenv('OPENAI_API_KEY')
-    if openai_api_key:
-        config['openai_api_key'] = openai_api_key
-    else:
-        st.error("❌ OPENAI_API_KEY non trovata nelle variabili d'ambiente")
-    
-    return config
-
-config = load_config()
-
-# Campo per inserire la chiave API OpenAI
-openai_api_key = st.text_input(
-    "🔑 OpenAI API Key",
-    value=config.get('openai_api_key', ''),
-    type="password",
-    help="Inserisci la tua chiave API OpenAI"
-)
-
-
-
-# Sidebar per configurazioni
-with st.sidebar:
-    st.header("⚙️ Configurazioni")
-    
-    # Mostra stato API Key
-    if openai_api_key:
-        # Test della chiave API
-        try:
-            client = get_openai_client(openai_api_key)
-            client.models.list()
-            st.success("✅ OpenAI API Key valida!")
-        except Exception as e:
-            st.error(f"❌ Errore con OpenAI API Key: {str(e)}")
-            st.info("💡 Verifica che la chiave API sia corretta e abbia crediti sufficienti")
-    else:
-        st.warning("⚠️ Inserisci la tua OpenAI API Key per iniziare")
-    
-    # Pulsante per ricaricare configurazione
-    if st.button("🔄 Ricarica Configurazione"):
-        config = load_config()
-        openai_api_key = os.getenv('OPENAI_API_KEY') or config.get('openai_api_key', '')
-        st.success("✅ Configurazione ricaricata!")
-        st.rerun()
-    
-    st.markdown("---")
-    st.markdown("### 📋 Istruzioni")
-    st.markdown("""
-    1. **Inserisci la tua OpenAI API Key**
-    2. **Carica il video** nel box principale
-    3. **Clicca 'Elabora Video'**
-    4. **Modifica i sottotitoli** se necessario
-    5. **Scarica o carica su YouTube**
-    """)
-
-# Inizializza session state
-if 'processed_video' not in st.session_state:
-    st.session_state.processed_video = None
-if 'segments' not in st.session_state:
-    st.session_state.segments = []
-if 'current_video_path' not in st.session_state:
-    st.session_state.current_video_path = None
+# Sidebar per la navigazione
+st.sidebar.title("📋 Menu")
 
 # Sezione principale
-st.header("📤 Carica Video")
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "🎬 Elaborazione Video", 
+    "📊 Gestione Account YouTube", 
+    "🏠 Gestione Appartamenti",
+    "📝 Gestione Tipologie Video",
+    "📈 Progresso Video"
+])
 
-# Upload del video
-uploaded_video = st.file_uploader(
-    "Scegli un file video",
-    type=['mp4', 'avi', 'mov', 'mkv'],
-    help="Formati supportati: MP4, AVI, MOV, MKV"
-)
-
-if uploaded_video is not None:
-    # Salva il video temporaneamente
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tmp_file:
-        tmp_file.write(uploaded_video.getvalue())
-        video_path = tmp_file.name
-        st.session_state.current_video_path = video_path
+# Tab 1: Elaborazione Video
+with tab1:
+    st.header("🎬 Elaborazione Video")
     
-    # Mostra informazioni del video
-    st.success(f"✅ Video caricato: {uploaded_video.name}")
+    # Upload del video
+    uploaded_file = st.file_uploader(
+        "Carica il video da elaborare",
+        type=['mp4', 'avi', 'mov', 'mkv', 'wmv', 'flv', 'webm', 'm4v', '3gp', 'ogv', 'ts', 'mts', 'm2ts', 'vob', 'asf', 'rm', 'rmvb', 'divx', 'xvid', 'h264', 'h265', 'hevc', 'vp8', 'vp9', 'av1'],
+        help="Formati supportati: MP4, AVI, MOV, MKV, WMV, FLV, WebM, M4V, 3GP, OGV, TS, MTS, M2TS, VOB, ASF, RM, RMVB, DivX, XviD, H.264, H.265, HEVC, VP8, VP9, AV1"
+    )
     
-    # Pulsante per elaborare
-    if uploaded_video:
-        if st.button("🚀 Elabora Video", type="primary"):
-            if not openai_api_key:
-                st.error("❌ Inserisci la tua OpenAI API Key per elaborare il video")
-                st.stop()
-            
-            with st.spinner("Elaborazione in corso..."):
-                # Crea directory temporanea per i file
-                temp_dir = tempfile.mkdtemp()
-                
-                # Usa musica di default
-                default_music = "Elaborazione/audio.mp3"
-                if os.path.exists(default_music):
-                    music_path = default_music
-                else:
-                    st.error("❌ File musica di default non trovato: Elaborazione/audio.mp3")
-                    st.stop()
-                
-                # Elabora il video
-                result = process_video(
-                    input_video=video_path,
-                    music_file=music_path,
-                    openai_api_key=openai_api_key,
-                    output_dir=temp_dir,
-                    custom_prompt=None,
-                    video_type=selected_video_type
-                )
-                
-                if result["success"]:
-                    st.session_state.processed_video = result
-                    st.session_state.segments = result["segments"]
-                    
-                    # Controlla se il video ha voce
-                    has_voice = result.get("has_voice", True)
-                    if has_voice:
-                        st.success("✅ Video elaborato con successo!")
-                    else:
-                        st.success("✅ Video elaborato con successo! (Nessuna voce rilevata)")
-                    
-                    # Mostra il video elaborato
-                    with open(result["final_video"], "rb") as video_file:
-                        st.video(video_file.read())
-                else:
-                    st.error(f"❌ Errore durante l'elaborazione: {result['error']}")
-    elif not uploaded_video:
-        st.warning("⚠️ Carica un video per iniziare l'elaborazione")
-
-# Sezione per modificare i sottotitoli (solo dopo elaborazione e solo se c'è voce)
-if st.session_state.processed_video and st.session_state.segments and st.session_state.processed_video.get("has_voice", True):
-    st.markdown("---")
-    st.header("✏️ Modifica Sottotitoli")
-    
-    # Editor per i sottotitoli
-    edited_segments = []
-    
-    for i, segment in enumerate(st.session_state.segments):
-        st.markdown(f"**Sottotitolo {i+1}**")
+    if uploaded_file is not None:
+        # Mostra informazioni del video
+        file_details = {
+            "Nome file": uploaded_file.name,
+            "Tipo file": uploaded_file.type,
+            "Dimensione": f"{uploaded_file.size / (1024*1024):.2f} MB"
+        }
+        st.write("**Informazioni file:**")
+        for key, value in file_details.items():
+            st.write(f"- {key}: {value}")
         
-        col1, col2, col3, col4 = st.columns([1, 2, 2, 1])
+        # Selezione appartamento
+        st.subheader("🏠 Seleziona Appartamento")
+        apartments = load_apartments()
+        
+        # Mostra appartamenti esistenti
+        if apartments:
+            selected_apartment = st.selectbox(
+                "Scegli un appartamento esistente:",
+                [apt['name'] for apt in apartments],
+                index=None,
+                placeholder="Seleziona un appartamento..."
+            )
+        else:
+            selected_apartment = None
+        
+        # Opzione per aggiungere nuovo appartamento
+        with st.expander("➕ Aggiungi nuovo appartamento"):
+            new_apartment_name = st.text_input("Nome nuovo appartamento:")
+            new_apartment_address = st.text_input("Indirizzo:")
+            new_apartment_price = st.number_input("Prezzo (€):", min_value=0, value=0)
+            new_apartment_rooms = st.number_input("Numero stanze:", min_value=1, value=1)
+            new_apartment_bathrooms = st.number_input("Numero bagni:", min_value=1, value=1)
+            new_apartment_sqm = st.number_input("Metri quadrati:", min_value=1, value=50)
+            
+            if st.button("Salva nuovo appartamento"):
+                if new_apartment_name:
+                    new_apartment = {
+                        'name': new_apartment_name,
+                        'address': new_apartment_address,
+                        'price': new_apartment_price,
+                        'rooms': new_apartment_rooms,
+                        'bathrooms': new_apartment_bathrooms,
+                        'sqm': new_apartment_sqm
+                    }
+                    save_custom_apartment(new_apartment)
+                    st.success(f"Appartamento '{new_apartment_name}' salvato!")
+                    st.rerun()
+        
+        # Selezione tipologia video
+        st.subheader("📝 Seleziona Tipologia Video")
+        video_types = get_video_types()
+        
+        # Mostra tipologie esistenti
+        if video_types:
+            selected_video_type = st.selectbox(
+                "Scegli una tipologia esistente:",
+                [vt['name'] for vt in video_types],
+                index=None,
+                placeholder="Seleziona una tipologia..."
+            )
+        else:
+            selected_video_type = None
+        
+        # Opzione per aggiungere nuova tipologia
+        with st.expander("➕ Aggiungi nuova tipologia video"):
+            new_video_type_name = st.text_input("Nome nuova tipologia:")
+            new_video_type_description = st.text_area("Descrizione:")
+            
+            if st.button("Salva nuova tipologia"):
+                if new_video_type_name:
+                    new_video_type = {
+                        'name': new_video_type_name,
+                        'description': new_video_type_description
+                    }
+                    save_custom_video_type(new_video_type)
+                    st.success(f"Tipologia '{new_video_type_name}' salvata!")
+                    st.rerun()
+        
+        # Controlli per procedere
+        if selected_apartment and selected_video_type:
+            st.success("✅ Tutti i campi sono compilati correttamente!")
+            
+            # Pulsante per elaborare il video
+            if st.button("🎬 Elabora Video", type="primary"):
+                with st.spinner("Elaborazione in corso..."):
+                    try:
+                        # Salva il file temporaneamente
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=f".{uploaded_file.name.split('.')[-1]}") as tmp_file:
+                            tmp_file.write(uploaded_file.getvalue())
+                            temp_video_path = tmp_file.name
+                        
+                        # Trova l'appartamento e la tipologia selezionati
+                        apartment = next((apt for apt in apartments if apt['name'] == selected_apartment), None)
+                        video_type = next((vt for vt in video_types if vt['name'] == selected_video_type), None)
+                        
+                        if apartment and video_type:
+                            # Elabora il video
+                            output_path = process_video(
+                                temp_video_path, 
+                                apartment, 
+                                video_type
+                            )
+                            
+                            if output_path and os.path.exists(output_path):
+                                st.success("✅ Video elaborato con successo!")
+                                
+                                # Mostra il video elaborato
+                                with open(output_path, "rb") as video_file:
+                                    st.video(video_file.read())
+                                
+                                # Pulsante per caricare su YouTube
+                                if st.button("📤 Carica su YouTube", type="secondary"):
+                                    # Controlla setup YouTube
+                                    youtube_status = check_youtube_setup()
+                                    if youtube_status['status'] == 'ready':
+                                        try:
+                                            # Carica su YouTube
+                                            video_url = upload_to_youtube(output_path, apartment, video_type)
+                                            if video_url:
+                                                st.success(f"✅ Video caricato su YouTube!")
+                                                st.markdown(f"**Link:** {video_url}")
+                                                
+                                                # Salva il progresso
+                                                progress_data = {
+                                                    'timestamp': datetime.now().isoformat(),
+                                                    'apartment': apartment['name'],
+                                                    'video_type': video_type['name'],
+                                                    'youtube_url': video_url,
+                                                    'file_name': uploaded_file.name
+                                                }
+                                                save_progress(progress_data)
+                                                
+                                        except Exception as e:
+                                            st.error(f"❌ Errore durante il caricamento su YouTube: {str(e)}")
+                                    else:
+                                        st.error(f"❌ Setup YouTube non configurato: {youtube_status['message']}")
+                                
+                                # Pulsante per scaricare il video
+                                with open(output_path, "rb") as video_file:
+                                    st.download_button(
+                                        label="💾 Scarica Video Elaborato",
+                                        data=video_file.read(),
+                                        file_name=f"elaborato_{uploaded_file.name}",
+                                        mime="video/mp4"
+                                    )
+                                
+                                # Pulisci i file temporanei
+                                try:
+                                    os.unlink(temp_video_path)
+                                    os.unlink(output_path)
+                                except:
+                                    pass
+                            else:
+                                st.error("❌ Errore durante l'elaborazione del video")
+                        else:
+                            st.error("❌ Errore: appartamento o tipologia video non trovati")
+                            
+                    except Exception as e:
+                        st.error(f"❌ Errore durante l'elaborazione: {str(e)}")
+                        # Pulisci i file temporanei
+                        try:
+                            os.unlink(temp_video_path)
+                        except:
+                            pass
+        else:
+            if not selected_apartment:
+                st.warning("⚠️ Seleziona un appartamento")
+            if not selected_video_type:
+                st.warning("⚠️ Seleziona una tipologia video")
+
+# Tab 2: Gestione Account YouTube
+with tab2:
+    st.header("📊 Gestione Account YouTube")
+    
+    # Dashboard account
+    st.subheader("📈 Dashboard Account")
+    accounts_status = account_manager.get_accounts_status()
+    
+    if accounts_status:
+        # Crea una tabella con lo stato degli account
+        status_data = []
+        for account in accounts_status:
+            status_data.append({
+                "Account": account['name'],
+                "Stato": "🟢 Attivo" if account['active'] else "🔴 Inattivo",
+                "Upload Oggi": f"{account['daily_uploads']}/{account['max_daily_uploads']}",
+                "Disponibile": "✅ Sì" if account['available'] else "❌ No",
+                "Token": "✅ Salvato" if account['token_exists'] else "❌ Mancante",
+                "Ultimo Uso": account['last_used'] or "Mai"
+            })
+        
+        df = pd.DataFrame(status_data)
+        st.dataframe(df, use_container_width=True)
+    else:
+        st.info("📝 Nessun account configurato. Aggiungi il primo account qui sotto.")
+    
+    # Aggiunta nuovo account
+    st.subheader("➕ Aggiungi Nuovo Account")
+    with st.form("add_account"):
+        account_name = st.text_input("Nome Account:")
+        client_id = st.text_input("Client ID:")
+        client_secret = st.text_input("Client Secret:", type="password")
+        project_id = st.text_input("Project ID:", value="knowledge-base-457009")
+        max_uploads = st.number_input("Limite upload giornalieri:", min_value=1, max_value=10, value=5)
+        
+        if st.form_submit_button("Aggiungi Account"):
+            if account_name and client_id and client_secret:
+                account_manager.add_account(account_name, client_id, client_secret, project_id, max_uploads)
+                st.success(f"Account '{account_name}' aggiunto con successo!")
+                st.rerun()
+            else:
+                st.error("Compila tutti i campi obbligatori")
+    
+    # Gestione account esistenti
+    if accounts_status:
+        st.subheader("⚙️ Gestione Account")
+        
+        for account in accounts_status:
+            with st.expander(f"Account: {account['name']}"):
+                col1, col2, col3, col4 = st.columns(4)
+                
+                with col1:
+                    if st.button(f"{'🔴 Disattiva' if account['active'] else '🟢 Attiva'}", key=f"toggle_{account['name']}"):
+                        account_manager.toggle_account_status(account['name'])
+                        st.rerun()
+                
+                with col2:
+                    if st.button("🔄 Reset Contatore", key=f"reset_{account['name']}"):
+                        account_manager.reset_account_usage(account['name'])
+                        st.rerun()
+                
+                with col3:
+                    if st.button("🗑️ Rimuovi", key=f"remove_{account['name']}"):
+                        account_manager.remove_account(account['name'])
+                        st.rerun()
+                
+                with col4:
+                    if st.button("🔑 Gestisci Token", key=f"token_{account['name']}"):
+                        st.session_state['manage_token_account'] = account['name']
+                        st.rerun()
+                
+                # Modifica limite upload
+                new_limit = st.number_input(
+                    "Nuovo limite upload:", 
+                    min_value=1, 
+                    max_value=10, 
+                    value=account['max_daily_uploads'],
+                    key=f"limit_{account['name']}"
+                )
+                if st.button("💾 Aggiorna Limite", key=f"update_limit_{account['name']}"):
+                    account_manager.update_account_limit(account['name'], new_limit)
+                    st.rerun()
+    
+    # Debug section
+    with st.expander("🔧 Debug"):
+        col1, col2 = st.columns(2)
         
         with col1:
-            st.text("**Inizio**")
-            start_time = st.text_input(
-                "Inizio",
-                value=format_timestamp(segment['start']),
-                key=f"start_{i}",
-                label_visibility="collapsed"
+            if st.button("🔄 Ricarica Account Manager"):
+                account_manager = YouTubeAccountManager()
+                st.success("Account manager ricaricato!")
+            
+            if st.button("🔄 Reset Tutti i Contatori"):
+                account_manager.reset_all_accounts_usage()
+                st.success("Tutti i contatori resettati!")
+        
+        with col2:
+            if st.button("📊 Mostra Configurazione Completa"):
+                config = account_manager.export_accounts_config()
+                st.json(config)
+
+# Tab 3: Gestione Token
+with tab3:
+    st.header("🔑 Gestione Token YouTube")
+    
+    # Informazioni sui token
+    token_info = account_manager.get_token_info()
+    
+    if token_info:
+        st.subheader("📋 Stato Token")
+        
+        # Crea una tabella con lo stato dei token
+        token_data = []
+        for token in token_info:
+            token_data.append({
+                "Account": token['account_name'],
+                "Token Esiste": "✅ Sì" if token['token_exists'] else "❌ No",
+                "Token Valido": "✅ Sì" if token['token_valid'] else "❌ No",
+                "File Token": token['token_file']
+            })
+        
+        df = pd.DataFrame(token_data)
+        st.dataframe(df, use_container_width=True)
+        
+        # Gestione token per account specifico
+        st.subheader("⚙️ Gestione Token per Account")
+        
+        account_names = [token['account_name'] for token in token_info]
+        selected_account = st.selectbox(
+            "Seleziona account per gestire il token:",
+            account_names
+        )
+        
+        if selected_account:
+            selected_token = next(t for t in token_info if t['account_name'] == selected_account)
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                if st.button("🔑 Autentica Account", key=f"auth_{selected_account}"):
+                    try:
+                        account = next(acc for acc in account_manager.accounts if acc['name'] == selected_account)
+                        credentials = account_manager.get_credentials_for_account(account)
+                        if credentials:
+                            st.success(f"✅ Token salvato per '{selected_account}'!")
+                        else:
+                            st.error(f"❌ Errore nell'autenticazione per '{selected_account}'")
+                    except Exception as e:
+                        st.error(f"❌ Errore: {str(e)}")
+            
+            with col2:
+                if st.button("🗑️ Rimuovi Token", key=f"remove_token_{selected_account}"):
+                    token_file = f"token_{selected_account.lower().replace(' ', '_')}.pickle"
+                    if os.path.exists(token_file):
+                        try:
+                            os.remove(token_file)
+                            st.success(f"✅ Token rimosso per '{selected_account}'!")
+                        except Exception as e:
+                            st.error(f"❌ Errore nel rimuovere il token: {str(e)}")
+                    else:
+                        st.warning(f"⚠️ Nessun token trovato per '{selected_account}'")
+            
+            with col3:
+                if st.button("🔄 Verifica Token", key=f"verify_{selected_account}"):
+                    if selected_token['token_valid']:
+                        st.success(f"✅ Token valido per '{selected_account}'!")
+                    else:
+                        st.error(f"❌ Token non valido per '{selected_account}'")
+        
+        # Test upload
+        st.subheader("🧪 Test Upload")
+        test_account = st.selectbox(
+            "Seleziona account per test upload:",
+            [acc['name'] for acc in account_manager.accounts if acc.get('active', True)]
+        )
+        
+        if test_account and st.button("🎬 Test Upload"):
+            try:
+                account = next(acc for acc in account_manager.accounts if acc['name'] == test_account)
+                credentials = account_manager.get_credentials_for_account(account)
+                if credentials:
+                    st.success(f"✅ Credenziali valide per '{test_account}'!")
+                    st.info(f"Account disponibile per upload: {account.get('daily_uploads', 0)}/{account.get('max_daily_uploads', 5)}")
+                else:
+                    st.error(f"❌ Credenziali non valide per '{test_account}'")
+            except Exception as e:
+                st.error(f"❌ Errore nel test: {str(e)}")
+    
+    else:
+        st.info("📝 Nessun account configurato. Aggiungi account nella sezione 'Gestione Account YouTube'.")
+    
+    # Informazioni generali
+    st.subheader("ℹ️ Informazioni sui Token")
+    st.markdown("""
+    **Come funzionano i token:**
+    - I token vengono salvati automaticamente quando autentichi un account
+    - I token scadono dopo un certo periodo e devono essere rinnovati
+    - Ogni account ha il proprio file token separato
+    - I token sono necessari per caricare video su YouTube
+    
+    **Gestione automatica:**
+    - I contatori si resettano automaticamente ogni giorno
+    - Gli account vengono usati in rotazione quando raggiungono il limite
+    - I token vengono verificati automaticamente prima di ogni upload
+    """)
+
+# Tab 4: Gestione Appartamenti
+with tab4:
+    st.header("🏠 Gestione Appartamenti")
+    
+    # Mostra appartamenti esistenti
+    apartments = load_apartments()
+    all_progress = load_all_progress()
+    
+    if apartments:
+        st.subheader("📋 Appartamenti con Video Processati")
+        
+        # Raggruppa i progressi per appartamento
+        apartment_progress = {}
+        for progress in all_progress:
+            apartment_name = progress['apartment']
+            video_type = progress['video_type']
+            
+            if apartment_name not in apartment_progress:
+                apartment_progress[apartment_name] = {
+                    'video_types': set(),
+                    'youtube_urls': [],
+                    'drive_urls': [],
+                    'manuals_it': [],
+                    'manuals_en': []
+                }
+            
+            apartment_progress[apartment_name]['video_types'].add(video_type)
+            
+            # Aggiungi URL se disponibili
+            if progress.get('youtube_url'):
+                apartment_progress[apartment_name]['youtube_urls'].append(progress['youtube_url'])
+            
+            if progress.get('drive_url'):
+                apartment_progress[apartment_name]['drive_urls'].append(progress['drive_url'])
+            
+            if progress.get('manual_it'):
+                apartment_progress[apartment_name]['manuals_it'].append(progress['manual_it'])
+            
+            if progress.get('manual_en'):
+                apartment_progress[apartment_name]['manuals_en'].append(progress['manual_en'])
+        
+        # Mostra gli appartamenti con video processati
+        if apartment_progress:
+            for apartment_name, progress_data in apartment_progress.items():
+                # Trova i dettagli dell'appartamento
+                apartment_details = next((apt for apt in apartments if apt['name'] == apartment_name), None)
+                
+                # Crea una card per ogni appartamento
+                with st.container():
+                    col1, col2, col3 = st.columns([3, 2, 1])
+                    
+                    with col1:
+                        st.markdown(f"**🏠 {apartment_name}**")
+                        if apartment_details:
+                            st.markdown(f"📍 {apartment_details.get('address', 'Indirizzo non disponibile')}")
+                            st.markdown(f"💰 €{apartment_details.get('price', 0):,} | 🏠 {apartment_details.get('rooms', 0)} stanze | 📏 {apartment_details.get('sqm', 0)} m²")
+                    
+                    with col2:
+                        # Mostra le emoji delle tipologie processate
+                        video_type_emojis = {
+                            'asciugatrice': '👕',
+                            'caldaia': '🔥',
+                            'check-in': '🔑',
+                            'condizionamento': '❄️',
+                            'forno': '🍳',
+                            'frigorifero': '🧊',
+                            'lavastoviglie': '🍽️',
+                            'lavatrice': '👚',
+                            'microonde': '⚡',
+                            'piano_cottura': '🔥',
+                            'riscaldamento': '🌡️',
+                            'scaldabagno': '🚿',
+                            'spazzatura': '🗑️'
+                        }
+                        
+                        emoji_list = []
+                        for video_type in progress_data['video_types']:
+                            emoji = video_type_emojis.get(video_type.lower(), '📹')
+                            emoji_list.append(emoji)
+                        
+                        st.markdown(f"**Tipologie processate:** {' '.join(emoji_list)}")
+                        st.markdown(f"**Video totali:** {len(progress_data['video_types'])}")
+                    
+                    with col3:
+                        if st.button("⚙️ Gestisci", key=f"manage_{apartment_name}"):
+                            st.session_state['selected_apartment'] = apartment_name
+                            st.session_state['apartment_progress'] = progress_data
+                            st.rerun()
+                    
+                    st.divider()
+        
+        # Sezione dettagli appartamento
+        if 'selected_apartment' in st.session_state:
+            selected_apartment = st.session_state['selected_apartment']
+            apartment_progress = st.session_state['apartment_progress']
+            
+            st.subheader(f"📋 Dettagli: {selected_apartment}")
+            
+            # Tabs per i diversi tipi di contenuto
+            tab_details, tab_youtube, tab_drive, tab_manuals = st.tabs([
+                "📊 Statistiche", "📺 YouTube", "☁️ Drive", "📚 Manuali"
+            ])
+            
+            with tab_details:
+                st.markdown(f"**Appartamento:** {selected_apartment}")
+                st.markdown(f"**Tipologie processate:** {len(apartment_progress['video_types'])}")
+                st.markdown(f"**Video YouTube:** {len(apartment_progress['youtube_urls'])}")
+                st.markdown(f"**File Drive:** {len(apartment_progress['drive_urls'])}")
+                st.markdown(f"**Manualetti IT:** {len(apartment_progress['manuals_it'])}")
+                st.markdown(f"**Manualetti EN:** {len(apartment_progress['manuals_en'])}")
+                
+                # Lista delle tipologie
+                st.markdown("**Tipologie video:**")
+                for video_type in sorted(apartment_progress['video_types']):
+                    st.markdown(f"- {video_type}")
+            
+            with tab_youtube:
+                if apartment_progress['youtube_urls']:
+                    st.markdown("**Video caricati su YouTube:**")
+                    for i, url in enumerate(apartment_progress['youtube_urls'], 1):
+                        st.markdown(f"{i}. [{url}]({url})")
+                else:
+                    st.info("📝 Nessun video caricato su YouTube")
+            
+            with tab_drive:
+                if apartment_progress['drive_urls']:
+                    st.markdown("**File su Google Drive:**")
+                    for i, url in enumerate(apartment_progress['drive_urls'], 1):
+                        st.markdown(f"{i}. [{url}]({url})")
+                else:
+                    st.info("📝 Nessun file su Google Drive")
+            
+            with tab_manuals:
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.markdown("**📖 Manualetti IT:**")
+                    if apartment_progress['manuals_it']:
+                        for i, url in enumerate(apartment_progress['manuals_it'], 1):
+                            st.markdown(f"{i}. [{url}]({url})")
+                    else:
+                        st.info("📝 Nessun manualetto IT")
+                
+                with col2:
+                    st.markdown("**📖 Manualetti EN:**")
+                    if apartment_progress['manuals_en']:
+                        for i, url in enumerate(apartment_progress['manuals_en'], 1):
+                            st.markdown(f"{i}. [{url}]({url})")
+                    else:
+                        st.info("📝 Nessun manualetto EN")
+            
+            # Pulsante per tornare indietro
+            if st.button("← Torna alla lista"):
+                del st.session_state['selected_apartment']
+                del st.session_state['apartment_progress']
+                st.rerun()
+        
+        # Statistiche generali
+        st.subheader("📊 Statistiche Generali")
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("Appartamenti con video", len(apartment_progress))
+        
+        with col2:
+            total_videos = sum(len(data['video_types']) for data in apartment_progress.values())
+            st.metric("Video totali", total_videos)
+        
+        with col3:
+            total_youtube = sum(len(data['youtube_urls']) for data in apartment_progress.values())
+            st.metric("Upload YouTube", total_youtube)
+        
+        with col4:
+            total_manuals = sum(len(data['manuals_it']) + len(data['manuals_en']) for data in apartment_progress.values())
+            st.metric("Manualetti", total_manuals)
+    
+    else:
+        st.info("📝 Nessun appartamento configurato")
+    
+    # Sezione per aggiungere nuovi appartamenti
+    st.subheader("➕ Aggiungi Nuovo Appartamento")
+    with st.form("add_apartment_form"):
+        new_apartment_name = st.text_input("Nome appartamento:")
+        new_apartment_address = st.text_input("Indirizzo:")
+        new_apartment_price = st.number_input("Prezzo (€):", min_value=0, value=0)
+        new_apartment_rooms = st.number_input("Numero stanze:", min_value=1, value=1)
+        new_apartment_bathrooms = st.number_input("Numero bagni:", min_value=1, value=1)
+        new_apartment_sqm = st.number_input("Metri quadrati:", min_value=1, value=50)
+        
+        if st.form_submit_button("Salva appartamento"):
+            if new_apartment_name:
+                new_apartment = {
+                    'name': new_apartment_name,
+                    'address': new_apartment_address,
+                    'price': new_apartment_price,
+                    'rooms': new_apartment_rooms,
+                    'bathrooms': new_apartment_bathrooms,
+                    'sqm': new_apartment_sqm
+                }
+                save_custom_apartment(new_apartment)
+                st.success(f"Appartamento '{new_apartment_name}' salvato!")
+                st.rerun()
+            else:
+                st.error("Inserisci il nome dell'appartamento")
+
+# Tab 5: Gestione Tipologie Video
+with tab5:
+    st.header("📝 Gestione Tipologie Video")
+    
+    # Mostra tipologie esistenti
+    video_types = get_video_types()
+    if video_types:
+        st.subheader("📋 Tipologie Configurate")
+        
+        # Crea una tabella con le tipologie
+        vt_data = []
+        for vt in video_types:
+            vt_data.append({
+                "Nome": vt['name'],
+                "Descrizione": vt.get('description', 'N/A')
+            })
+        
+        df = pd.DataFrame(vt_data)
+        st.dataframe(df, use_container_width=True)
+    else:
+        st.info("📝 Nessuna tipologia configurata")
+    
+    # Statistiche
+    st.subheader("📊 Statistiche")
+    if video_types:
+        total_types = len(video_types)
+        st.metric("Totale Tipologie", total_types)
+
+# Tab 6: Progresso Video
+with tab6:
+    st.header("📈 Progresso Video")
+    
+    # Carica tutti i progressi
+    all_progress = load_all_progress()
+    
+    if all_progress:
+        st.subheader("📋 Video Completati")
+        
+        # Filtri
+        col1, col2 = st.columns(2)
+        with col1:
+            apartments_filter = st.multiselect(
+                "Filtra per appartamento:",
+                options=list(set(p['apartment'] for p in all_progress)),
+                default=[]
             )
         
         with col2:
-            st.text("**Italiano**")
-            edited_text_it = st.text_input(
-                "Testo italiano",
-                value=segment['text'],
-                key=f"text_it_{i}",
-                label_visibility="collapsed"
+            video_types_filter = st.multiselect(
+                "Filtra per tipologia:",
+                options=list(set(p['video_type'] for p in all_progress)),
+                default=[]
             )
         
-        with col3:
-            st.text("**Inglese**")
-            # Usa il testo inglese se disponibile, altrimenti traduci
-            english_text = segment.get('text_en', '')
-            if not english_text and segment['text']:
-                # Traduci automaticamente se non c'è già
-                try:
-                    client = get_openai_client(openai_api_key)
-                    translation = client.chat.completions.create(
-                        model="gpt-4",
-                        messages=[
-                            {"role": "system", "content": "Traduci in inglese questo testo per sottotitoli:"},
-                            {"role": "user", "content": segment['text']}
-                        ]
-                    )
-                    english_text = translation.choices[0].message.content.strip()
-                except:
-                    english_text = ""
+        # Filtra i progressi
+        filtered_progress = all_progress
+        if apartments_filter:
+            filtered_progress = [p for p in filtered_progress if p['apartment'] in apartments_filter]
+        if video_types_filter:
+            filtered_progress = [p for p in filtered_progress if p['video_type'] in video_types_filter]
+        
+        # Mostra i progressi filtrati
+        if filtered_progress:
+            # Crea una tabella con i progressi
+            progress_data = []
+            for p in filtered_progress:
+                progress_data.append({
+                    "Data": p['timestamp'][:10],
+                    "Ora": p['timestamp'][11:19],
+                    "Appartamento": p['apartment'],
+                    "Tipologia": p['video_type'],
+                    "File": p['file_name'],
+                    "YouTube": p.get('youtube_url', 'N/A')
+                })
             
-            edited_text_en = st.text_input(
-                "Testo inglese",
-                value=english_text,
-                key=f"text_en_{i}",
-                label_visibility="collapsed"
-            )
-        
-        with col4:
-            st.text("**Fine**")
-            end_time = st.text_input(
-                "Fine",
-                value=format_timestamp(segment['end']),
-                key=f"end_{i}",
-                label_visibility="collapsed"
-            )
-        
-        edited_segments.append({
-            'start': segment['start'],
-            'end': segment['end'],
-            'text': edited_text_it,
-            'text_en': edited_text_en
-        })
-        
-        st.markdown("---")
-    
-    # Pulsante per applicare le modifiche
-    if st.button("💾 Applica Modifiche"):
-        # Ricrea i file SRT con le modifiche
-        temp_dir = tempfile.mkdtemp()
-        
-        # File SRT italiani
-        subtitle_file_it = os.path.join(temp_dir, "subtitles_it_edited.srt")
-        create_srt_file(edited_segments, subtitle_file_it, "IT")
-        
-        # File SRT inglesi (usa i testi modificati)
-        subtitle_file_en = os.path.join(temp_dir, "subtitles_en_edited.srt")
-        
-        # Crea file SRT inglese con i testi modificati
-        with open(subtitle_file_en, "w", encoding="utf-8") as srt:
-            for i, segment in enumerate(edited_segments, start=1):
-                start = format_timestamp(segment['start'])
-                end = format_timestamp(segment['end'])
-                text = segment['text_en']
-                lines = split_text(text)
-                srt.write(f"{i}\n{start} --> {end}\n{lines[0]}\n{lines[1] if len(lines) > 1 else ''}\n\n")
-        
-        # Ricrea il video con i sottotitoli modificati
-        final_output = os.path.join(temp_dir, "final_output_edited.mp4")
-        
-        # Aggiungi sottotitoli al video originale
-        add_subtitles_to_video(
-            st.session_state.current_video_path,
-            subtitle_file_it,
-            subtitle_file_en,
-            final_output
-        )
-        
-        st.session_state.processed_video["final_video"] = final_output
-        st.session_state.edited_segments = edited_segments  # Salva per i transcript
-        st.success("✅ Video aggiornato con le modifiche!")
-
-# Sezione per personalizzare altezza sottotitoli
-if st.session_state.processed_video and st.session_state.processed_video.get("has_voice", True):
-    st.markdown("---")
-    st.header("📏 Personalizza Altezza Sottotitoli")
-    st.info("Modifica l'altezza dei sottotitoli italiani e inglesi. Valori più alti = sottotitoli più in basso.")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        italian_height = st.slider(
-            "🇮🇹 Altezza sottotitoli italiani",
-            min_value=20,
-            max_value=150,
-            value=75,
-            step=5,
-            help="Altezza dei sottotitoli italiani (default: 75)"
-        )
-    
-    with col2:
-        english_height = st.slider(
-            "🇬🇧 Altezza sottotitoli inglesi",
-            min_value=20,
-            max_value=150,
-            value=50,
-            step=5,
-            help="Altezza dei sottotitoli inglesi (default: 50)"
-        )
-    
-    if st.button("🔄 Rielabora con nuove altezze"):
-        with st.spinner("Rielaborazione con nuove altezze in corso..."):
-            # Crea directory temporanea per i file
-            temp_dir = tempfile.mkdtemp()
+            df = pd.DataFrame(progress_data)
+            st.dataframe(df, use_container_width=True)
             
-            # Usa musica di default
-            default_music = "Elaborazione/audio.mp3"
-            if os.path.exists(default_music):
-                music_path = default_music
-            else:
-                st.error("❌ File musica di default non trovato: Elaborazione/audio.mp3")
-                st.stop()
-            
-            # Elabora il video con le nuove altezze
-            result = process_video(
-                input_video=st.session_state.current_video_path,
-                music_file=music_path,
-                openai_api_key=openai_api_key,
-                output_dir=temp_dir,
-                video_type=selected_video_type,
-                italian_height=italian_height,
-                english_height=english_height
-            )
-            
-            if result["success"]:
-                st.session_state.processed_video = result
-                st.session_state.segments = result["segments"]
-                st.success(f"✅ Video rielaborato con nuove altezze! (IT: {italian_height}, EN: {english_height})")
-                
-                # Mostra il video elaborato
-                with open(result["final_video"], "rb") as video_file:
-                    st.video(video_file.read())
-            else:
-                st.error(f"❌ Errore durante la rielaborazione: {result['error']}")
-
-# Sezione per modifiche personalizzate
-if st.session_state.processed_video:
-    st.markdown("---")
-    st.header("✏️ Modifiche personalizzate al prompt")
-    
-    custom_prompt = st.text_area(
-        "Modifiche personalizzate al prompt",
-        placeholder="Es: Usa un tono più formale, Evita termini tecnici, etc.",
-        help="Inserisci modifiche specifiche al prompt di elaborazione. Queste verranno applicate solo per questa elaborazione."
-    )
-    
-    if custom_prompt and custom_prompt.strip():
-        with st.expander("📝 Anteprima modifiche al prompt"):
-            st.info("**Modifiche personalizzate:**")
-            st.text(custom_prompt)
-            st.info("Queste modifiche verranno aggiunte al prompt base di elaborazione.")
-    
-    if st.button("🔄 Rielabora con modifiche personalizzate"):
-        with st.spinner("Rielaborazione in corso..."):
-            # Crea directory temporanea per i file
-            temp_dir = tempfile.mkdtemp()
-            
-            # Usa musica di default
-            default_music = "Elaborazione/audio.mp3"
-            if os.path.exists(default_music):
-                music_path = default_music
-            else:
-                st.error("❌ File musica di default non trovato: Elaborazione/audio.mp3")
-                st.stop()
-            
-            # Elabora il video con le modifiche personalizzate
-            result = process_video(
-                input_video=st.session_state.current_video_path,
-                music_file=music_path,
-                openai_api_key=openai_api_key,
-                output_dir=temp_dir,
-                custom_prompt=custom_prompt.strip(),
-                video_type=selected_video_type
-            )
-            
-            if result["success"]:
-                st.session_state.processed_video = result
-                st.session_state.segments = result["segments"]
-                st.success("✅ Video rielaborato con successo!")
-                
-                # Mostra il video elaborato
-                with open(result["final_video"], "rb") as video_file:
-                    st.video(video_file.read())
-            else:
-                st.error(f"❌ Errore durante la rielaborazione: {result['error']}")
-
-# Sezione per download e upload
-if st.session_state.processed_video:
-    st.markdown("---")
-    st.header("📤 Esporta Video")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("💾 Download")
-        
-        # Pulsante per scaricare il video
-        with open(st.session_state.processed_video["final_video"], "rb") as video_file:
-            st.download_button(
-                label="📥 Scarica Video",
-                data=video_file.read(),
-                file_name="video_elaborato.mp4",
-                mime="video/mp4"
-            )
-    
-    with col2:
-        st.subheader("📺 Upload YouTube")
-        
-        # Verifica configurazione YouTube
-        youtube_status = check_youtube_setup()
-        
-        if not youtube_status["ready"]:
-            st.warning("⚠️ YouTube non configurato")
-            st.info("📋 Per caricare su YouTube, devi configurare le credenziali OAuth2")
-            with st.expander("🔧 Come configurare YouTube"):
-                st.markdown("""
-                ### Configurazione YouTube OAuth2 per Streamlit Cloud:
-                
-                **⚠️ IMPORTANTE:** Questa app funziona su Streamlit Cloud. Per l'autenticazione YouTube:
-                
-                1. **Vai su Google Cloud Console:**
-                   - Apri [Google Cloud Console](https://console.cloud.google.com/)
-                   - Crea un nuovo progetto o seleziona uno esistente
-                
-                2. **Abilita l'API YouTube:**
-                   - Vai su "APIs & Services" > "Library"
-                   - Cerca "YouTube Data API v3"
-                   - Clicca su "Enable"
-                
-                3. **Crea credenziali OAuth2:**
-                   - Vai su "APIs & Services" > "Credentials"
-                   - Clicca "Create Credentials" > "OAuth 2.0 Client IDs"
-                   - Tipo: "Web application" (⚠️ IMPORTANTE per Streamlit Cloud)
-                   - Nome: "YouTube Upload App"
-                   - **URI autorizzati:** Aggiungi l'URL della tua app Streamlit
-                   - Clicca "Create"
-                
-                4. **Scarica le credenziali:**
-                   - Clicca sul client OAuth2 appena creato
-                   - Clicca "Download JSON"
-                   - Rinomina il file in `client_secrets.json`
-                   - Carica il file nella sezione "Secrets" di Streamlit Cloud
-                
-                5. **Configura Streamlit Cloud:**
-                   - Vai su [Streamlit Cloud](https://share.streamlit.io/)
-                   - Seleziona il tuo repository
-                   - Vai su "Settings" > "Secrets"
-                   - Incolla il contenuto di `client_secrets.json`
-                
-                6. **Prima autenticazione:**
-                   - Alla prima richiesta di upload, si aprirà una finestra per l'autenticazione
-                   - Accedi con il tuo account YouTube
-                   - Autorizza l'applicazione
-                
-                **💡 Suggerimento:** Ogni account YouTube ha un limite di 5 video al giorno. Se raggiungi il limite, configura un altro account.
-                """)
+            # Statistiche
+            st.subheader("📊 Statistiche")
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Totale Video", len(filtered_progress))
+            with col2:
+                youtube_uploads = len([p for p in filtered_progress if p.get('youtube_url') != 'N/A'])
+                st.metric("Upload YouTube", youtube_uploads)
+            with col3:
+                unique_apartments = len(set(p['apartment'] for p in filtered_progress))
+                st.metric("Appartamenti Usati", unique_apartments)
         else:
-            # Form per l'upload su YouTube
-            with st.form("youtube_upload"):
-                video_title = st.text_input("Titolo del video", value=video_title)
-                privacy_status = st.selectbox(
-                    "Privacy",
-                    options=["unlisted", "private", "public"],
-                    help="unlisted = solo con link, private = solo tu, public = tutti"
-                )
-                
-                if st.form_submit_button("🚀 Carica su YouTube"):
-                    with st.spinner("Caricamento su YouTube..."):
-                        result = upload_to_youtube(
-                            video_path=st.session_state.processed_video["final_video"],
-                            title=video_title,
-                            privacy_status=privacy_status
-                        )
-                        
-                        if result["success"]:
-                            st.success("✅ Video caricato con successo!")
-                            st.markdown(f"**Link:** {result['video_url']}")
-                            
-                            # Salva il link YouTube nel session state
-                            st.session_state.youtube_link = result['video_url']
-                            
-                            # Mostra informazioni aggiuntive
-                            with st.expander("📊 Dettagli upload"):
-                                st.json({
-                                    "video_id": result['video_id'],
-                                    "title": video_title,
-                                    "privacy": privacy_status,
-                                    "url": result['video_url']
-                                })
-                        else:
-                            st.error(f"❌ Errore durante il caricamento: {result['error']}")
-                            
-                            # Gestione errori specifici per Streamlit Cloud
-                            error_msg = result['error'].lower()
-                            
-                            if "quota" in error_msg or "daily" in error_msg or "limit" in error_msg:
-                                st.warning("🚨 **Limite giornaliero raggiunto!**")
-                                st.info("""
-                                **Hai raggiunto il limite di 5 video al giorno per questo account YouTube.**
-                                
-                                **Soluzioni:**
-                                1. **Cambia account YouTube:** Elimina il file `token.pickle` e riavvia l'app
-                                2. **Aspetta domani:** Il limite si resetta ogni giorno
-                                3. **Usa un altro account:** Configura un nuovo `client_secrets.json`
-                                """)
-                                
-                                with st.expander("🔧 Come cambiare account YouTube"):
-                                    st.markdown("""
-                                    ### Per cambiare account YouTube:
-                                    
-                                    1. **Elimina il token esistente:**
-                                       - Trova il file `token.pickle` nella cartella del progetto
-                                       - Eliminalo (verrà ricreato automaticamente)
-                                    
-                                    2. **Configura nuovo account:**
-                                       - Scarica un nuovo `client_secrets.json` da Google Cloud Console
-                                       - Sostituisci quello esistente
-                                    
-                                    3. **Riautenticati:**
-                                       - Riavvia l'app
-                                       - Prova di nuovo l'upload
-                                       - Si aprirà il browser per l'autenticazione del nuovo account
-                                    """)
-                                    
-                            elif "authentication" in error_msg or "token" in error_msg:
-                                st.warning("🔐 **Problema di autenticazione!**")
-                                st.info("""
-                                **Il token di accesso è scaduto o non valido.**
-                                
-                                **Soluzione:**
-                                1. Elimina il file `token.pickle`
-                                2. Riavvia l'app
-                                3. Riprova l'upload (si aprirà il browser per riautenticarti)
-                                """)
-                                
-                            elif "forbidden" in error_msg or "access" in error_msg:
-                                st.warning("🚫 **Accesso negato!**")
-                                st.info("""
-                                **L'account YouTube non ha i permessi necessari.**
-                                
-                                **Possibili cause:**
-                                - L'account non ha abilitato l'upload di video
-                                - Le credenziali OAuth2 non sono configurate correttamente
-                                - L'API YouTube non è abilitata nel progetto Google Cloud
-                                
-                                **Soluzione:**
-                                1. Verifica la configurazione in Google Cloud Console
-                                2. Assicurati che l'API YouTube Data API v3 sia abilitata
-                                3. Ricrea le credenziali OAuth2 se necessario
-                                """)
-                                
-                            else:
-                                st.info("""
-                                **Errore generico durante l'upload.**
-                                
-                                **Possibili soluzioni:**
-                                1. Verifica la connessione internet
-                                2. Controlla che il video non sia troppo grande
-                                3. Prova a riavviare l'app
-                                4. Contatta il supporto se il problema persiste
-                                """)
-
-    # Sezione per l'upload su Google Drive
-    st.subheader("☁️ Carica su Google Drive")
-    
-    if st.button("🚀 Carica su Drive"):
-        with st.spinner("Caricamento su Google Drive..."):
-            drive_link = upload_video_to_drive(
-                video_path=st.session_state.processed_video["final_video"],
-                apartment_name=selected_apartment,
-                video_type=selected_video_type
-            )
-            
-            if drive_link:
-                st.success("✅ Video caricato su Drive con successo!")
-                st.markdown(f"**Link Drive:** {drive_link}")
-                
-                # Salva nel tracking
-                youtube_link = st.session_state.get('youtube_link', '')
-                italian_transcript_path = st.session_state.get('italian_transcript_path', '')
-                english_transcript_path = st.session_state.get('english_transcript_path', '')
-                add_tracking_entry(
-                    apartment=selected_apartment,
-                    video_type=selected_video_type,
-                    youtube_link=youtube_link,
-                    drive_link=drive_link,
-                    italian_transcript_path=italian_transcript_path,
-                    english_transcript_path=english_transcript_path
-                )
-                
-                st.session_state.drive_link = drive_link
-                st.success("✅ Entry aggiunta al tracking!")
-            else:
-                st.error("❌ Errore durante il caricamento su Drive")
-                st.info("""
-                **Possibili cause:**
-                1. Problemi di autenticazione Google Drive
-                2. Permessi insufficienti sulla cartella
-                3. Connessione internet instabile
-                
-                **Soluzione:**
-                1. Verifica le credenziali Google Drive
-                2. Controlla i permessi sulla cartella condivisa
-                3. Riprova più tardi
-                """)
-
-# Sezione per i transcript modificabili (solo se c'è voce)
-if st.session_state.processed_video and (st.session_state.segments or st.session_state.get('edited_segments')) and st.session_state.processed_video.get("has_voice", True):
-    st.markdown("---")
-    st.header("📝 Transcript per Manuali")
-    st.info("Modifica i testi per creare i manuali di istruzioni. I file verranno salvati nella cartella del video.")
-    
-    # Usa i segmenti modificati se disponibili, altrimenti quelli originali
-    segments_for_transcript = st.session_state.get('edited_segments', st.session_state.segments)
-    
-    # Prepara i testi per le box
-    italian_text = ""
-    english_text = ""
-    
-    for i, segment in enumerate(segments_for_transcript, 1):
-        italian_text += f"{i}. {segment['text']}\n"
-        
-        # Usa il testo inglese se disponibile, altrimenti traduci
-        english_segment = segment.get('text_en', '')
-        if not english_segment and segment['text']:
-            # Traduci automaticamente se non c'è già
-            try:
-                client = get_openai_client(openai_api_key)
-                translation = client.chat.completions.create(
-                    model="gpt-4",
-                    messages=[
-                        {"role": "system", "content": "Traduci in inglese questo testo per manuali:"},
-                        {"role": "user", "content": segment['text']}
-                    ]
-                )
-                english_segment = translation.choices[0].message.content.strip()
-            except:
-                english_segment = ""
-        
-        english_text += f"{i}. {english_segment}\n"
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("🇮🇹 Italiano")
-        edited_italian_text = st.text_area(
-            "Testo italiano",
-            value=italian_text,
-            key="transcript_italian_box",
-            height=400
-        )
-    
-    with col2:
-        st.subheader("🇬🇧 Inglese")
-        edited_english_text = st.text_area(
-            "Testo inglese",
-            value=english_text,
-            key="transcript_english_box",
-            height=400
-        )
-    
-    # Pulsanti per salvare i transcript
-    if st.button("💾 Salva Entrambi i Transcript"):
-        try:
-            # Salva su Google Drive
-            from drive_manager import get_drive_service, create_folder_if_not_exists
-            
-            service = get_drive_service()
-            
-            # ID della cartella principale
-            main_folder_id = "1w9P2oiRfFgsOOj82V7xOruhjnl-APCCi"
-            
-            # Crea la cartella dell'appartamento se non esiste
-            apartment_folder_id = create_folder_if_not_exists(service, main_folder_id, selected_apartment)
-            if not apartment_folder_id:
-                st.error("❌ Errore nella creazione della cartella appartamento")
-                st.stop()
-            
-            # Crea la cartella del tipo video se non esiste
-            video_type_folder_id = create_folder_if_not_exists(service, apartment_folder_id, selected_video_type)
-            if not video_type_folder_id:
-                st.error("❌ Errore nella creazione della cartella tipo video")
-                st.stop()
-            
-            # Carica il file su Drive
-            from googleapiclient.http import MediaIoBaseUpload
-            import io
-            
-            # Salva transcript italiano
-            filename_it = f"Istruzioni_{selected_video_type}_{selected_apartment}_ita.txt"
-            file_metadata_it = {
-                'name': filename_it,
-                'parents': [video_type_folder_id]
-            }
-            
-            file_content_it = io.BytesIO(edited_italian_text.encode('utf-8'))
-            media_it = MediaIoBaseUpload(file_content_it, mimetype='text/plain', resumable=True)
-            
-            file_it = service.files().create(
-                body=file_metadata_it,
-                media_body=media_it,
-                fields='id,webViewLink'
-            ).execute()
-            
-            # Rendi il file pubblico
-            service.permissions().create(
-                fileId=file_it['id'],
-                body={'type': 'anyone', 'role': 'reader'},
-                fields='id'
-            ).execute()
-            
-            file_link_it = file_it['webViewLink']
-            
-            # Salva transcript inglese
-            filename_en = f"Istruzioni_{selected_video_type}_{selected_apartment}_en.txt"
-            file_metadata_en = {
-                'name': filename_en,
-                'parents': [video_type_folder_id]
-            }
-            
-            file_content_en = io.BytesIO(edited_english_text.encode('utf-8'))
-            media_en = MediaIoBaseUpload(file_content_en, mimetype='text/plain', resumable=True)
-            
-            file_en = service.files().create(
-                body=file_metadata_en,
-                media_body=media_en,
-                fields='id,webViewLink'
-            ).execute()
-            
-            # Rendi il file pubblico
-            service.permissions().create(
-                fileId=file_en['id'],
-                body={'type': 'anyone', 'role': 'reader'},
-                fields='id'
-            ).execute()
-            
-            file_link_en = file_en['webViewLink']
-            
-            st.success(f"✅ Entrambi i transcript salvati su Drive!")
-            st.info(f"🇮🇹 Italiano: {filename_it}")
-            st.info(f"🇬🇧 Inglese: {filename_en}")
-            
-            st.session_state.italian_transcript_path = file_link_it
-            st.session_state.english_transcript_path = file_link_en
-            
-        except Exception as e:
-            st.error(f"❌ Errore nel salvataggio dei transcript: {str(e)}")
-
-# Footer
-st.markdown("---")
-st.markdown("""
-<div style='text-align: center; color: #666;'>
-    <p>🎬 Video Editor con Sottotitoli Automatici | Powered by OpenAI Whisper & GPT-4</p>
-</div>
-""", unsafe_allow_html=True) 
+            st.info("📝 Nessun video trovato con i filtri selezionati")
+    else:
+        st.info("📝 Nessun video completato ancora") 
