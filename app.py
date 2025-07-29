@@ -4,7 +4,6 @@ import tempfile
 import json
 import time
 from pathlib import Path
-import subprocess
 import sys
 
 # Aggiungi il percorso del modulo Elaborazione
@@ -118,8 +117,6 @@ openai_api_key = st.text_input(
     help="Inserisci la tua chiave API OpenAI"
 )
 
-
-
 # Sidebar per configurazioni
 with st.sidebar:
     st.header("⚙️ Configurazioni")
@@ -225,452 +222,272 @@ if uploaded_video is not None:
         if st.button("🚀 Elabora Video", type="primary"):
             if not openai_api_key:
                 st.error("❌ Inserisci la tua OpenAI API Key per elaborare il video")
-                st.stop()
-            
-            with st.spinner("Elaborazione in corso..."):
-                # Crea directory temporanea per i file
-                temp_dir = tempfile.mkdtemp()
-                
-                # Usa musica di default
-                default_music = "Elaborazione/audio.mp3"
-                if os.path.exists(default_music):
-                    music_path = default_music
-                else:
-                    st.error("❌ File musica di default non trovato: Elaborazione/audio.mp3")
-                    st.stop()
-                
-                # Elabora il video
-                result = process_video(
-                    input_video=video_path,
-                    music_file=music_path,
-                    openai_api_key=openai_api_key,
-                    output_dir=temp_dir,
-                    custom_prompt=None,
-                    video_type=selected_video_type
-                )
-                
-                if result["success"]:
-                    st.session_state.processed_video = result
-                    st.session_state.segments = result["segments"]
-                    
-                    # Controlla se il video ha voce
-                    has_voice = result.get("has_voice", True)
-                    if has_voice:
-                        st.success("✅ Video elaborato con successo!")
-                    else:
-                        st.success("✅ Video elaborato con successo! (Nessuna voce rilevata)")
-                    
-                    # Mostra il video elaborato
-                    with open(result["final_video"], "rb") as video_file:
-                        st.video(video_file.read())
-                else:
-                    st.error(f"❌ Errore durante l'elaborazione: {result['error']}")
-    elif not uploaded_video:
-        st.warning("⚠️ Carica un video per iniziare l'elaborazione")
+            else:
+                with st.spinner("Elaborazione in corso..."):
+                    try:
+                        # Crea cartella temporanea per l'output
+                        output_dir = tempfile.mkdtemp()
+                        
+                        # Elabora il video
+                        result = process_video(
+                            input_video=video_path,
+                            music_file=None,  # Nessuna musica di sottofondo
+                            openai_api_key=openai_api_key,
+                            output_dir=output_dir,
+                            video_type=selected_video_type
+                        )
+                        
+                        if result and result.get('success'):
+                            st.session_state.processed_video = result
+                            st.session_state.segments = result.get('segments', [])
+                            st.success("✅ Video elaborato con successo!")
+                            
+                            # Mostra il video elaborato
+                            if os.path.exists(result['final_video']):
+                                with open(result['final_video'], 'rb') as f:
+                                    st.video(f.read())
+                                
+                                # Pulsante per scaricare
+                                with open(result['final_video'], 'rb') as f:
+                                    st.download_button(
+                                        label="📥 Scarica Video",
+                                        data=f.read(),
+                                        file_name=f"{video_title}.mp4",
+                                        mime="video/mp4"
+                                    )
+                        else:
+                            st.error("❌ Errore durante l'elaborazione del video")
+                            
+                    except Exception as e:
+                        st.error(f"❌ Errore durante l'elaborazione: {str(e)}")
+                        st.info("💡 Verifica che il video sia in un formato supportato e che la chiave API sia valida")
 
-# Sezione per modificare i sottotitoli (solo dopo elaborazione e solo se c'è voce)
+# Sezione per modificare i sottotitoli (solo se il video è stato elaborato)
 if st.session_state.processed_video and st.session_state.segments and st.session_state.processed_video.get("has_voice", True):
     st.markdown("---")
     st.header("✏️ Modifica Sottotitoli")
+    st.info("Modifica i sottotitoli italiani e inglesi. I sottotitoli inglesi manterranno la stessa durata di quelli italiani.")
     
-    # Editor per i sottotitoli
-    edited_segments = []
+    # Crea le colonne per la tabella
+    col1, col2, col3, col4 = st.columns(4)
     
-    for i, segment in enumerate(st.session_state.segments):
-        st.markdown(f"**Sottotitolo {i+1}**")
-        
-        col1, col2, col3, col4 = st.columns([1, 2, 2, 1])
+    with col1:
+        st.write("**Inizio**")
+    with col2:
+        st.write("**Italiano**")
+    with col3:
+        st.write("**Inglese**")
+    with col4:
+        st.write("**Fine**")
+    
+    # Inizializza edited_segments se non esiste
+    if 'edited_segments' not in st.session_state:
+        st.session_state.edited_segments = st.session_state.segments.copy()
+    
+    # Mostra i sottotitoli modificabili
+    for i, segment in enumerate(st.session_state.edited_segments):
+        col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            st.text("**Inizio**")
-            start_time = st.text_input(
-                "Inizio",
-                value=format_timestamp(segment['start']),
-                key=f"start_{i}",
-                label_visibility="collapsed"
-            )
+            st.write(format_timestamp(segment['start']))
         
         with col2:
-            st.text("**Italiano**")
-            edited_text_it = st.text_input(
-                "Testo italiano",
+            # Campo per il testo italiano
+            edited_text = st.text_area(
+                f"IT {i+1}",
                 value=segment['text'],
-                key=f"text_it_{i}",
-                label_visibility="collapsed"
+                key=f"it_{i}",
+                height=60
             )
+            st.session_state.edited_segments[i]['text'] = edited_text
         
         with col3:
-            st.text("**Inglese**")
-            # Usa il testo inglese se disponibile, altrimenti traduci
-            english_text = segment.get('text_en', '')
-            if not english_text and segment['text']:
-                # Traduci automaticamente se non c'è già
-                try:
-                    client = get_openai_client(openai_api_key)
-                    translation = client.chat.completions.create(
-                        model="gpt-4",
-                        messages=[
-                            {"role": "system", "content": "Traduci in inglese questo testo per sottotitoli:"},
-                            {"role": "user", "content": segment['text']}
-                        ]
-                    )
-                    english_text = translation.choices[0].message.content.strip()
-                except:
-                    english_text = ""
-            
-            edited_text_en = st.text_input(
-                "Testo inglese",
-                value=english_text,
-                key=f"text_en_{i}",
-                label_visibility="collapsed"
+            # Campo per il testo inglese
+            edited_text_en = st.text_area(
+                f"EN {i+1}",
+                value=segment.get('text_en', ''),
+                key=f"en_{i}",
+                height=60
             )
+            st.session_state.edited_segments[i]['text_en'] = edited_text_en
         
         with col4:
-            st.text("**Fine**")
-            end_time = st.text_input(
-                "Fine",
-                value=format_timestamp(segment['end']),
-                key=f"end_{i}",
-                label_visibility="collapsed"
-            )
-        
-        edited_segments.append({
-            'start': segment['start'],
-            'end': segment['end'],
-            'text': edited_text_it,
-            'text_en': edited_text_en
-        })
-        
-        st.markdown("---")
+            st.write(format_timestamp(segment['end']))
     
-    # Pulsante per applicare le modifiche
-    if st.button("💾 Applica Modifiche"):
-        # Ricrea i file SRT con le modifiche
-        temp_dir = tempfile.mkdtemp()
-        
-        # File SRT italiani
-        subtitle_file_it = os.path.join(temp_dir, "subtitles_it_edited.srt")
-        create_srt_file(edited_segments, subtitle_file_it, "IT")
-        
-        # File SRT inglesi (usa i testi modificati)
-        subtitle_file_en = os.path.join(temp_dir, "subtitles_en_edited.srt")
-        
-        # Crea file SRT inglese con i testi modificati
-        with open(subtitle_file_en, "w", encoding="utf-8") as srt:
-            for i, segment in enumerate(edited_segments, start=1):
-                start = format_timestamp(segment['start'])
-                end = format_timestamp(segment['end'])
-                text = segment['text_en']
-                lines = split_text(text)
-                srt.write(f"{i}\n{start} --> {end}\n{lines[0]}\n{lines[1] if len(lines) > 1 else ''}\n\n")
-        
-        # Ricrea il video con i sottotitoli modificati
-        final_output = os.path.join(temp_dir, "final_output_edited.mp4")
-        
-        # Aggiungi sottotitoli al video originale
-        add_subtitles_to_video(
-            st.session_state.current_video_path,
-            subtitle_file_it,
-            subtitle_file_en,
-            final_output
-        )
-        
-        st.session_state.processed_video["final_video"] = final_output
-        st.session_state.edited_segments = edited_segments  # Salva per i transcript
-        st.success("✅ Video aggiornato con le modifiche!")
+    # Pulsante per rielaborare con i sottotitoli modificati
+    if st.button("🔄 Rielabora con Sottotitoli Modificati"):
+        with st.spinner("Rielaborazione in corso..."):
+            try:
+                # Crea i file SRT temporanei
+                temp_srt_it = tempfile.NamedTemporaryFile(mode='w', suffix='.srt', delete=False)
+                temp_srt_en = tempfile.NamedTemporaryFile(mode='w', suffix='.srt', delete=False)
+                
+                # Scrivi i sottotitoli modificati
+                create_srt_file(st.session_state.edited_segments, temp_srt_it.name, "IT")
+                create_srt_file(st.session_state.edited_segments, temp_srt_en.name, "EN")
+                
+                # Rielabora il video con i nuovi sottotitoli
+                result = add_subtitles_to_video(
+                    input_video=st.session_state.processed_video['video_with_music'],
+                    subtitle_file_it=temp_srt_it.name,
+                    subtitle_file_en=temp_srt_en.name,
+                    output_video=st.session_state.processed_video['final_video']
+                )
+                
+                # Pulisci i file temporanei
+                os.unlink(temp_srt_it.name)
+                os.unlink(temp_srt_en.name)
+                
+                st.success("✅ Video rielaborato con successo!")
+                st.rerun()
+                
+            except Exception as e:
+                st.error(f"❌ Errore durante la rielaborazione: {str(e)}")
 
-# Sezione per personalizzare altezza sottotitoli
-if st.session_state.processed_video and st.session_state.processed_video.get("has_voice", True):
+# Sezione per personalizzare l'altezza dei sottotitoli
+if st.session_state.processed_video and st.session_state.segments and st.session_state.processed_video.get("has_voice", True):
     st.markdown("---")
-    st.header("📏 Personalizza Altezza Sottotitoli")
-    st.info("Modifica l'altezza dei sottotitoli italiani e inglesi. Valori più alti = sottotitoli più in basso.")
+    st.header("🎛️ Personalizza Altezza Sottotitoli")
     
     col1, col2 = st.columns(2)
     
     with col1:
         italian_height = st.slider(
-            "🇮🇹 Altezza sottotitoli italiani",
-            min_value=20,
-            max_value=150,
+            "🇮🇹 Altezza Sottotitoli Italiani",
+            min_value=10,
+            max_value=90,
             value=75,
-            step=5,
-            help="Altezza dei sottotitoli italiani (default: 75)"
+            help="Posizione verticale dei sottotitoli italiani (10=alto, 90=basso)"
         )
     
     with col2:
         english_height = st.slider(
-            "🇬🇧 Altezza sottotitoli inglesi",
-            min_value=20,
-            max_value=150,
+            "🇬🇧 Altezza Sottotitoli Inglesi",
+            min_value=10,
+            max_value=90,
             value=50,
-            step=5,
-            help="Altezza dei sottotitoli inglesi (default: 50)"
+            help="Posizione verticale dei sottotitoli inglesi (10=alto, 90=basso)"
         )
     
-    if st.button("🔄 Rielabora con nuove altezze"):
-        with st.spinner("Rielaborazione con nuove altezze in corso..."):
-            # Crea directory temporanea per i file
-            temp_dir = tempfile.mkdtemp()
-            
-            # Usa musica di default
-            default_music = "Elaborazione/audio.mp3"
-            if os.path.exists(default_music):
-                music_path = default_music
-            else:
-                st.error("❌ File musica di default non trovato: Elaborazione/audio.mp3")
-                st.stop()
-            
-            # Elabora il video con le nuove altezze
-            result = process_video(
-                input_video=st.session_state.current_video_path,
-                music_file=music_path,
-                openai_api_key=openai_api_key,
-                output_dir=temp_dir,
-                video_type=selected_video_type,
-                italian_height=italian_height,
-                english_height=english_height
-            )
-            
-            if result["success"]:
-                st.session_state.processed_video = result
-                st.session_state.segments = result["segments"]
-                st.success(f"✅ Video rielaborato con nuove altezze! (IT: {italian_height}, EN: {english_height})")
+    if st.button("🔄 Rielabora con Nuove Altezze"):
+        with st.spinner("Rielaborazione con nuove altezze..."):
+            try:
+                # Crea i file SRT temporanei
+                temp_srt_it = tempfile.NamedTemporaryFile(mode='w', suffix='.srt', delete=False)
+                temp_srt_en = tempfile.NamedTemporaryFile(mode='w', suffix='.srt', delete=False)
                 
-                # Mostra il video elaborato
-                with open(result["final_video"], "rb") as video_file:
-                    st.video(video_file.read())
-            else:
-                st.error(f"❌ Errore durante la rielaborazione: {result['error']}")
-
-# Sezione per modifiche personalizzate
-if st.session_state.processed_video:
-    st.markdown("---")
-    st.header("✏️ Modifiche personalizzate al prompt")
-    
-    custom_prompt = st.text_area(
-        "Modifiche personalizzate al prompt",
-        placeholder="Es: Usa un tono più formale, Evita termini tecnici, etc.",
-        help="Inserisci modifiche specifiche al prompt di elaborazione. Queste verranno applicate solo per questa elaborazione."
-    )
-    
-    if custom_prompt and custom_prompt.strip():
-        with st.expander("📝 Anteprima modifiche al prompt"):
-            st.info("**Modifiche personalizzate:**")
-            st.text(custom_prompt)
-            st.info("Queste modifiche verranno aggiunte al prompt base di elaborazione.")
-    
-    if st.button("🔄 Rielabora con modifiche personalizzate"):
-        with st.spinner("Rielaborazione in corso..."):
-            # Crea directory temporanea per i file
-            temp_dir = tempfile.mkdtemp()
-            
-            # Usa musica di default
-            default_music = "Elaborazione/audio.mp3"
-            if os.path.exists(default_music):
-                music_path = default_music
-            else:
-                st.error("❌ File musica di default non trovato: Elaborazione/audio.mp3")
-                st.stop()
-            
-            # Elabora il video con le modifiche personalizzate
-            result = process_video(
-                input_video=st.session_state.current_video_path,
-                music_file=music_path,
-                openai_api_key=openai_api_key,
-                output_dir=temp_dir,
-                custom_prompt=custom_prompt.strip(),
-                video_type=selected_video_type
-            )
-            
-            if result["success"]:
-                st.session_state.processed_video = result
-                st.session_state.segments = result["segments"]
-                st.success("✅ Video rielaborato con successo!")
+                # Scrivi i sottotitoli
+                segments_to_use = st.session_state.get('edited_segments', st.session_state.segments)
+                create_srt_file(segments_to_use, temp_srt_it.name, "IT")
+                create_srt_file(segments_to_use, temp_srt_en.name, "EN")
                 
-                # Mostra il video elaborato
-                with open(result["final_video"], "rb") as video_file:
-                    st.video(video_file.read())
-            else:
-                st.error(f"❌ Errore durante la rielaborazione: {result['error']}")
-
-# Sezione per download e upload
-if st.session_state.processed_video:
-    st.markdown("---")
-    st.header("📤 Esporta Video")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("💾 Download")
-        
-        # Pulsante per scaricare il video
-        with open(st.session_state.processed_video["final_video"], "rb") as video_file:
-            st.download_button(
-                label="📥 Scarica Video",
-                data=video_file.read(),
-                file_name="video_elaborato.mp4",
-                mime="video/mp4"
-            )
-    
-    with col2:
-        st.subheader("📺 Upload YouTube")
-        
-        # Verifica configurazione YouTube
-        youtube_status = check_youtube_setup()
-        
-        if not youtube_status["ready"]:
-            st.warning("⚠️ YouTube non configurato")
-            st.info("📋 Per caricare su YouTube, devi configurare le credenziali OAuth2")
-            with st.expander("🔧 Come configurare YouTube"):
-                st.markdown("""
-                ### Configurazione YouTube OAuth2 per Streamlit Cloud:
-                
-                **⚠️ IMPORTANTE:** Questa app funziona su Streamlit Cloud. Per l'autenticazione YouTube:
-                
-                1. **Vai su Google Cloud Console:**
-                   - Apri [Google Cloud Console](https://console.cloud.google.com/)
-                   - Crea un nuovo progetto o seleziona uno esistente
-                
-                2. **Abilita l'API YouTube:**
-                   - Vai su "APIs & Services" > "Library"
-                   - Cerca "YouTube Data API v3"
-                   - Clicca su "Enable"
-                
-                3. **Crea credenziali OAuth2:**
-                   - Vai su "APIs & Services" > "Credentials"
-                   - Clicca "Create Credentials" > "OAuth 2.0 Client IDs"
-                   - Tipo: "Web application" (⚠️ IMPORTANTE per Streamlit Cloud)
-                   - Nome: "YouTube Upload App"
-                   - **URI autorizzati:** Aggiungi l'URL della tua app Streamlit
-                   - Clicca "Create"
-                
-                4. **Scarica le credenziali:**
-                   - Clicca sul client OAuth2 appena creato
-                   - Clicca "Download JSON"
-                   - Rinomina il file in `client_secrets.json`
-                   - Carica il file nella sezione "Secrets" di Streamlit Cloud
-                
-                5. **Configura Streamlit Cloud:**
-                   - Vai su [Streamlit Cloud](https://share.streamlit.io/)
-                   - Seleziona il tuo repository
-                   - Vai su "Settings" > "Secrets"
-                   - Incolla il contenuto di `client_secrets.json`
-                
-                6. **Prima autenticazione:**
-                   - Alla prima richiesta di upload, si aprirà una finestra per l'autenticazione
-                   - Accedi con il tuo account YouTube
-                   - Autorizza l'applicazione
-                
-                **💡 Suggerimento:** Ogni account YouTube ha un limite di 5 video al giorno. Se raggiungi il limite, configura un altro account.
-                """)
-        else:
-            # Mostra stato degli account YouTube
-            youtube_status = get_youtube_status()
-            if youtube_status:
-                st.info(f"📊 **Stato Account YouTube:** {youtube_status['active']} attivi, {youtube_status['expired']} scaduti, {youtube_status['unauthenticated']} non autenticati")
-                
-                # Mostra dettagli account
-                with st.expander("📋 Dettagli Account"):
-                    for account, status in youtube_status['accounts'].items():
-                        st.write(f"**{account}:** {status}")
-            
-            # Form per l'upload su YouTube
-            with st.form("youtube_upload"):
-                video_title = st.text_input("Titolo del video", value=video_title)
-                privacy_status = st.selectbox(
-                    "Privacy",
-                    options=["unlisted", "private", "public"],
-                    help="unlisted = solo con link, private = solo tu, public = tutti"
+                # Rielabora il video con le nuove altezze
+                result = add_subtitles_to_video(
+                    input_video=st.session_state.processed_video['video_with_music'],
+                    subtitle_file_it=temp_srt_it.name,
+                    subtitle_file_en=temp_srt_en.name,
+                    output_video=st.session_state.processed_video['final_video'],
+                    italian_height=italian_height,
+                    english_height=english_height
                 )
                 
-                if st.form_submit_button("🚀 Carica su YouTube"):
-                    with st.spinner("Caricamento su YouTube..."):
-                        try:
-                            result = upload_to_youtube(
-                                video_path=st.session_state.processed_video["final_video"],
-                                title=video_title,
-                                privacy_status=privacy_status
-                            )
-                            
-                            if result:
-                                st.success("✅ Video caricato con successo su YouTube!")
-                                st.markdown(f"**Link:** {result}")
-                                
-                                # Salva il link YouTube nel session state
-                                st.session_state.youtube_link = result
-                                
-                                # Mostra informazioni aggiuntive
-                                with st.expander("📊 Dettagli upload"):
-                                    st.json({
-                                        "title": video_title,
-                                        "privacy": privacy_status,
-                                        "url": result
-                                    })
-                            else:
-                                st.error("❌ Errore durante il caricamento su YouTube")
-                                
-                        except Exception as e:
-                            st.error(f"❌ Errore nell'upload YouTube: {e}")
-                            
-                            # Gestione errori specifici
-                            error_msg = str(e).lower()
-                            
-                            if "quota" in error_msg or "daily" in error_msg or "limit" in error_msg:
-                                st.warning("🚨 **Limite giornaliero raggiunto!**")
-                                st.info("""
-                                **Hai raggiunto il limite di 5 video al giorno per questo account YouTube.**
-                                
-                                **Soluzioni:**
-                                1. **Configura altri account:** Vai alla pagina "YouTube Accounts" per aggiungere più account
-                                2. **Aspetta domani:** Il limite si resetta ogni giorno
-                                3. **Rotazione automatica:** Il sistema proverà automaticamente il prossimo account disponibile
-                                """)
-                                
-                            elif "authentication" in error_msg or "token" in error_msg:
-                                st.warning("🔐 **Problema di autenticazione!**")
-                                st.info("""
-                                **Il token di accesso è scaduto o non valido.**
-                                
-                                **Soluzione:**
-                                1. Vai alla pagina "YouTube Accounts"
-                                2. Re-autentica gli account scaduti
-                                3. Riprova l'upload
-                                """)
-                                
-                            elif "forbidden" in error_msg or "access" in error_msg:
-                                st.warning("🚫 **Accesso negato!**")
-                                st.info("""
-                                **L'account YouTube non ha i permessi necessari.**
-                                
-                                **Possibili cause:**
-                                - L'account non ha abilitato l'upload di video
-                                - Le credenziali OAuth2 non sono configurate correttamente
-                                - L'API YouTube non è abilitata nel progetto Google Cloud
-                                
-                                **Soluzione:**
-                                1. Verifica la configurazione in Google Cloud Console
-                                2. Assicurati che l'API YouTube Data API v3 sia abilitata
-                                3. Ricrea le credenziali OAuth2 se necessario
-                                """)
-                                
-                            else:
-                                st.info("""
-                                **Errore generico durante l'upload.**
-                                
-                                **Possibili soluzioni:**
-                                1. Verifica la connessione internet
-                                2. Controlla che il video non sia troppo grande
-                                3. Prova a riavviare l'app
-                                4. Contatta il supporto se il problema persiste
-                                """)
+                # Pulisci i file temporanei
+                os.unlink(temp_srt_it.name)
+                os.unlink(temp_srt_en.name)
+                
+                st.success("✅ Video rielaborato con nuove altezze!")
+                st.rerun()
+                
+            except Exception as e:
+                st.error(f"❌ Errore durante la rielaborazione: {str(e)}")
 
-    # Sezione per l'upload su Google Drive
-    st.subheader("☁️ Carica su Google Drive")
-    
+# Sezione per modifiche personalizzate al prompt
+st.markdown("---")
+st.header("✏️ Modifiche personalizzate al prompt")
+
+custom_prompt = st.text_area(
+    "Prompt personalizzato per l'ottimizzazione dei sottotitoli",
+    placeholder="Inserisci un prompt personalizzato per l'ottimizzazione dei sottotitoli...",
+    help="Questo prompt verrà utilizzato per ottimizzare i sottotitoli del video"
+)
+
+# Sezione per l'upload su YouTube
+st.markdown("---")
+st.header("📺 Upload YouTube")
+
+# Controlla lo stato di YouTube
+youtube_status = check_youtube_setup()
+st.info(youtube_status[1])
+
+if st.session_state.processed_video and os.path.exists(st.session_state.processed_video['final_video']):
+    # Form per l'upload su YouTube
+    with st.form("youtube_upload_form"):
+        st.subheader("📤 Carica su YouTube")
+        
+        # Campi per l'upload
+        youtube_title = st.text_input(
+            "Titolo del video",
+            value=video_title,
+            help="Titolo del video su YouTube"
+        )
+        
+        privacy_status = st.selectbox(
+            "Privacy",
+            options=["unlisted", "private", "public"],
+            help="Impostazioni di privacy del video"
+        )
+        
+        # Pulsante per l'upload
+        if st.form_submit_button("🚀 Carica su YouTube"):
+            if youtube_status[0]:
+                with st.spinner("Caricamento su YouTube..."):
+                    try:
+                        youtube_link = upload_to_youtube(
+                            video_path=st.session_state.processed_video['final_video'],
+                            title=youtube_title,
+                            privacy_status=privacy_status
+                        )
+                        
+                        if youtube_link:
+                            st.success("✅ Video caricato su YouTube con successo!")
+                            st.markdown(f"**Link YouTube:** {youtube_link}")
+                            st.session_state.youtube_link = youtube_link
+                        else:
+                            st.error("❌ Errore durante l'upload su YouTube")
+                            
+                    except Exception as e:
+                        st.error(f"❌ Errore durante l'upload: {str(e)}")
+                        st.info("""
+                        **Possibili cause:**
+                        1. Problemi di autenticazione YouTube
+                        2. Quota giornaliera esaurita
+                        3. Problemi di connessione
+                        
+                        **Soluzione:**
+                        1. Verifica la configurazione in Google Cloud Console
+                        2. Assicurati che l'API YouTube Data API v3 sia abilitata
+                        3. Ricrea le credenziali OAuth2 se necessario
+                        """)
+                        
+            else:
+                st.info("""
+                **Errore generico durante l'upload.**
+                
+                **Possibili soluzioni:**
+                1. Verifica la connessione internet
+                2. Controlla che il video non sia troppo grande
+                3. Prova a riavviare l'app
+                4. Contatta il supporto se il problema persiste
+                """)
+
+# Sezione per l'upload su Google Drive
+st.subheader("☁️ Carica su Google Drive")
+
+if st.session_state.processed_video and os.path.exists(st.session_state.processed_video['final_video']):
     if st.button("🚀 Carica su Drive"):
         with st.spinner("Caricamento su Google Drive..."):
             drive_link = upload_video_to_drive(
-                video_path=st.session_state.processed_video["final_video"],
+                video_path=st.session_state.processed_video['final_video'],
                 apartment_name=selected_apartment,
                 video_type=selected_video_type
             )
