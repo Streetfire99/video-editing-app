@@ -13,51 +13,33 @@ SCOPES = [
 def get_google_sheets_client():
     """Inizializza il client Google Sheets"""
     try:
-        # Prova prima dalle variabili d'ambiente (per Streamlit Cloud)
         google_credentials = os.getenv('GOOGLE_SHEETS_CREDENTIALS')
         
-        st.write(f"🔍 Debug - GOOGLE_SHEETS_CREDENTIALS presente: {google_credentials is not None}")
         if google_credentials:
-            st.write(f"🔍 Debug - Lunghezza credenziali: {len(google_credentials)} caratteri")
-            st.write(f"🔍 Debug - Primi 50 caratteri: {google_credentials[:50]}...")
-        
-        if google_credentials:
-            st.write("🔍 Debug - Usando credenziali da variabile d'ambiente")
-            # Usa le credenziali dalle variabili d'ambiente
             import json
             try:
                 credentials_dict = json.loads(google_credentials)
-                st.write(f"🔍 Debug - JSON parsato correttamente, chiavi: {list(credentials_dict.keys())}")
                 credentials = Credentials.from_service_account_info(
                     credentials_dict,
                     scopes=SCOPES
                 )
-                st.write("🔍 Debug - Credenziali create con successo")
             except json.JSONDecodeError as e:
                 st.error(f"❌ Errore nel parsing JSON delle credenziali: {e}")
-                st.write(f"🔍 Debug - JSON problematico: {google_credentials[:200]}...")
                 return None
         else:
-            st.write("🔍 Debug - Usando credenziali da file locale")
-            # Fallback al file locale (per sviluppo)
             if os.path.exists('service_account_key.json'):
-                st.write("🔍 Debug - File service_account_key.json trovato")
                 credentials = Credentials.from_service_account_file(
                     'service_account_key.json',
                     scopes=SCOPES
                 )
             else:
-                st.write("🔍 Debug - File service_account_key.json NON trovato")
                 st.error("Nessuna credenziale Google trovata. Configura GOOGLE_SHEETS_CREDENTIALS nei secrets di Streamlit Cloud.")
                 return None
         
         client = gspread.authorize(credentials)
-        st.write("🔍 Debug - Client Google Sheets autorizzato con successo")
         return client
     except Exception as e:
         st.error(f"Errore nel caricamento delle credenziali Google: {e}")
-        st.write(f"🔍 Debug - Errore completo: {str(e)}")
-        st.write(f"🔍 Debug - Tipo di errore: {type(e).__name__}")
         return None
 
 def load_apartments():
