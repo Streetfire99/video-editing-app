@@ -66,34 +66,22 @@ def get_google_sheets_client():
                 print("🔧 DEBUG: After fix - \\n count:", private_key.count('\\n'))
                 print("🔧 DEBUG: After fix - \n count:", private_key.count('\n'))
             
-            # Se la chiave non funziona, ricostruiscila completamente
-            # Ricostruisci la chiave con il formato corretto
-            print("🔧 DEBUG: Rebuilding private_key with correct format")
+            # Sostituisci spazi con newline se necessario
+            if ' ' in private_key and '\n' not in private_key:
+                print("🔧 DEBUG: Fixing spaces in private_key")
+                private_key = private_key.replace(' ', '\n')
+                credentials_dict['private_key'] = private_key
+                print("🔧 DEBUG: After space fix - space count:", private_key.count(' '))
+                print("🔧 DEBUG: After space fix - \n count:", private_key.count('\n'))
             
-            # Estrai il contenuto base64 dalla chiave attuale
-            lines = private_key.split('\n')
-            base64_lines = []
-            in_key = False
-            
-            for line in lines:
-                if '-----BEGIN PRIVATE KEY-----' in line:
-                    in_key = True
-                    continue
-                elif '-----END PRIVATE KEY-----' in line:
-                    break
-                elif in_key and line.strip():
-                    base64_lines.append(line.strip())
-            
-            # Ricostruisci la chiave con il formato corretto
-            rebuilt_key = "-----BEGIN PRIVATE KEY-----\n"
-            # Aggiungi le righe base64
-            for line in base64_lines:
-                rebuilt_key += line + "\n"
-            rebuilt_key += "-----END PRIVATE KEY-----\n"
-            
-            print("🔧 DEBUG: Rebuilt private_key length:", len(rebuilt_key))
-            print("🔧 DEBUG: Rebuilt private_key starts with:", rebuilt_key[:50])
-            credentials_dict['private_key'] = rebuilt_key
+            # Assicurati che la chiave finisca correttamente
+            if not private_key.endswith('-----END PRIVATE KEY-----'):
+                print("🔧 DEBUG: Fixing private_key ending")
+                # Rimuovi spazi extra alla fine
+                private_key = private_key.rstrip()
+                if not private_key.endswith('-----END PRIVATE KEY-----'):
+                    private_key += '\n-----END PRIVATE KEY-----\n'
+                credentials_dict['private_key'] = private_key
             
             # Verifica che la chiave inizi e finisca correttamente
             if not private_key.startswith('-----BEGIN PRIVATE KEY-----'):
