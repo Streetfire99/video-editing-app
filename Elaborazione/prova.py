@@ -286,9 +286,9 @@ def add_background_music(input_video, music_file, output_video):
         print(f"❌ DEBUG: Unexpected error in add_background_music - {e}")
         raise e
 
-def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, output_video):
+def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, output_video, italian_height=75, english_height=50):
     """Aggiunge sottotitoli duali al video"""
-    print(f"🔧 DEBUG: add_subtitles_to_video - input: {input_video}, it_subs: {subtitle_file_it}, en_subs: {subtitle_file_en}, output: {output_video}")
+    print(f"🔧 DEBUG: add_subtitles_to_video - input: {input_video}, it_subs: {subtitle_file_it}, en_subs: {subtitle_file_en}, output: {output_video}, it_height: {italian_height}, en_height: {english_height}")
     # Usa solo ffmpeg-python
     try:
         print("🔧 DEBUG: Importing ffmpeg for subtitles...")
@@ -301,7 +301,7 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
         stream = ffmpeg.output(
             stream,
             "temp_with_it_subs.mp4",
-            vf=f"subtitles={subtitle_file_it}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV=75'"
+            vf=f"subtitles={subtitle_file_it}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height}'"
         )
         ffmpeg.run(stream, overwrite_output=True)
         print("🔧 DEBUG: Italian subtitles added successfully")
@@ -312,7 +312,7 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
         stream = ffmpeg.output(
             stream,
             output_video,
-            vf=f"subtitles={subtitle_file_en}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV=50'"
+            vf=f"subtitles={subtitle_file_en}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height}'"
         )
         ffmpeg.run(stream, overwrite_output=True)
         print("🔧 DEBUG: English subtitles added successfully")
@@ -329,9 +329,9 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
         print(f"❌ DEBUG: Unexpected error in add_subtitles_to_video - {e}")
         raise e
 
-def process_video(input_video, music_file, openai_api_key, output_dir=".", custom_prompt=None, video_type=None):
+def process_video(input_video, music_file, openai_api_key, output_dir=".", custom_prompt=None, video_type=None, italian_height=75, english_height=50):
     """Funzione principale per elaborare il video"""
-    print(f"🔧 DEBUG: process_video started - input: {input_video}, music: {music_file}, output_dir: {output_dir}")
+    print(f"🔧 DEBUG: process_video started - input: {input_video}, music: {music_file}, output_dir: {output_dir}, it_height: {italian_height}, en_height: {english_height}")
     
     # Configura file di output
     audio_file = os.path.join(output_dir, "audio.wav")
@@ -414,7 +414,7 @@ def process_video(input_video, music_file, openai_api_key, output_dir=".", custo
         # 8. Aggiungi sottotitoli duali (solo se c'è voce)
         if has_voice:
             print("🔧 DEBUG: Step 8 - Adding subtitles...")
-            add_subtitles_to_video(video_with_music, subtitle_file_it, subtitle_file_en, final_output)
+            add_subtitles_to_video(video_with_music, subtitle_file_it, subtitle_file_en, final_output, italian_height=italian_height, english_height=english_height)
             print("🔧 DEBUG: Step 8 completed - Subtitles added")
         else:
             print("🔧 DEBUG: Step 8 - No voice detected, copying video without subtitles...")

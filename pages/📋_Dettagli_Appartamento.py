@@ -68,9 +68,15 @@ else:
     
     # Funzione per creare link ai file locali
     def make_file_link(filepath):
-        if filepath and filepath != 'N/A' and os.path.exists(filepath):
-            filename = os.path.basename(filepath)
-            return f'<a href="file://{filepath}" target="_blank">📄 {filename}</a>'
+        if filepath and filepath != 'N/A':
+            # Se è un link Drive (contiene 'drive.google.com')
+            if 'drive.google.com' in filepath:
+                filename = filepath.split('/')[-1] if '/' in filepath else 'Transcript'
+                return f'<a href="{filepath}" target="_blank">📄 {filename}</a>'
+            # Se è un percorso locale (per compatibilità)
+            elif os.path.exists(filepath):
+                filename = os.path.basename(filepath)
+                return f'<a href="file://{filepath}" target="_blank">📄 {filename}</a>'
         return 'N/A'
     
     # Applica le funzioni ai link
