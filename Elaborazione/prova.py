@@ -358,26 +358,34 @@ def process_video(input_video, music_file, openai_api_key, output_dir=".", custo
         transcript = transcribe_audio(audio_file, client)
         print("🔧 DEBUG: Step 2 completed - Audio transcribed")
         
-        # 3. Ottimizza la trascrizione
-        print("🔧 DEBUG: Step 3 - Optimizing transcription...")
+        # Controlla se il video ha voce
         raw_transcription = "\n".join([seg.text for seg in transcript.segments])
-        optimized_texts = optimize_transcription(raw_transcription, client, custom_prompt, video_type)
-        print("🔧 DEBUG: Step 3 completed - Transcription optimized")
-        
-        # 4. Distribuisci i sottotitoli
-        print("🔧 DEBUG: Step 4 - Distributing subtitles...")
-        distributed_segments = distribute_subtitles(transcript.segments, optimized_texts)
-        print("🔧 DEBUG: Step 4 completed - Subtitles distributed")
-        
-        # 5. Crea file SRT italiani
-        print("🔧 DEBUG: Step 5 - Creating Italian SRT file...")
-        create_srt_file(distributed_segments, subtitle_file_it, "IT")
-        print("🔧 DEBUG: Step 5 completed - Italian SRT created")
-        
-        # 6. Traduci e crea file SRT inglesi
-        print("🔧 DEBUG: Step 6 - Creating English SRT file...")
-        translate_subtitles(distributed_segments, client, subtitle_file_en, video_type)
-        print("🔧 DEBUG: Step 6 completed - English SRT created")
+        if not raw_transcription.strip():
+            print("🔧 DEBUG: No voice detected in video, skipping subtitles")
+            # Video senza voce - salta i sottotitoli
+            distributed_segments = []
+            has_voice = False
+        else:
+            # 3. Ottimizza la trascrizione
+            print("🔧 DEBUG: Step 3 - Optimizing transcription...")
+            optimized_texts = optimize_transcription(raw_transcription, client, custom_prompt, video_type)
+            print("🔧 DEBUG: Step 3 completed - Transcription optimized")
+            
+            # 4. Distribuisci i sottotitoli
+            print("🔧 DEBUG: Step 4 - Distributing subtitles...")
+            distributed_segments = distribute_subtitles(transcript.segments, optimized_texts)
+            print("🔧 DEBUG: Step 4 completed - Subtitles distributed")
+            
+            # 5. Crea file SRT italiani
+            print("🔧 DEBUG: Step 5 - Creating Italian SRT file...")
+            create_srt_file(distributed_segments, subtitle_file_it, "IT")
+            print("🔧 DEBUG: Step 5 completed - Italian SRT created")
+            
+            # 6. Traduci e crea file SRT inglesi
+            print("🔧 DEBUG: Step 6 - Creating English SRT file...")
+            translate_subtitles(distributed_segments, client, subtitle_file_en, video_type)
+            print("🔧 DEBUG: Step 6 completed - English SRT created")
+            has_voice = True
         
         # 7. Aggiungi musica di sottofondo
         print("🔧 DEBUG: Step 7 - Adding background music...")
@@ -403,19 +411,33 @@ def process_video(input_video, music_file, openai_api_key, output_dir=".", custo
                 raise e
         print("🔧 DEBUG: Step 7 completed - Background music/video copy done")
         
-        # 8. Aggiungi sottotitoli duali
-        print("🔧 DEBUG: Step 8 - Adding subtitles...")
-        add_subtitles_to_video(video_with_music, subtitle_file_it, subtitle_file_en, final_output)
-        print("🔧 DEBUG: Step 8 completed - Subtitles added")
+        # 8. Aggiungi sottotitoli duali (solo se c'è voce)
+        if has_voice:
+            print("🔧 DEBUG: Step 8 - Adding subtitles...")
+            add_subtitles_to_video(video_with_music, subtitle_file_it, subtitle_file_en, final_output)
+            print("🔧 DEBUG: Step 8 completed - Subtitles added")
+        else:
+            print("🔧 DEBUG: Step 8 - No voice detected, copying video without subtitles...")
+            # Copia il video senza sottotitoli
+            try:
+                import ffmpeg
+                stream = ffmpeg.input(video_with_music)
+                stream = ffmpeg.output(stream, final_output, c='copy')
+                ffmpeg.run(stream, overwrite_output=True)
+                print("🔧 DEBUG: Video copied without subtitles")
+            except Exception as e:
+                print(f"❌ DEBUG: Error copying video without subtitles - {e}")
+                raise e
         
         print("🔧 DEBUG: All steps completed successfully!")
         return {
             "success": True,
             "final_video": final_output,
-            "subtitles_it": subtitle_file_it,
-            "subtitles_en": subtitle_file_en,
+            "subtitles_it": subtitle_file_it if has_voice else None,
+            "subtitles_en": subtitle_file_en if has_voice else None,
             "transcript": raw_transcription,
-            "segments": distributed_segments
+            "segments": distributed_segments,
+            "has_voice": has_voice
         }
         
     except Exception as e:

@@ -209,7 +209,13 @@ if uploaded_video is not None:
                 if result["success"]:
                     st.session_state.processed_video = result
                     st.session_state.segments = result["segments"]
-                    st.success("✅ Video elaborato con successo!")
+                    
+                    # Controlla se il video ha voce
+                    has_voice = result.get("has_voice", True)
+                    if has_voice:
+                        st.success("✅ Video elaborato con successo!")
+                    else:
+                        st.success("✅ Video elaborato con successo! (Nessuna voce rilevata)")
                     
                     # Mostra il video elaborato
                     with open(result["final_video"], "rb") as video_file:
@@ -219,8 +225,8 @@ if uploaded_video is not None:
     elif not uploaded_video:
         st.warning("⚠️ Carica un video per iniziare l'elaborazione")
 
-# Sezione per modificare i sottotitoli
-if st.session_state.segments:
+# Sezione per modificare i sottotitoli (solo dopo elaborazione e solo se c'è voce)
+if st.session_state.processed_video and st.session_state.segments and st.session_state.processed_video.get("has_voice", True):
     st.markdown("---")
     st.header("✏️ Modifica Sottotitoli")
     
@@ -601,8 +607,8 @@ if st.session_state.processed_video:
                 3. Riprova più tardi
                 """)
 
-# Sezione per i transcript modificabili
-if st.session_state.processed_video and (st.session_state.segments or st.session_state.get('edited_segments')):
+# Sezione per i transcript modificabili (solo se c'è voce)
+if st.session_state.processed_video and (st.session_state.segments or st.session_state.get('edited_segments')) and st.session_state.processed_video.get("has_voice", True):
     st.markdown("---")
     st.header("📝 Transcript per Manuali")
     st.info("Modifica i testi per creare i manuali di istruzioni. I file verranno salvati nella cartella del video.")
@@ -610,48 +616,51 @@ if st.session_state.processed_video and (st.session_state.segments or st.session
     # Usa i segmenti modificati se disponibili, altrimenti quelli originali
     segments_for_transcript = st.session_state.get('edited_segments', st.session_state.segments)
     
+    # Prepara i testi per le box
+    italian_text = ""
+    english_text = ""
+    
+    for i, segment in enumerate(segments_for_transcript, 1):
+        italian_text += f"{i}. {segment['text']}\n"
+        
+        # Usa il testo inglese se disponibile, altrimenti traduci
+        english_segment = segment.get('text_en', '')
+        if not english_segment and segment['text']:
+            # Traduci automaticamente se non c'è già
+            try:
+                client = get_openai_client(openai_api_key)
+                translation = client.chat.completions.create(
+                    model="gpt-4",
+                    messages=[
+                        {"role": "system", "content": "Traduci in inglese questo testo per manuali:"},
+                        {"role": "user", "content": segment['text']}
+                    ]
+                )
+                english_segment = translation.choices[0].message.content.strip()
+            except:
+                english_segment = ""
+        
+        english_text += f"{i}. {english_segment}\n"
+    
     col1, col2 = st.columns(2)
     
     with col1:
         st.subheader("🇮🇹 Italiano")
-        italian_texts = []
-        for i, segment in enumerate(segments_for_transcript, 1):
-            edited_text = st.text_area(
-                f"{i}.",
-                value=segment['text'],
-                key=f"transcript_it_{i}",
-                height=60
-            )
-            italian_texts.append(edited_text)
+        edited_italian_text = st.text_area(
+            "Testo italiano",
+            value=italian_text,
+            key="transcript_italian_box",
+            height=400
+        )
     
     with col2:
         st.subheader("🇬🇧 Inglese")
-        english_texts = []
-        for i, segment in enumerate(segments_for_transcript, 1):
-            # Usa il testo inglese se disponibile, altrimenti traduci
-            english_text = segment.get('text_en', '')
-            if not english_text and segment['text']:
-                # Traduci automaticamente se non c'è già
-                try:
-                    client = get_openai_client(openai_api_key)
-                    translation = client.chat.completions.create(
-                        model="gpt-4",
-                        messages=[
-                            {"role": "system", "content": "Traduci in inglese questo testo per manuali:"},
-                            {"role": "user", "content": segment['text']}
-                        ]
-                    )
-                    english_text = translation.choices[0].message.content.strip()
-                except:
-                    english_text = ""
-            
-            edited_text = st.text_area(
-                f"{i}.",
-                value=english_text,
-                key=f"transcript_en_{i}",
-                height=60
-            )
-            english_texts.append(edited_text)
+        edited_english_text = st.text_area(
+            "Testo inglese",
+            value=english_text,
+            key="transcript_english_box",
+            height=400
+        )
     
     # Pulsanti per salvare i transcript
     col1, col2 = st.columns(2)
@@ -660,13 +669,13 @@ if st.session_state.processed_video and (st.session_state.segments or st.session
         if st.button("💾 Salva Transcript Italiano"):
             # Crea il nome del file
             filename = f"Istruzioni_{selected_video_type}_{selected_apartment}_ita.txt"
-            filepath = os.path.join(os.path.dirname(st.session_state.processed_video["final_video"]), filename)
+            # Salva nella cartella del video elaborato
+            video_dir = os.path.dirname(st.session_state.processed_video["final_video"])
+            filepath = os.path.join(video_dir, filename)
             
             # Salva il file
             with open(filepath, "w", encoding="utf-8") as f:
-                for i, text in enumerate(italian_texts, 1):
-                    if text.strip():  # Salva solo se non vuoto
-                        f.write(f"{i}. {text.strip()}\n")
+                f.write(edited_italian_text)
             
             st.success(f"✅ Transcript italiano salvato: {filename}")
             st.session_state.italian_transcript_path = filepath
@@ -675,13 +684,13 @@ if st.session_state.processed_video and (st.session_state.segments or st.session
         if st.button("💾 Salva Transcript Inglese"):
             # Crea il nome del file
             filename = f"Istruzioni_{selected_video_type}_{selected_apartment}_en.txt"
-            filepath = os.path.join(os.path.dirname(st.session_state.processed_video["final_video"]), filename)
+            # Salva nella cartella del video elaborato
+            video_dir = os.path.dirname(st.session_state.processed_video["final_video"])
+            filepath = os.path.join(video_dir, filename)
             
             # Salva il file
             with open(filepath, "w", encoding="utf-8") as f:
-                for i, text in enumerate(english_texts, 1):
-                    if text.strip():  # Salva solo se non vuoto
-                        f.write(f"{i}. {text.strip()}\n")
+                f.write(edited_english_text)
             
             st.success(f"✅ Transcript inglese salvato: {filename}")
             st.session_state.english_transcript_path = filepath
