@@ -19,6 +19,25 @@ from google.auth.transport.requests import Request
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+def get_video_info(input_video):
+    """Ottiene informazioni sul video per gestire meglio i codec"""
+    try:
+        import ffmpeg
+        probe = ffmpeg.probe(input_video)
+        video_info = next(s for s in probe['streams'] if s['codec_type'] == 'video')
+        audio_info = next((s for s in probe['streams'] if s['codec_type'] == 'audio'), None)
+        
+        return {
+            'video_codec': video_info.get('codec_name', 'unknown'),
+            'audio_codec': audio_info.get('codec_name', 'unknown') if audio_info else None,
+            'width': int(video_info.get('width', 0)),
+            'height': int(video_info.get('height', 0)),
+            'duration': float(probe.get('format', {}).get('duration', 0))
+        }
+    except Exception as e:
+        print(f"🔧 DEBUG: Error getting video info - {e}")
+        return None
+
 # === CONFIG ===
 def get_openai_client(api_key):
     """Inizializza il client OpenAI"""
@@ -33,7 +52,7 @@ def extract_audio_from_video(input_video, audio_file):
         import ffmpeg
         print("🔧 DEBUG: ffmpeg imported successfully")
         stream = ffmpeg.input(input_video)
-        stream = ffmpeg.output(stream, audio_file, vn=None, ac=1, ar=16000)
+        stream = ffmpeg.output(stream, audio_file, vn=None, ac=1, ar=16000, acodec='pcm_s16le')
         print("🔧 DEBUG: Running ffmpeg.run...")
         ffmpeg.run(stream, overwrite_output=True)
         print("🔧 DEBUG: ffmpeg.run completed successfully")
@@ -274,7 +293,11 @@ def add_background_music(input_video, music_file, output_video):
             input_stream['v'],
             ffmpeg.filter(music_stream['a'], 'volume', 0.7),
             output_video,
-            shortest=None
+            shortest=None,
+            vcodec='libx264',
+            acodec='aac',
+            preset='medium',
+            crf=23
         )
         print("🔧 DEBUG: Running ffmpeg.run for background music...")
         ffmpeg.run(stream, overwrite_output=True)
@@ -295,13 +318,21 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
         import ffmpeg
         print("🔧 DEBUG: ffmpeg imported successfully for subtitles")
         
+        # Ottieni informazioni sul video per gestire meglio i codec
+        video_info = get_video_info(input_video)
+        print(f"🔧 DEBUG: Video codec detected: {video_info['video_codec'] if video_info else 'unknown'}")
+        
         # Sottotitoli italiani
         print("🔧 DEBUG: Adding Italian subtitles...")
         stream = ffmpeg.input(input_video)
         stream = ffmpeg.output(
             stream,
             "temp_with_it_subs.mp4",
-            vf=f"subtitles={subtitle_file_it}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height}'"
+            vf=f"subtitles={subtitle_file_it}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height}'",
+            vcodec='libx264',
+            acodec='aac',
+            preset='medium',
+            crf=23
         )
         ffmpeg.run(stream, overwrite_output=True)
         print("🔧 DEBUG: Italian subtitles added successfully")
@@ -312,7 +343,11 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
         stream = ffmpeg.output(
             stream,
             output_video,
-            vf=f"subtitles={subtitle_file_en}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height}'"
+            vf=f"subtitles={subtitle_file_en}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height}'",
+            vcodec='libx264',
+            acodec='aac',
+            preset='medium',
+            crf=23
         )
         ffmpeg.run(stream, overwrite_output=True)
         print("🔧 DEBUG: English subtitles added successfully")
@@ -327,7 +362,35 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
         raise Exception("ffmpeg-python non è disponibile. Installa ffmpeg-python.")
     except Exception as e:
         print(f"❌ DEBUG: Unexpected error in add_subtitles_to_video - {e}")
-        raise e
+        # Fallback per video problematici
+        print("🔧 DEBUG: Trying fallback method for problematic video...")
+        try:
+            import ffmpeg
+            # Metodo alternativo: prima converti il video, poi aggiungi i sottotitoli
+            stream = ffmpeg.input(input_video)
+            stream = ffmpeg.output(stream, "temp_converted.mp4", vcodec='libx264', acodec='aac', preset='fast', crf=25)
+            ffmpeg.run(stream, overwrite_output=True)
+            
+            # Ora aggiungi i sottotitoli al video convertito
+            stream = ffmpeg.input("temp_converted.mp4")
+            stream = ffmpeg.output(
+                stream,
+                output_video,
+                vf=f"subtitles={subtitle_file_it}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height}',subtitles={subtitle_file_en}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height}'",
+                vcodec='libx264',
+                acodec='aac',
+                preset='medium',
+                crf=23
+            )
+            ffmpeg.run(stream, overwrite_output=True)
+            
+            # Rimuovi i file temporanei
+            if os.path.exists("temp_converted.mp4"):
+                os.remove("temp_converted.mp4")
+            print("🔧 DEBUG: Fallback method completed successfully")
+        except Exception as fallback_error:
+            print(f"❌ DEBUG: Fallback method also failed - {fallback_error}")
+            raise e  # Rilancia l'errore originale
 
 def process_video(input_video, music_file, openai_api_key, output_dir=".", custom_prompt=None, video_type=None, italian_height=75, english_height=50):
     """Funzione principale per elaborare il video"""
@@ -341,6 +404,11 @@ def process_video(input_video, music_file, openai_api_key, output_dir=".", custo
     final_output = os.path.join(output_dir, "final_output.mp4")
     
     print(f"🔧 DEBUG: Output files - audio: {audio_file}, it_subs: {subtitle_file_it}, en_subs: {subtitle_file_en}, video_music: {video_with_music}, final: {final_output}")
+    
+    # Ottieni informazioni sul video
+    video_info = get_video_info(input_video)
+    if video_info:
+        print(f"🔧 DEBUG: Video info - codec: {video_info['video_codec']}, audio: {video_info['audio_codec']}, size: {video_info['width']}x{video_info['height']}")
     
     # Inizializza client OpenAI
     client = get_openai_client(openai_api_key)
@@ -399,7 +467,7 @@ def process_video(input_video, music_file, openai_api_key, output_dir=".", custo
                 import ffmpeg
                 print("🔧 DEBUG: ffmpeg imported successfully for video copy")
                 stream = ffmpeg.input(input_video)
-                stream = ffmpeg.output(stream, video_with_music, c='copy')
+                stream = ffmpeg.output(stream, video_with_music, vcodec='libx264', acodec='aac', preset='medium', crf=23)
                 print("🔧 DEBUG: Running ffmpeg.run for video copy...")
                 ffmpeg.run(stream, overwrite_output=True)
                 print("🔧 DEBUG: Video copy completed successfully")
@@ -422,7 +490,7 @@ def process_video(input_video, music_file, openai_api_key, output_dir=".", custo
             try:
                 import ffmpeg
                 stream = ffmpeg.input(video_with_music)
-                stream = ffmpeg.output(stream, final_output, c='copy')
+                stream = ffmpeg.output(stream, final_output, vcodec='libx264', acodec='aac', preset='medium', crf=23)
                 ffmpeg.run(stream, overwrite_output=True)
                 print("🔧 DEBUG: Video copied without subtitles")
             except Exception as e:

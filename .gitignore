@@ -1,12 +1,20 @@
-# Byte-compiled / optimized / DLL files
+# File sensibili
+config.json
+client_secrets.json
+token.pickle
+service_account_key.json
+
+# File temporanei
+*.tmp
+*.temp
+temp_*
+tmp_*
+
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
-
-# C extensions
 *.so
-
-# Distribution / packaging
 .Python
 build/
 develop-eggs/
@@ -20,280 +28,37 @@ parts/
 sdist/
 var/
 wheels/
-pip-wheel-metadata/
-share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
 MANIFEST
 
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
-*.manifest
-*.spec
-
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-
-# Translations
-*.mo
-*.pot
-
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-
-# Flask stuff:
-instance/
-.webassets-cache
-
-# Scrapy stuff:
-.scrapy
-
-# Sphinx documentation
-docs/_build/
-
-# PyBuilder
-target/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# IPython
-profile_default/
-ipython_config.py
-
-# pyenv
-.python-version
-
-# pipenv
-#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
-#   However, in case of collaboration, if having platform-specific dependencies or dependencies
-#   having no cross-platform support, pipenv may install dependencies that don't work, or not
-#   install all needed dependencies.
-#Pipfile.lock
-
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow
-__pypackages__/
-
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
-
-# SageMath parsed files
-*.sage.py
-
-# Environments
-.env
-.venv
-env/
+# Virtual environment
 venv/
+env/
 ENV/
-env.bak/
-venv.bak/
-
-# Spyder project settings
-.spyderproject
-.spyproject
-
-# Rope project settings
-.ropeproject
-
-# mkdocs documentation
-/site
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Pyre type checker
-.pyre/
-
-# Credenziali e file sensibili
-*.pickle
-token_*.pickle
-client_secret*.json
-service_account_key.json
-youtube_accounts.json
-user_progress.json
-custom_apartments.json
-custom_video_types.json
-config.json
-
-# File temporanei
-*.tmp
-*.temp
-temp/
-tmp/
-
-# File di output video
-*.mp4
-*.avi
-*.mov
-*.wmv
-*.flv
-*.webm
-*.mkv
-*.m4v
-*.3gp
-*.ogv
-*.ts
-*.mts
-*.m2ts
-*.vob
-*.asf
-*.rm
-*.rmvb
-*.divx
-*.xvid
-*.h264
-*.h265
-*.hevc
-*.vp8
-*.vp9
-*.av1
-
-# File audio
-*.mp3
-*.wav
-*.aac
-*.ogg
-*.flac
-*.wma
-*.m4a
-*.opus
-*.amr
-*.ac3
-*.dts
-*.pcm
-*.raw
-*.au
-*.snd
-*.ra
-*.rm
-*.ram
-*.mid
-*.midi
-*.kar
-*.mod
-*.s3m
-*.xm
-*.it
-*.mtm
-*.umx
-*.669
-*.far
-*.amf
-*.gdm
-*.imf
-*.m15
-*.med
-*.okt
-*.stm
-*.ult
-*.uni
-*.wow
-*.gbs
-*.gbr
-*.hes
-*.kss
-*.nsf
-*.nsfe
-*.sap
-*.spc
-*.vgm
-*.vgz
-*.ay
-*.gym
-*.hes
-*.kss
-*.nsf
-*.nsfe
-*.sap
-*.spc
-*.vgm
-*.vgz
-
-# File di sottotitoli
-*.srt
-*.sub
-*.ssa
-*.ass
-*.vtt
-*.ttml
-*.dfxp
-*.scc
-*.stl
-*.smi
-*.rt
-*.txt
-
-# File di log
-*.log
-logs/
-log/
-
-# File di configurazione locale
-config.local.json
-.env.local
-.env.production
-.env.staging
-
-# File di cache
-.cache/
-cache/
-*.cache
-
-# File di backup
-*.bak
-*.backup
-*.old
-*.orig
-
-# File di sistema
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
-*~
+
+# OS
+.DS_Store
+Thumbs.db
 
 # Streamlit
-.streamlit/
+.streamlit/secrets.toml
 
-# Test files
-test_*.py
-*_test.py
-test/
-tests/
+# Logs
+*.log
 
-# Documentation
-*.md
-!README.md 
+# Tracking CSV
+apartments_tracking.csv
+
+# Video files (opzionale, se vuoi escluderli)
+*.mp4
+*.avi
+*.mov
+*.mkv 
