@@ -269,22 +269,33 @@ def get_youtube_service(account=None):
 
 def upload_video_with_rotation(video_path, title, privacy_status="unlisted", description="", tags=""):
     """Carica un video su YouTube usando la rotazione automatica degli account"""
+    print("🔧 DEBUG: Starting upload_video_with_rotation")
+    print(f"🔧 DEBUG: Video path: {video_path}")
+    print(f"🔧 DEBUG: Title: {title}")
+    print(f"🔧 DEBUG: Privacy status: {privacy_status}")
+    
     max_attempts = 5  # Numero massimo di tentativi per account
     
     for account in YOUTUBE_ACCOUNTS:
         if not is_account_authenticated(account):
+            print(f"❌ DEBUG: Account {account} not authenticated, skipping")
             continue
             
-        print(f"🔧 Tentativo con account: {account}")
+        print(f"🔧 DEBUG: Trying account: {account}")
         
         for attempt in range(max_attempts):
             try:
+                print(f"🔧 DEBUG: Attempt {attempt + 1} for account {account}")
                 youtube_service, used_account = get_youtube_service(account)
+                print(f"🔧 DEBUG: Got YouTube service for {used_account}")
                 
                 # Prepara il video per l'upload
+                print("🔧 DEBUG: Preparing video for upload")
                 media = MediaFileUpload(video_path, resumable=True)
+                print("🔧 DEBUG: MediaFileUpload created")
                 
                 # Crea la richiesta di upload
+                print("🔧 DEBUG: Creating upload request")
                 request = youtube_service.videos().insert(
                     part='snippet,status',
                     body={
@@ -299,11 +310,16 @@ def upload_video_with_rotation(video_path, title, privacy_status="unlisted", des
                     },
                     media_body=media
                 )
+                print("🔧 DEBUG: Upload request created")
                 
                 # Esegui l'upload
+                print("🔧 DEBUG: Starting upload execution")
                 response = request.execute()
+                print("🔧 DEBUG: Upload executed successfully")
                 video_id = response['id']
                 video_url = f"https://www.youtube.com/watch?v={video_id}"
+                print(f"🔧 DEBUG: Video ID: {video_id}")
+                print(f"🔧 DEBUG: Video URL: {video_url}")
                 
                 return {
                     "success": True,
@@ -315,20 +331,31 @@ def upload_video_with_rotation(video_path, title, privacy_status="unlisted", des
             except HttpError as e:
                 error_details = e.error_details[0] if e.error_details else {}
                 reason = error_details.get('reason', 'unknown')
+                print(f"❌ DEBUG: HttpError for {account}, attempt {attempt + 1}: {e}")
+                print(f"❌ DEBUG: Error reason: {reason}")
                 
                 if reason in ['quotaExceeded', 'dailyLimitExceeded']:
-                    print(f"❌ Quota esaurita per {account}, prova prossimo account")
+                    print(f"❌ DEBUG: Quota exceeded for {account}, trying next account")
                     break  # Passa al prossimo account
                 else:
-                    print(f"❌ Tentativo {attempt + 1} fallito per {account}: {e}")
+                    print(f"❌ DEBUG: Other error for {account}, attempt {attempt + 1}")
                     if attempt == max_attempts - 1:
+                        print(f"❌ DEBUG: All attempts failed for {account}, trying next account")
                         continue  # Passa al prossimo account
                     else:
+                        print(f"🔧 DEBUG: Retrying {account}")
                         continue  # Riprova con lo stesso account
+            except Exception as e:
+                print(f"❌ DEBUG: General exception for {account}, attempt {attempt + 1}: {e}")
+                if attempt == max_attempts - 1:
+                    continue  # Passa al prossimo account
+                else:
+                    continue  # Riprova con lo stesso account
         
-        print(f"❌ Account {account} esaurito, prova prossimo")
+        print(f"❌ DEBUG: Account {account} exhausted, trying next")
     
     # Se arriviamo qui, tutti gli account hanno fallito
+    print("❌ DEBUG: All accounts failed")
     raise Exception("❌ Tutti gli account YouTube hanno fallito. Controlla le credenziali e le quote.")
 
 def show_authentication_banner(account):

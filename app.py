@@ -5,6 +5,7 @@ import json
 import time
 from pathlib import Path
 import sys
+import random
 
 # Aggiungi il percorso del modulo Elaborazione
 sys.path.append('Elaborazione')
@@ -33,6 +34,14 @@ from data_manager import (
 # Importa le funzioni per Google Drive
 from drive_manager import upload_video_to_drive, add_tracking_entry
 
+def create_session_temp_file(prefix, suffix):
+    """Crea un file temporaneo unico per questa sessione"""
+    session_id = st.session_state.session_id
+    timestamp = int(time.time())
+    random_id = random.randint(1000, 9999)
+    filename = f"{prefix}_{session_id}_{timestamp}_{random_id}{suffix}"
+    return os.path.join(tempfile.gettempdir(), filename)
+
 # Configurazione della pagina
 st.set_page_config(
     page_title="Video Editor con Sottotitoli",
@@ -40,9 +49,32 @@ st.set_page_config(
     layout="wide"
 )
 
+# Inizializza session state per multi-tab
+if 'session_id' not in st.session_state:
+    st.session_state.session_id = f"session_{int(time.time())}_{random.randint(1000, 9999)}"
+
+if 'current_video_path' not in st.session_state:
+    st.session_state.current_video_path = None
+
+if 'processed_video' not in st.session_state:
+    st.session_state.processed_video = None
+
+if 'has_voice' not in st.session_state:
+    st.session_state.has_voice = True
+
+if 'youtube_link' not in st.session_state:
+    st.session_state.youtube_link = ''
+
 # Titolo dell'app
 st.title("🎬 Editing Video")
 st.markdown("Sistema di elaborazione video con sottotitoli automatici per appartamenti")
+
+# Mostra session ID per debug multi-tab
+with st.expander("🔧 Debug Info"):
+    st.write(f"**Session ID:** {st.session_state.session_id}")
+    st.write(f"**Current Video:** {st.session_state.current_video_path}")
+    st.write(f"**Processed Video:** {st.session_state.processed_video is not None}")
+    st.write(f"**Has Voice:** {st.session_state.has_voice}")
 
 # Carica gli appartamenti e le tipologie
 apartments = load_apartments()
@@ -208,11 +240,11 @@ uploaded_video = st.file_uploader(
 )
 
 if uploaded_video is not None:
-    # Salva il video temporaneamente
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tmp_file:
-        tmp_file.write(uploaded_video.getvalue())
-        video_path = tmp_file.name
-        st.session_state.current_video_path = video_path
+    # Salva il video temporaneamente con nome unico per la sessione
+    video_path = create_session_temp_file("video", ".mp4")
+    with open(video_path, "wb") as f:
+        f.write(uploaded_video.getvalue())
+    st.session_state.current_video_path = video_path
     
     # Mostra informazioni del video
     st.success(f"✅ Video caricato: {uploaded_video.name}")
@@ -225,8 +257,9 @@ if uploaded_video is not None:
             else:
                 with st.spinner("Elaborazione in corso..."):
                     try:
-                        # Crea cartella temporanea per l'output
-                        output_dir = tempfile.mkdtemp()
+                        # Crea cartella temporanea unica per questa sessione
+                        output_dir = create_session_temp_file("output", "")
+                        os.makedirs(output_dir, exist_ok=True)
                         
                         # Elabora il video
                         result = process_video(
@@ -419,66 +452,69 @@ st.header("📺 Upload YouTube")
 youtube_status = check_youtube_setup()
 st.info(youtube_status[1])
 
-if st.session_state.processed_video and os.path.exists(st.session_state.processed_video['final_video']):
-    # Form per l'upload su YouTube
-    with st.form("youtube_upload_form"):
-        st.subheader("📤 Carica su YouTube")
+# Form per l'upload su YouTube
+with st.form("youtube_upload_form"):
+    st.subheader("📤 Carica su YouTube")
+    
+    # Campo per il titolo del video
+    youtube_title = st.text_input(
+        "Titolo del video",
+        value=video_title,
+        help="Titolo del video su YouTube"
+    )
+    
+    # Campo per la privacy
+    privacy_status = st.selectbox(
+        "Privacy",
+        options=["unlisted", "private", "public"],
+        index=0,
+        help="Impostazioni di privacy del video"
+    )
+    
+    # Pulsante per caricare
+    if st.form_submit_button("🚀 Carica su YouTube"):
+        print("🔧 DEBUG: YouTube upload button clicked")
+        print(f"🔧 DEBUG: Video title: {youtube_title}")
+        print(f"🔧 DEBUG: Privacy status: {privacy_status}")
         
-        # Campi per l'upload
-        youtube_title = st.text_input(
-            "Titolo del video",
-            value=video_title,
-            help="Titolo del video su YouTube"
-        )
-        
-        privacy_status = st.selectbox(
-            "Privacy",
-            options=["unlisted", "private", "public"],
-            help="Impostazioni di privacy del video"
-        )
-        
-        # Pulsante per l'upload
-        if st.form_submit_button("🚀 Carica su YouTube"):
-            if youtube_status[0]:
-                with st.spinner("Caricamento su YouTube..."):
-                    try:
-                        youtube_link = upload_to_youtube(
-                            video_path=st.session_state.processed_video['final_video'],
-                            title=youtube_title,
-                            privacy_status=privacy_status
-                        )
+        if youtube_status[0]:
+            print("🔧 DEBUG: YouTube status is OK, starting upload")
+            with st.spinner("Caricamento su YouTube..."):
+                try:
+                    print("🔧 DEBUG: Getting processed video path")
+                    if st.session_state.processed_video and 'final_video' in st.session_state.processed_video:
+                        video_path = st.session_state.processed_video['final_video']
+                        print(f"🔧 DEBUG: Video path: {video_path}")
+                        print(f"🔧 DEBUG: File exists: {os.path.exists(video_path)}")
                         
-                        if youtube_link:
-                            st.success("✅ Video caricato su YouTube con successo!")
-                            st.markdown(f"**Link YouTube:** {youtube_link}")
-                            st.session_state.youtube_link = youtube_link
-                        else:
-                            st.error("❌ Errore durante l'upload su YouTube")
+                        if os.path.exists(video_path):
+                            print("🔧 DEBUG: Calling upload_to_youtube")
+                            youtube_link = upload_to_youtube(
+                                video_path=video_path,
+                                title=youtube_title,
+                                privacy_status=privacy_status
+                            )
+                            print(f"🔧 DEBUG: Upload result: {youtube_link}")
                             
-                    except Exception as e:
-                        st.error(f"❌ Errore durante l'upload: {str(e)}")
-                        st.info("""
-                        **Possibili cause:**
-                        1. Problemi di autenticazione YouTube
-                        2. Quota giornaliera esaurita
-                        3. Problemi di connessione
+                            if youtube_link:
+                                st.success("✅ Video caricato su YouTube con successo!")
+                                st.markdown(f"**Link YouTube:** {youtube_link}")
+                                st.session_state.youtube_link = youtube_link
+                            else:
+                                st.error("❌ Errore durante l'upload su YouTube")
+                        else:
+                            st.error("❌ File video non trovato")
+                            print(f"❌ DEBUG: Video file not found at {video_path}")
+                    else:
+                        st.error("❌ Nessun video elaborato disponibile")
+                        print("❌ DEBUG: No processed video in session state")
                         
-                        **Soluzione:**
-                        1. Verifica la configurazione in Google Cloud Console
-                        2. Assicurati che l'API YouTube Data API v3 sia abilitata
-                        3. Ricrea le credenziali OAuth2 se necessario
-                        """)
-                        
-            else:
-                st.info("""
-                **Errore generico durante l'upload.**
-                
-                **Possibili soluzioni:**
-                1. Verifica la connessione internet
-                2. Controlla che il video non sia troppo grande
-                3. Prova a riavviare l'app
-                4. Contatta il supporto se il problema persiste
-                """)
+                except Exception as e:
+                    st.error(f"❌ Errore durante l'upload su YouTube: {str(e)}")
+                    print(f"❌ DEBUG: Exception in YouTube upload: {e}")
+        else:
+            print("❌ DEBUG: YouTube status is not OK")
+            st.error("❌ YouTube non configurato correttamente")
 
 # Sezione per l'upload su Google Drive
 st.subheader("☁️ Carica su Google Drive")

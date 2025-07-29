@@ -37,18 +37,28 @@ def check_youtube_setup():
 
 def upload_to_youtube(video_path, title, privacy_status="unlisted", description="", tags=""):
     """Carica il video su YouTube usando la rotazione automatica degli account"""
+    print("🔧 DEBUG: Starting upload_to_youtube")
+    print(f"🔧 DEBUG: Video path: {video_path}")
+    print(f"🔧 DEBUG: Title: {title}")
+    print(f"🔧 DEBUG: Privacy status: {privacy_status}")
+    
     try:
+        print("🔧 DEBUG: Checking if any accounts are authenticated")
         # Controlla se ci sono account autenticati
         if not any(is_account_authenticated(acc) for acc in ["xeniamilano.info@gmail.com", "videoxenia1@gmail.com", "videoxenia2@gmail.com", "videoxenia3@gmail.com", "videoxenia4@gmail.com"]):
+            print("❌ DEBUG: No authenticated accounts found")
             # Nessun account autenticato, mostra banner per il primo
             next_account = get_next_account_to_authenticate()
             if next_account:
+                print(f"🔧 DEBUG: Showing authentication banner for {next_account}")
                 show_authentication_banner(next_account)
                 return None
             else:
+                print("❌ DEBUG: No accounts available for authentication")
                 st.error("❌ Nessun account YouTube disponibile")
                 return None
         
+        print("🔧 DEBUG: Found authenticated accounts, starting upload")
         # Prova l'upload
         result = upload_video_with_rotation(
             video_path=video_path,
@@ -58,16 +68,21 @@ def upload_to_youtube(video_path, title, privacy_status="unlisted", description=
             tags=tags
         )
         
+        print(f"🔧 DEBUG: Upload result: {result}")
+        
         if result["success"]:
+            print("✅ DEBUG: Upload successful")
             st.success(f"✅ Video caricato con successo su YouTube!")
             st.info(f"📺 Account utilizzato: {result['account_used']}")
             st.info(f"🔗 Link: {result['video_url']}")
             return result['video_url']
         else:
+            print("❌ DEBUG: Upload failed")
             st.error("❌ Errore nel caricamento su YouTube")
             return None
             
     except Exception as e:
+        print(f"❌ DEBUG: Exception in upload_to_youtube: {e}")
         st.error(f"❌ Errore nell'upload YouTube: {e}")
         return None
 
