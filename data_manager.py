@@ -45,6 +45,12 @@ def get_google_sheets_client():
                 if 'private_key' in google_credentials:
                     print(f"🔧 DEBUG: private_key length: {len(google_credentials['private_key'])}")
                     print(f"🔧 DEBUG: private_key starts with: {google_credentials['private_key'][:50]}...")
+                    # Sostituisci \\n con \n se necessario
+                    if '\\\\n' in google_credentials['private_key']:
+                        print("🔧 DEBUG: Replacing \\\\n with \\n")
+                        google_credentials['private_key'] = google_credentials['private_key'].replace('\\\\n', '\\n')
+                    elif '\\n' not in google_credentials['private_key']:
+                        print("🔧 DEBUG: No \\n found in private_key, this might be the issue")
                 
                 credentials = Credentials.from_service_account_info(google_credentials)
                 print("🔧 DEBUG: Credentials created successfully")
