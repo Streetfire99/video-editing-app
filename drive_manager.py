@@ -4,7 +4,7 @@ import tempfile
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload
+from googleapiclient.http import MediaFileUpload, MediaIoBaseUpload
 from googleapiclient.errors import HttpError
 from google.oauth2.service_account import Credentials
 import streamlit as st
@@ -183,7 +183,7 @@ def save_tracking_csv(tracking_data):
         if files:
             # Aggiorna il file esistente
             file_id = files[0]['id']
-            media = MediaFileUpload(
+            media = MediaIoBaseUpload(
                 io.BytesIO(csv_content.encode('utf-8')),
                 mimetype='text/csv',
                 resumable=True
@@ -199,7 +199,7 @@ def save_tracking_csv(tracking_data):
                 'parents': [main_folder_id]
             }
             
-            media = MediaFileUpload(
+            media = MediaIoBaseUpload(
                 io.BytesIO(csv_content.encode('utf-8')),
                 mimetype='text/csv',
                 resumable=True
