@@ -30,6 +30,7 @@ def get_google_sheets_client():
                 try:
                     google_credentials = json.loads(google_credentials)
                     print("🔧 DEBUG: JSON parsing successful")
+                    print(f"🔧 DEBUG: Parsed credentials keys: {list(google_credentials.keys())}")
                 except json.JSONDecodeError as e:
                     print(f"❌ DEBUG: JSON parsing failed: {e}")
                     st.error(f"❌ Errore nel parsing JSON delle credenziali: {e}")
@@ -39,10 +40,17 @@ def get_google_sheets_client():
             # Crea le credenziali dal dizionario
             from google.oauth2.service_account import Credentials
             try:
+                print(f"🔧 DEBUG: Credentials dict keys: {list(google_credentials.keys())}")
+                print(f"🔧 DEBUG: private_key present: {'private_key' in google_credentials}")
+                if 'private_key' in google_credentials:
+                    print(f"🔧 DEBUG: private_key length: {len(google_credentials['private_key'])}")
+                    print(f"🔧 DEBUG: private_key starts with: {google_credentials['private_key'][:50]}...")
+                
                 credentials = Credentials.from_service_account_info(google_credentials)
                 print("🔧 DEBUG: Credentials created successfully")
             except Exception as e:
                 print(f"❌ DEBUG: Error creating credentials: {e}")
+                print(f"❌ DEBUG: Error type: {type(e)}")
                 st.error(f"❌ Errore nella creazione delle credenziali: {e}")
                 return None
             
