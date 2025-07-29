@@ -65,6 +65,22 @@ if 'has_voice' not in st.session_state:
 if 'youtube_link' not in st.session_state:
     st.session_state.youtube_link = ''
 
+# Pulisci session state per evitare memory leaks
+def cleanup_session_state():
+    """Pulisce i dati temporanei dalla session state"""
+    keys_to_clean = [key for key in st.session_state.keys() if key.startswith('auth_cache_') or key.startswith('pending_auth_')]
+    for key in keys_to_clean:
+        if key in st.session_state:
+            del st.session_state[key]
+
+# Esegui pulizia ogni 10 minuti
+if 'last_cleanup' not in st.session_state:
+    st.session_state.last_cleanup = time.time()
+
+if time.time() - st.session_state.last_cleanup > 600:  # 10 minuti
+    cleanup_session_state()
+    st.session_state.last_cleanup = time.time()
+
 # Titolo dell'app
 st.title("🎬 Editing Video")
 st.markdown("Sistema di elaborazione video con sottotitoli automatici per appartamenti")

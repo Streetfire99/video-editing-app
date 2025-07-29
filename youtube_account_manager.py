@@ -52,26 +52,20 @@ def get_client_secrets():
 
 def get_token_from_drive(account):
     """Ottiene il token da Google Drive"""
-    print(f"🔧 DEBUG: Getting token from Drive for {account}")
     try:
         service = get_drive_service()
         if not service:
-            print("❌ DEBUG: Drive service not available")
             return None
         
         filename = f"{account.replace('@', '_at_').replace('.', '_')}.pickle"
-        print(f"🔧 DEBUG: Looking for file: {filename}")
         
         # Cerca il file su Google Drive
         query = f"'{TOKENS_FOLDER_ID}' in parents and name='{filename}' and trashed=false"
-        print(f"🔧 DEBUG: Drive query: {query}")
         results = service.files().list(q=query).execute()
         files = results.get('files', [])
-        print(f"🔧 DEBUG: Found {len(files)} files")
         
         if files:
             file_id = files[0]['id']
-            print(f"🔧 DEBUG: File ID: {file_id}")
             
             # Scarica il file
             request = service.files().get_media(fileId=file_id)
@@ -80,14 +74,11 @@ def get_token_from_drive(account):
             
             # Carica il token
             credentials = pickle.load(file_content)
-            print(f"✅ Token caricato per {account}")
             return credentials
         else:
-            print(f"❌ Nessun token trovato per {account}")
             return None
             
     except Exception as e:
-        print(f"❌ Errore nel caricamento del token per {account}: {e}")
         return None
 
 def save_token_to_drive(account, credentials):
@@ -161,22 +152,26 @@ def is_token_expired(credentials):
 
 def is_account_authenticated(account):
     """Controlla se un account è autenticato"""
-    print(f"🔧 DEBUG: Checking if account {account} is authenticated")
+    # Cache per evitare controlli ripetuti
+    cache_key = f"auth_cache_{account}"
+    if cache_key in st.session_state:
+        return st.session_state[cache_key]
+    
     try:
         credentials = get_token_from_drive(account)
         if credentials:
-            print(f"🔧 DEBUG: Found credentials for {account}")
             if is_token_expired(credentials):
-                print(f"❌ DEBUG: Token expired for {account}")
-                return False
+                result = False
             else:
-                print(f"✅ DEBUG: Account {account} is authenticated")
-                return True
+                result = True
         else:
-            print(f"❌ DEBUG: No credentials found for {account}")
-            return False
+            result = False
+        
+        # Cache il risultato per 5 minuti
+        st.session_state[cache_key] = result
+        return result
     except Exception as e:
-        print(f"❌ DEBUG: Error checking authentication for {account}: {e}")
+        st.session_state[cache_key] = False
         return False
 
 def get_next_account_to_authenticate():
