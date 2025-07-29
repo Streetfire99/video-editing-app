@@ -49,12 +49,31 @@ def get_google_sheets_client():
             print("🔧 DEBUG: private_key present:", bool(private_key))
             print("🔧 DEBUG: private_key length:", len(private_key))
             print("🔧 DEBUG: private_key starts with:", private_key[:50])
+            print("🔧 DEBUG: private_key ends with:", private_key[-50:])
+            
+            # Conta i \\n e \n
+            double_backslash_count = private_key.count('\\n')
+            single_backslash_count = private_key.count('\n')
+            print("🔧 DEBUG: \\n count:", double_backslash_count)
+            print("🔧 DEBUG: \n count:", single_backslash_count)
             
             # Sostituisci \\n con \n se necessario
             if '\\n' in private_key:
                 print("🔧 DEBUG: Fixing \\n in private_key")
                 private_key = private_key.replace('\\n', '\n')
                 credentials_dict['private_key'] = private_key
+                print("🔧 DEBUG: After fix - \\n count:", private_key.count('\\n'))
+                print("🔧 DEBUG: After fix - \n count:", private_key.count('\n'))
+            
+            # Verifica che la chiave inizi e finisca correttamente
+            if not private_key.startswith('-----BEGIN PRIVATE KEY-----'):
+                print("❌ DEBUG: private_key doesn't start with BEGIN")
+            if not private_key.endswith('-----END PRIVATE KEY-----'):
+                print("❌ DEBUG: private_key doesn't end with END")
+            
+            # Verifica che non ci siano caratteri strani
+            print("🔧 DEBUG: private_key contains \\r:", '\\r' in private_key)
+            print("🔧 DEBUG: private_key contains \\t:", '\\t' in private_key)
         
         print("🔧 DEBUG: Creating credentials from service account info")
         print("🔧 DEBUG: Credentials dict keys:", list(credentials_dict.keys()))
