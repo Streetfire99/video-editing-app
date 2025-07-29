@@ -3,9 +3,7 @@ import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 import os
-from google.oauth2.credentials import Credentials
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
+import json
 
 # Configurazione Google Sheets
 SCOPES = [
@@ -16,22 +14,14 @@ SCOPES = [
 def get_google_sheets_client():
     """Ottiene il client per Google Sheets"""
     try:
-        print("🔧 DEBUG: Starting get_google_sheets_client")
-        
         # Prova prima da Streamlit secrets
         credentials_str = st.secrets.get('GOOGLE_SHEETS_CREDENTIALS')
         if credentials_str:
-            print("🔧 DEBUG: Got credentials from secrets:", type(credentials_str))
-            
             # Se è una stringa JSON, convertila in dizionario
             if isinstance(credentials_str, str):
-                print("🔧 DEBUG: Converting string to dict")
-                import json
                 credentials_dict = json.loads(credentials_str)
-                print("🔧 DEBUG: JSON parsing successful")
             else:
                 credentials_dict = credentials_str
-                print("🔧 DEBUG: Using secrets directly")
         else:
             # Fallback alle variabili d'ambiente
             credentials_str = os.getenv('GOOGLE_SHEETS_CREDENTIALS')
@@ -39,30 +29,17 @@ def get_google_sheets_client():
                 st.error("❌ GOOGLE_SHEETS_CREDENTIALS non trovata nei secrets o nelle variabili d'ambiente")
                 return None
             
-            import json
             credentials_dict = json.loads(credentials_str)
         
-        print("🔧 DEBUG: Parsed credentials keys:", list(credentials_dict.keys()))
-        
-        print("🔧 DEBUG: Creating credentials from service account info")
-        print("🔧 DEBUG: Credentials dict keys:", list(credentials_dict.keys()))
-        
         # Crea le credenziali
-        from google.oauth2.service_account import Credentials
         credentials = Credentials.from_service_account_info(credentials_dict)
         
-        print("🔧 DEBUG: Credentials created successfully")
-        
         # Crea il client
-        import gspread
         client = gspread.authorize(credentials)
         
-        print("🔧 DEBUG: Service built successfully")
         return client
         
     except Exception as e:
-        print("❌ DEBUG: Error creating credentials:", str(e))
-        print("❌ DEBUG: Error type:", type(e))
         st.error(f"❌ Errore nel caricamento delle credenziali Google: {e}")
         return None
 

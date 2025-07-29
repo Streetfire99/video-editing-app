@@ -10,6 +10,7 @@ from googleapiclient.errors import HttpError
 from google.oauth2.service_account import Credentials as ServiceAccountCredentials
 import streamlit as st
 import io
+import json
 
 # If modifying these scopes, delete the file token.pickle.
 SCOPES = ['https://www.googleapis.com/auth/drive']
@@ -17,22 +18,14 @@ SCOPES = ['https://www.googleapis.com/auth/drive']
 def get_drive_service():
     """Ottiene il servizio Google Drive"""
     try:
-        print("🔧 DEBUG: Starting get_drive_service")
-        
         # Prova prima da Streamlit secrets
         credentials_str = st.secrets.get('GOOGLE_SHEETS_CREDENTIALS')
         if credentials_str:
-            print("🔧 DEBUG: Got credentials from secrets:", type(credentials_str))
-            
             # Se è una stringa JSON, convertila in dizionario
             if isinstance(credentials_str, str):
-                print("🔧 DEBUG: Converting string to dict")
-                import json
                 credentials_dict = json.loads(credentials_str)
-                print("🔧 DEBUG: JSON parsing successful")
             else:
                 credentials_dict = credentials_str
-                print("🔧 DEBUG: Using secrets directly")
         else:
             # Fallback alle variabili d'ambiente
             credentials_str = os.getenv('GOOGLE_SHEETS_CREDENTIALS')
@@ -40,30 +33,17 @@ def get_drive_service():
                 st.error("❌ GOOGLE_SHEETS_CREDENTIALS non trovata nei secrets o nelle variabili d'ambiente")
                 return None
             
-            import json
             credentials_dict = json.loads(credentials_str)
         
-        print("🔧 DEBUG: Parsed credentials keys:", list(credentials_dict.keys()))
-        
-        print("🔧 DEBUG: Creating credentials from service account info")
-        print("🔧 DEBUG: Credentials dict keys:", list(credentials_dict.keys()))
-        
         # Crea le credenziali
-        from google.oauth2.service_account import Credentials
         credentials = Credentials.from_service_account_info(credentials_dict)
         
-        print("🔧 DEBUG: Credentials created successfully")
-        
         # Crea il servizio Drive
-        from googleapiclient.discovery import build
         service = build('drive', 'v3', credentials=credentials)
         
-        print("🔧 DEBUG: Service built successfully")
         return service
         
     except Exception as e:
-        print("❌ DEBUG: Error creating credentials:", str(e))
-        print("❌ DEBUG: Error type:", type(e))
         st.error(f"❌ Errore nel caricamento delle credenziali Google Drive: {e}")
         return None
 
