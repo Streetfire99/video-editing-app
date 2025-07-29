@@ -228,35 +228,71 @@ if st.session_state.segments:
     edited_segments = []
     
     for i, segment in enumerate(st.session_state.segments):
-        col1, col2, col3 = st.columns([1, 2, 1])
+        st.markdown(f"**Sottotitolo {i+1}**")
+        
+        col1, col2, col3, col4 = st.columns([1, 2, 2, 1])
         
         with col1:
-            st.text(f"**{i+1}**")
+            st.text("**Inizio**")
             start_time = st.text_input(
                 "Inizio",
                 value=format_timestamp(segment['start']),
-                key=f"start_{i}"
+                key=f"start_{i}",
+                label_visibility="collapsed"
             )
         
         with col2:
-            edited_text = st.text_input(
-                "Testo",
+            st.text("**Italiano**")
+            edited_text_it = st.text_input(
+                "Testo italiano",
                 value=segment['text'],
-                key=f"text_{i}"
+                key=f"text_it_{i}",
+                label_visibility="collapsed"
             )
         
         with col3:
+            st.text("**Inglese**")
+            # Usa il testo inglese se disponibile, altrimenti traduci
+            english_text = segment.get('text_en', '')
+            if not english_text and segment['text']:
+                # Traduci automaticamente se non c'è già
+                try:
+                    client = get_openai_client(openai_api_key)
+                    translation = client.chat.completions.create(
+                        model="gpt-4",
+                        messages=[
+                            {"role": "system", "content": "Traduci in inglese questo testo per sottotitoli:"},
+                            {"role": "user", "content": segment['text']}
+                        ]
+                    )
+                    english_text = translation.choices[0].message.content.strip()
+                except:
+                    english_text = ""
+            
+            edited_text_en = st.text_input(
+                "Testo inglese",
+                value=english_text,
+                key=f"text_en_{i}",
+                label_visibility="collapsed"
+            )
+        
+        with col4:
+            st.text("**Fine**")
             end_time = st.text_input(
                 "Fine",
                 value=format_timestamp(segment['end']),
-                key=f"end_{i}"
+                key=f"end_{i}",
+                label_visibility="collapsed"
             )
         
         edited_segments.append({
             'start': segment['start'],
             'end': segment['end'],
-            'text': edited_text
+            'text': edited_text_it,
+            'text_en': edited_text_en
         })
+        
+        st.markdown("---")
     
     # Pulsante per applicare le modifiche
     if st.button("💾 Applica Modifiche"):
@@ -267,29 +303,17 @@ if st.session_state.segments:
         subtitle_file_it = os.path.join(temp_dir, "subtitles_it_edited.srt")
         create_srt_file(edited_segments, subtitle_file_it, "IT")
         
-        # File SRT inglesi (traduci di nuovo)
+        # File SRT inglesi (usa i testi modificati)
         subtitle_file_en = os.path.join(temp_dir, "subtitles_en_edited.srt")
-        client = get_openai_client(openai_api_key)
         
-        # Traduci i sottotitoli modificati
-        for segment in edited_segments:
-            translation = client.chat.completions.create(
-                model="gpt-4",
-                messages=[
-                    {"role": "system", "content": "Traduci in inglese questo testo per sottotitoli:"},
-                    {"role": "user", "content": segment['text']}
-                ]
-            )
-            segment['text_en'] = translation.choices[0].message.content.strip()
-        
-        # Crea file SRT inglese
+        # Crea file SRT inglese con i testi modificati
         with open(subtitle_file_en, "w", encoding="utf-8") as srt:
             for i, segment in enumerate(edited_segments, start=1):
                 start = format_timestamp(segment['start'])
                 end = format_timestamp(segment['end'])
                 text = segment['text_en']
                 lines = split_text(text)
-                srt.write(f"{i}\n{start} --> {end}\n[EN] {lines[0]}\n{lines[1] if len(lines) > 1 else ''}\n\n")
+                srt.write(f"{i}\n{start} --> {end}\n{lines[0]}\n{lines[1] if len(lines) > 1 else ''}\n\n")
         
         # Ricrea il video con i sottotitoli modificati
         final_output = os.path.join(temp_dir, "final_output_edited.mp4")
@@ -303,6 +327,7 @@ if st.session_state.segments:
         )
         
         st.session_state.processed_video["final_video"] = final_output
+        st.session_state.edited_segments = edited_segments  # Salva per i transcript
         st.success("✅ Video aggiornato con le modifiche!")
 
 # Sezione per modifiche personalizzate
@@ -549,11 +574,15 @@ if st.session_state.processed_video:
                 
                 # Salva nel tracking
                 youtube_link = st.session_state.get('youtube_link', '')
+                italian_transcript_path = st.session_state.get('italian_transcript_path', '')
+                english_transcript_path = st.session_state.get('english_transcript_path', '')
                 add_tracking_entry(
                     apartment=selected_apartment,
                     video_type=selected_video_type,
                     youtube_link=youtube_link,
-                    drive_link=drive_link
+                    drive_link=drive_link,
+                    italian_transcript_path=italian_transcript_path,
+                    english_transcript_path=english_transcript_path
                 )
                 
                 st.session_state.drive_link = drive_link
@@ -571,6 +600,91 @@ if st.session_state.processed_video:
                 2. Controlla i permessi sulla cartella condivisa
                 3. Riprova più tardi
                 """)
+
+# Sezione per i transcript modificabili
+if st.session_state.processed_video and (st.session_state.segments or st.session_state.get('edited_segments')):
+    st.markdown("---")
+    st.header("📝 Transcript per Manuali")
+    st.info("Modifica i testi per creare i manuali di istruzioni. I file verranno salvati nella cartella del video.")
+    
+    # Usa i segmenti modificati se disponibili, altrimenti quelli originali
+    segments_for_transcript = st.session_state.get('edited_segments', st.session_state.segments)
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("🇮🇹 Italiano")
+        italian_texts = []
+        for i, segment in enumerate(segments_for_transcript, 1):
+            edited_text = st.text_area(
+                f"{i}.",
+                value=segment['text'],
+                key=f"transcript_it_{i}",
+                height=60
+            )
+            italian_texts.append(edited_text)
+    
+    with col2:
+        st.subheader("🇬🇧 Inglese")
+        english_texts = []
+        for i, segment in enumerate(segments_for_transcript, 1):
+            # Usa il testo inglese se disponibile, altrimenti traduci
+            english_text = segment.get('text_en', '')
+            if not english_text and segment['text']:
+                # Traduci automaticamente se non c'è già
+                try:
+                    client = get_openai_client(openai_api_key)
+                    translation = client.chat.completions.create(
+                        model="gpt-4",
+                        messages=[
+                            {"role": "system", "content": "Traduci in inglese questo testo per manuali:"},
+                            {"role": "user", "content": segment['text']}
+                        ]
+                    )
+                    english_text = translation.choices[0].message.content.strip()
+                except:
+                    english_text = ""
+            
+            edited_text = st.text_area(
+                f"{i}.",
+                value=english_text,
+                key=f"transcript_en_{i}",
+                height=60
+            )
+            english_texts.append(edited_text)
+    
+    # Pulsanti per salvare i transcript
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("💾 Salva Transcript Italiano"):
+            # Crea il nome del file
+            filename = f"Istruzioni_{selected_video_type}_{selected_apartment}_ita.txt"
+            filepath = os.path.join(os.path.dirname(st.session_state.processed_video["final_video"]), filename)
+            
+            # Salva il file
+            with open(filepath, "w", encoding="utf-8") as f:
+                for i, text in enumerate(italian_texts, 1):
+                    if text.strip():  # Salva solo se non vuoto
+                        f.write(f"{i}. {text.strip()}\n")
+            
+            st.success(f"✅ Transcript italiano salvato: {filename}")
+            st.session_state.italian_transcript_path = filepath
+    
+    with col2:
+        if st.button("💾 Salva Transcript Inglese"):
+            # Crea il nome del file
+            filename = f"Istruzioni_{selected_video_type}_{selected_apartment}_en.txt"
+            filepath = os.path.join(os.path.dirname(st.session_state.processed_video["final_video"]), filename)
+            
+            # Salva il file
+            with open(filepath, "w", encoding="utf-8") as f:
+                for i, text in enumerate(english_texts, 1):
+                    if text.strip():  # Salva solo se non vuoto
+                        f.write(f"{i}. {text.strip()}\n")
+            
+            st.success(f"✅ Transcript inglese salvato: {filename}")
+            st.session_state.english_transcript_path = filepath
 
 # Footer
 st.markdown("---")

@@ -125,14 +125,14 @@ def load_tracking_csv():
 def save_tracking_csv(tracking_data):
     """Salva il CSV di tracking"""
     csv_file = 'apartments_tracking.csv'
-    fieldnames = ['apartment', 'video_type', 'youtube_link', 'drive_link', 'date_created']
+    fieldnames = ['apartment', 'video_type', 'youtube_link', 'drive_link', 'italian_transcript', 'english_transcript', 'date_created']
     
     with open(csv_file, 'w', newline='', encoding='utf-8') as file:
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(tracking_data)
 
-def add_tracking_entry(apartment, video_type, youtube_link, drive_link):
+def add_tracking_entry(apartment, video_type, youtube_link, drive_link, italian_transcript_path=None, english_transcript_path=None):
     """Aggiunge una nuova entry al tracking"""
     import datetime
     
@@ -148,6 +148,8 @@ def add_tracking_entry(apartment, video_type, youtube_link, drive_link):
         'video_type': video_type,
         'youtube_link': youtube_link or '',
         'drive_link': drive_link or '',
+        'italian_transcript': italian_transcript_path or '',
+        'english_transcript': english_transcript_path or '',
         'date_created': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     }
     
