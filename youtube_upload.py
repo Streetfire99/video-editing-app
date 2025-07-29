@@ -1,11 +1,15 @@
 import os
 import pickle
 import streamlit as st
+import logging
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from googleapiclient.errors import HttpError
+
+# Configurazione logging
+logger = logging.getLogger(__name__)
 
 # Importa il nuovo sistema di gestione account
 from youtube_account_manager import (
@@ -13,7 +17,8 @@ from youtube_account_manager import (
     get_accounts_summary,
     is_account_authenticated,
     get_next_account_to_authenticate,
-    show_authentication_banner
+    show_modern_authentication_banner,
+    authenticate_with_code_modern
 )
 
 # Configurazione OAuth2 per YouTube
@@ -51,7 +56,7 @@ def upload_to_youtube(video_path, title, privacy_status="unlisted", description=
             next_account = get_next_account_to_authenticate()
             if next_account:
                 print(f"🔧 DEBUG: Showing authentication banner for {next_account}")
-                show_authentication_banner(next_account)
+                show_modern_authentication_banner(next_account)
                 return None
             else:
                 print("❌ DEBUG: No accounts available for authentication")
@@ -84,7 +89,6 @@ def upload_to_youtube(video_path, title, privacy_status="unlisted", description=
     except Exception as e:
         print(f"❌ DEBUG: Exception in upload_to_youtube: {e}")
         st.error(f"❌ Errore nell'upload YouTube: {e}")
-        return None
 
 def get_youtube_status():
     """Ottiene lo stato di tutti gli account YouTube"""

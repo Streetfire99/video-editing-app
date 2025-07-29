@@ -1,6 +1,10 @@
 import os
 import pickle
 import tempfile
+import secrets
+import hashlib
+import base64
+import logging
 from datetime import datetime, timedelta
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
@@ -10,6 +14,10 @@ from googleapiclient.errors import HttpError
 import streamlit as st
 import json
 import io
+import urllib.parse
+
+# Configurazione logging
+logger = logging.getLogger(__name__)
 
 # Configurazione degli account
 YOUTUBE_ACCOUNTS = [
@@ -26,13 +34,16 @@ SCOPES = ['https://www.googleapis.com/auth/youtube.upload']
 # ID della cartella Google Drive per i token
 TOKENS_FOLDER_ID = "1w9P2oiRfFgsOOj82V7xOruhjnl-APCCi"  # Stessa cartella del CSV
 
+# Streamlit app URL per OAuth2
+REDIRECT_URI = "https://video-editing-app-streetfire99.streamlit.app"
+
 def get_drive_service():
     """Ottiene il servizio Google Drive"""
     try:
         from drive_manager import get_drive_service
         return get_drive_service()
     except Exception as e:
-        print(f"❌ Errore nel caricamento del servizio Drive: {e}")
+        logger.error(f"❌ Errore nel caricamento del servizio Drive: {e}")
         return None
 
 def get_client_secrets():
@@ -47,8 +58,14 @@ def get_client_secrets():
         else:
             return None
     except Exception as e:
-        print(f"❌ Errore nel caricamento delle credenziali: {e}")
+        logger.error(f"❌ Errore nel caricamento delle credenziali: {e}")
         return None
+
+def generate_pkce():
+    """Genera PKCE code verifier e challenge"""
+    code_verifier = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode('utf-8').rstrip('=')
+    code_challenge = base64.urlsafe_b64encode(hashlib.sha256(code_verifier.encode('utf-8')).digest()).decode('utf-8').rstrip('=')
+    return code_verifier, code_challenge
 
 def get_token_from_drive(account):
     """Ottiene il token da Google Drive"""
@@ -129,11 +146,11 @@ def save_token_to_drive(account, credentials):
                 fields='id'
             ).execute()
         
-        print(f"✅ Token salvato per {account}")
+        logger.info(f"✅ Token salvato per {account}")
         return True
         
     except Exception as e:
-        print(f"❌ Errore nel salvataggio del token per {account}: {e}")
+        logger.error(f"❌ Errore nel salvataggio del token per {account}: {e}")
         return False
 
 def is_token_expired(credentials):
@@ -167,7 +184,7 @@ def is_account_authenticated(account):
         else:
             result = False
         
-        # Cache il risultato per 5 minuti
+        # Cache il risultato
         st.session_state[cache_key] = result
         return result
     except Exception as e:
@@ -181,27 +198,39 @@ def get_next_account_to_authenticate():
             return account
     return None
 
-def create_auth_url(account):
-    """Crea l'URL di autenticazione per un account"""
+def create_modern_auth_url(account):
+    """Crea l'URL di autenticazione moderno con PKCE"""
     try:
         client_secrets = get_client_secrets()
         if not client_secrets:
             return None
+        
+        # Genera PKCE
+        code_verifier, code_challenge = generate_pkce()
+        
+        # Salva code_verifier per dopo
+        st.session_state[f"code_verifier_{account}"] = code_verifier
         
         # Crea un file temporaneo con le credenziali
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
             json.dump(client_secrets, f)
             client_secrets_file = f.name
         
-        # Crea il flusso OAuth2
+        # Crea il flusso OAuth2 moderno
         flow = InstalledAppFlow.from_client_secrets_file(
             client_secrets_file, 
             SCOPES,
-            redirect_uri="urn:ietf:wg:oauth:2.0:oob"  # Redirect per app installate
+            redirect_uri=REDIRECT_URI
         )
         
-        # Genera l'URL di autorizzazione
-        auth_url, _ = flow.authorization_url(prompt='consent')
+        # Genera l'URL di autorizzazione con PKCE
+        auth_url, _ = flow.authorization_url(
+            prompt='consent',
+            access_type='offline',
+            include_granted_scopes='true',
+            code_challenge=code_challenge,
+            code_challenge_method='S256'
+        )
         
         # Pulisci il file temporaneo
         os.unlink(client_secrets_file)
@@ -209,14 +238,19 @@ def create_auth_url(account):
         return auth_url
         
     except Exception as e:
-        print(f"❌ Errore nella creazione dell'URL di autenticazione: {e}")
+        logger.error(f"❌ Errore nella creazione dell'URL di autenticazione: {e}")
         return None
 
-def authenticate_with_code(account, auth_code):
-    """Autentica un account con il codice di autorizzazione"""
+def authenticate_with_code_modern(account, auth_code):
+    """Autentica un account con il codice di autorizzazione moderno"""
     try:
         client_secrets = get_client_secrets()
         if not client_secrets:
+            return False
+        
+        # Recupera code_verifier
+        code_verifier = st.session_state.get(f"code_verifier_{account}")
+        if not code_verifier:
             return False
         
         # Crea un file temporaneo con le credenziali
@@ -224,25 +258,31 @@ def authenticate_with_code(account, auth_code):
             json.dump(client_secrets, f)
             client_secrets_file = f.name
         
-        # Crea il flusso OAuth2
+        # Crea il flusso OAuth2 moderno
         flow = InstalledAppFlow.from_client_secrets_file(
             client_secrets_file, 
             SCOPES,
-            redirect_uri="urn:ietf:wg:oauth:2.0:oob"  # Redirect per app installate
+            redirect_uri=REDIRECT_URI
         )
         
-        # Scambia il codice per i token
-        flow.fetch_token(code=auth_code)
+        # Scambia il codice per i token con PKCE
+        flow.fetch_token(
+            code=auth_code,
+            code_verifier=code_verifier
+        )
         credentials = flow.credentials
         
         # Salva il token su Google Drive
         if save_token_to_drive(account, credentials):
+            # Pulisci code_verifier
+            if f"code_verifier_{account}" in st.session_state:
+                del st.session_state[f"code_verifier_{account}"]
             return True
         else:
             return False
         
     except Exception as e:
-        print(f"❌ Errore nell'autenticazione: {e}")
+        logger.error(f"❌ Errore nell'autenticazione: {e}")
         return False
 
 def get_youtube_service(account=None):
@@ -368,12 +408,12 @@ def upload_video_with_rotation(video_path, title, privacy_status="unlisted", des
     print("❌ DEBUG: All accounts failed")
     raise Exception("❌ Tutti gli account YouTube hanno fallito. Controlla le credenziali e le quote.")
 
-def show_authentication_banner(account):
-    """Mostra un banner per autenticare un account"""
-    auth_url = create_auth_url(account)
+def show_modern_authentication_banner(account):
+    """Mostra un banner moderno per autenticare un account"""
+    auth_url = create_modern_auth_url(account)
     
     if auth_url:
-        st.error(f"❌ **Account YouTube richiesto**")
+        st.error(f"❌ **Autenticazione YouTube richiesta**")
         st.markdown(f"""
         Per caricare video su YouTube, devi autenticare l'account: **{account}**
         
@@ -389,7 +429,6 @@ def show_authentication_banner(account):
             help="Copia il codice che ricevi dopo l'autenticazione"
         )
         
-        # Usa st.form_submit_button invece di st.button
         if auth_code:
             st.info("💡 Dopo aver inserito il codice, clicca '🚀 Carica su YouTube' per confermare l'autenticazione")
             

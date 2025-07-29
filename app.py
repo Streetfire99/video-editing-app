@@ -3,9 +3,34 @@ import os
 import tempfile
 import json
 import time
+import logging
 from pathlib import Path
 import sys
 import random
+
+# Configurazione logging per debug
+def setup_logging():
+    """Configura il logging per debug"""
+    # Crea directory logs se non esiste
+    log_dir = "logs"
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    
+    # Configura logging
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(f'{log_dir}/app_debug.log', mode='a'),  # Append mode
+            logging.StreamHandler()  # Anche su console
+        ]
+    )
+    
+    return logging.getLogger(__name__)
+
+# Inizializza logger
+logger = setup_logging()
+logger.info("🚀 App avviata - Logging configurato")
 
 # Aggiungi il percorso del modulo Elaborazione
 sys.path.append('Elaborazione')
@@ -42,6 +67,34 @@ def create_session_temp_file(prefix, suffix):
     filename = f"{prefix}_{session_id}_{timestamp}_{random_id}{suffix}"
     return os.path.join(tempfile.gettempdir(), filename)
 
+def create_session_temp_dir():
+    """Crea una directory temporanea unica per questa sessione"""
+    session_id = st.session_state.session_id
+    timestamp = int(time.time())
+    random_id = random.randint(1000, 9999)
+    dirname = f"session_{session_id}_{timestamp}_{random_id}"
+    temp_dir = os.path.join(tempfile.gettempdir(), dirname)
+    os.makedirs(temp_dir, exist_ok=True)
+    return temp_dir
+
+def cleanup_session_files():
+    """Pulisce i file temporanei di questa sessione"""
+    session_id = st.session_state.session_id
+    temp_dir = tempfile.gettempdir()
+    
+    # Trova e rimuovi tutti i file di questa sessione
+    for filename in os.listdir(temp_dir):
+        if filename.startswith(f"session_{session_id}_"):
+            filepath = os.path.join(temp_dir, filename)
+            try:
+                if os.path.isfile(filepath):
+                    os.remove(filepath)
+                elif os.path.isdir(filepath):
+                    import shutil
+                    shutil.rmtree(filepath)
+            except Exception as e:
+                print(f"Errore nella pulizia file {filepath}: {e}")
+
 # Configurazione della pagina
 st.set_page_config(
     page_title="Video Editor con Sottotitoli",
@@ -65,6 +118,35 @@ if 'has_voice' not in st.session_state:
 if 'youtube_link' not in st.session_state:
     st.session_state.youtube_link = ''
 
+# Pulisci file temporanei di sessioni precedenti (più vecchie di 1 ora)
+def cleanup_old_session_files():
+    """Pulisce i file temporanei di sessioni vecchie"""
+    temp_dir = tempfile.gettempdir()
+    current_time = time.time()
+    
+    for filename in os.listdir(temp_dir):
+        if filename.startswith("session_"):
+            try:
+                # Estrai timestamp dal nome file
+                parts = filename.split('_')
+                if len(parts) >= 3:
+                    timestamp_str = parts[2]
+                    if timestamp_str.isdigit():
+                        file_timestamp = int(timestamp_str)
+                        # Se il file è più vecchio di 1 ora, rimuovilo
+                        if current_time - file_timestamp > 3600:  # 1 ora
+                            filepath = os.path.join(temp_dir, filename)
+                            if os.path.isfile(filepath):
+                                os.remove(filepath)
+                            elif os.path.isdir(filepath):
+                                import shutil
+                                shutil.rmtree(filepath)
+            except Exception as e:
+                pass  # Ignora errori di pulizia
+
+# Esegui pulizia all'avvio
+cleanup_old_session_files()
+
 # Pulisci session state per evitare memory leaks
 def cleanup_session_state():
     """Pulisce i dati temporanei dalla session state"""
@@ -79,6 +161,7 @@ if 'last_cleanup' not in st.session_state:
 
 if time.time() - st.session_state.last_cleanup > 600:  # 10 minuti
     cleanup_session_state()
+    cleanup_session_files()  # Pulisci anche i file di questa sessione
     st.session_state.last_cleanup = time.time()
 
 # Titolo dell'app
@@ -269,47 +352,42 @@ if uploaded_video is not None:
     if uploaded_video:
         if st.button("🚀 Elabora Video", type="primary"):
             if not openai_api_key:
-                st.error("❌ Inserisci la tua OpenAI API Key per elaborare il video")
-            else:
-                with st.spinner("Elaborazione in corso..."):
-                    try:
-                        # Crea cartella temporanea unica per questa sessione
-                        output_dir = create_session_temp_file("output", "")
-                        os.makedirs(output_dir, exist_ok=True)
+                st.error("❌ Inserisci la tua OpenAI API Key")
+                st.stop()
+            
+            # Crea directory temporanea per questa sessione
+            output_dir = create_session_temp_dir()
+            
+            with st.spinner("🔄 Elaborazione video in corso..."):
+                try:
+                    # Elabora il video
+                    result = process_video(
+                        input_video=video_path,
+                        music_file=None,  # Per ora senza musica
+                        openai_api_key=openai_api_key,
+                        output_dir=output_dir,
+                        video_type=selected_video_type,
+                        italian_height=italian_height,
+                        english_height=english_height
+                    )
+                    
+                    if result['success']:
+                        st.session_state.processed_video = result
+                        st.session_state.segments = result.get('segments', [])
+                        st.success("✅ Video elaborato con successo!")
                         
-                        # Elabora il video
-                        result = process_video(
-                            input_video=video_path,
-                            music_file=None,  # Nessuna musica di sottofondo
-                            openai_api_key=openai_api_key,
-                            output_dir=output_dir,
-                            video_type=selected_video_type
-                        )
-                        
-                        if result and result.get('success'):
-                            st.session_state.processed_video = result
-                            st.session_state.segments = result.get('segments', [])
-                            st.success("✅ Video elaborato con successo!")
-                            
-                            # Mostra il video elaborato
-                            if os.path.exists(result['final_video']):
-                                with open(result['final_video'], 'rb') as f:
-                                    st.video(f.read())
-                                
-                                # Pulsante per scaricare
-                                with open(result['final_video'], 'rb') as f:
-                                    st.download_button(
-                                        label="📥 Scarica Video",
-                                        data=f.read(),
-                                        file_name=f"{video_title}.mp4",
-                                        mime="video/mp4"
-                                    )
+                        # Mostra il video elaborato
+                        if os.path.exists(result['final_video']):
+                            st.video(result['final_video'])
                         else:
-                            st.error("❌ Errore durante l'elaborazione del video")
-                            
-                    except Exception as e:
-                        st.error(f"❌ Errore durante l'elaborazione: {str(e)}")
-                        st.info("💡 Verifica che il video sia in un formato supportato e che la chiave API sia valida")
+                            st.error("❌ File video elaborato non trovato")
+                    else:
+                        st.error(f"❌ Errore durante l'elaborazione: {result.get('error', 'Errore sconosciuto')}")
+                        
+                except Exception as e:
+                    st.error(f"❌ Errore durante l'elaborazione: {str(e)}")
+                    # Pulisci i file temporanei in caso di errore
+                    cleanup_session_files()
 
 # Sezione per modificare i sottotitoli (solo se il video è stato elaborato)
 if st.session_state.processed_video and st.session_state.segments and st.session_state.processed_video.get("has_voice", True):
@@ -494,7 +572,7 @@ with st.form("youtube_upload_form"):
         print(f"🔧 DEBUG: Privacy status: {privacy_status}")
         
         # Controlla se c'è un codice di autenticazione in attesa
-        from youtube_account_manager import get_next_account_to_authenticate, authenticate_with_code
+        from youtube_account_manager import get_next_account_to_authenticate, authenticate_with_code_modern
         pending_account = None
         pending_code = None
         
@@ -506,7 +584,7 @@ with st.form("youtube_upload_form"):
         
         if pending_code and pending_account:
             print(f"🔧 DEBUG: Processing authentication for {pending_account}")
-            if authenticate_with_code(pending_account, pending_code):
+            if authenticate_with_code_modern(pending_account, pending_code):
                 st.success(f"✅ {pending_account} autenticato con successo!")
                 # Pulisci i dati di autenticazione
                 del st.session_state[f"pending_auth_code_{pending_account}"]
@@ -555,11 +633,11 @@ with st.form("youtube_upload_form"):
             st.error("❌ YouTube non configurato correttamente")
             
             # Mostra banner di autenticazione se necessario
-            from youtube_account_manager import get_next_account_to_authenticate, show_authentication_banner
+            from youtube_account_manager import get_next_account_to_authenticate, show_modern_authentication_banner
             next_account = get_next_account_to_authenticate()
             if next_account:
                 st.warning("🔐 **Autenticazione YouTube richiesta**")
-                show_authentication_banner(next_account)
+                show_modern_authentication_banner(next_account)
 
 # Sezione per l'upload su Google Drive
 st.subheader("☁️ Carica su Google Drive")
