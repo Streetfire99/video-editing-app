@@ -179,46 +179,6 @@ with st.expander("🔧 Debug Info"):
 apartments = load_apartments()
 video_types = get_video_types()
 
-# Sezione di selezione
-st.header("📋 Configurazione Video")
-
-# Selezione appartamento
-selected_apartment = st.selectbox(
-    "🏠 Seleziona Appartamento",
-    options=[""] + apartments,
-    help="Scegli l'appartamento per cui stai creando il video"
-)
-
-# Selezione tipologia video
-selected_video_type = st.selectbox(
-    "🎥 Tipologia Video",
-    options=[""] + video_types,
-    help="Scegli la tipologia di video che stai creando"
-)
-
-# Campo per aggiungere nuove tipologie
-with st.expander("➕ Aggiungi Nuova Tipologia"):
-    new_video_type = st.text_input(
-        "Nuova tipologia",
-        placeholder="es: aspirapolvere",
-        help="Inserisci una nuova tipologia di video"
-    )
-    if st.button("Aggiungi"):
-        if new_video_type and new_video_type not in video_types:
-            video_types.append(new_video_type)
-            video_types.sort()
-            st.success(f"✅ Tipologia '{new_video_type}' aggiunta!")
-            st.rerun()
-
-# Verifica che siano state selezionate entrambe le opzioni
-if not selected_apartment or not selected_video_type:
-    st.warning("⚠️ Seleziona sia l'appartamento che la tipologia di video per procedere")
-    st.stop()
-
-# Mostra il titolo del video
-video_title = f"{selected_apartment} {selected_video_type}"
-st.success(f"📹 Titolo video: **{video_title}**")
-
 # Carica configurazioni
 def load_config():
     """Carica la configurazione dalle variabili d'ambiente"""
@@ -347,47 +307,91 @@ if uploaded_video is not None:
     
     # Mostra informazioni del video
     st.success(f"✅ Video caricato: {uploaded_video.name}")
-    
-    # Pulsante per elaborare
-    if uploaded_video:
-        if st.button("🚀 Elabora Video", type="primary"):
-            if not openai_api_key:
-                st.error("❌ Inserisci la tua OpenAI API Key")
-                st.stop()
-            
-            # Crea directory temporanea per questa sessione
-            output_dir = create_session_temp_dir()
-            
-            with st.spinner("🔄 Elaborazione video in corso..."):
-                try:
-                    # Elabora il video
-                    result = process_video(
-                        input_video=video_path,
-                        music_file=None,  # Per ora senza musica
-                        openai_api_key=openai_api_key,
-                        output_dir=output_dir,
-                        video_type=selected_video_type,
-                        italian_height=italian_height,
-                        english_height=english_height
-                    )
+
+# Sezione di selezione
+st.header("📋 Configurazione Video")
+
+# Selezione appartamento
+selected_apartment = st.selectbox(
+    "🏠 Seleziona Appartamento",
+    options=[""] + apartments,
+    help="Scegli l'appartamento per cui stai creando il video"
+)
+
+# Selezione tipologia video
+selected_video_type = st.selectbox(
+    "🎥 Tipologia Video",
+    options=[""] + video_types,
+    help="Scegli la tipologia di video che stai creando"
+)
+
+# Campo per aggiungere nuove tipologie
+with st.expander("➕ Aggiungi Nuova Tipologia"):
+    new_video_type = st.text_input(
+        "Nuova tipologia",
+        placeholder="es: aspirapolvere",
+        help="Inserisci una nuova tipologia di video"
+    )
+    if st.button("Aggiungi"):
+        if new_video_type and new_video_type not in video_types:
+            video_types.append(new_video_type)
+            video_types.sort()
+            st.success(f"✅ Tipologia '{new_video_type}' aggiunta!")
+            st.rerun()
+
+# Verifica che siano state selezionate entrambe le opzioni
+if not selected_apartment or not selected_video_type:
+    st.warning("⚠️ Seleziona sia l'appartamento che la tipologia di video per procedere")
+    st.stop()
+
+# Mostra il titolo del video
+video_title = f"{selected_apartment} {selected_video_type}"
+st.success(f"📹 Titolo video: **{video_title}**")
+
+# Pulsante per elaborare (solo se video caricato e selezioni fatte)
+if uploaded_video is not None and selected_apartment and selected_video_type:
+    if st.button("🚀 Elabora Video", type="primary"):
+        if not openai_api_key:
+            st.error("❌ Inserisci la tua OpenAI API Key")
+            st.stop()
+        
+        # Crea directory temporanea per questa sessione
+        output_dir = create_session_temp_dir()
+        
+        # Valori di default per l'altezza dei sottotitoli
+        italian_height = 75
+        english_height = 50
+        
+        with st.spinner("🔄 Elaborazione video in corso..."):
+            try:
+                # Elabora il video
+                result = process_video(
+                    input_video=video_path,
+                    music_file=None,  # Per ora senza musica
+                    openai_api_key=openai_api_key,
+                    output_dir=output_dir,
+                    video_type=selected_video_type,
+                    italian_height=italian_height,
+                    english_height=english_height
+                )
+                
+                if result['success']:
+                    st.session_state.processed_video = result
+                    st.session_state.segments = result.get('segments', [])
+                    st.success("✅ Video elaborato con successo!")
                     
-                    if result['success']:
-                        st.session_state.processed_video = result
-                        st.session_state.segments = result.get('segments', [])
-                        st.success("✅ Video elaborato con successo!")
-                        
-                        # Mostra il video elaborato
-                        if os.path.exists(result['final_video']):
-                            st.video(result['final_video'])
-                        else:
-                            st.error("❌ File video elaborato non trovato")
+                    # Mostra il video elaborato
+                    if os.path.exists(result['final_video']):
+                        st.video(result['final_video'])
                     else:
-                        st.error(f"❌ Errore durante l'elaborazione: {result.get('error', 'Errore sconosciuto')}")
-                        
-                except Exception as e:
-                    st.error(f"❌ Errore durante l'elaborazione: {str(e)}")
-                    # Pulisci i file temporanei in caso di errore
-                    cleanup_session_files()
+                        st.error("❌ File video elaborato non trovato")
+                else:
+                    st.error(f"❌ Errore durante l'elaborazione: {result.get('error', 'Errore sconosciuto')}")
+                    
+            except Exception as e:
+                st.error(f"❌ Errore durante l'elaborazione: {str(e)}")
+                # Pulisci i file temporanei in caso di errore
+                cleanup_session_files()
 
 # Sezione per modificare i sottotitoli (solo se il video è stato elaborato)
 if st.session_state.processed_video and st.session_state.segments and st.session_state.processed_video.get("has_voice", True):
