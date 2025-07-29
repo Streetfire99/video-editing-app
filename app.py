@@ -477,6 +477,29 @@ with st.form("youtube_upload_form"):
         print(f"🔧 DEBUG: Video title: {youtube_title}")
         print(f"🔧 DEBUG: Privacy status: {privacy_status}")
         
+        # Controlla se c'è un codice di autenticazione in attesa
+        from youtube_account_manager import get_next_account_to_authenticate, authenticate_with_code
+        pending_account = None
+        pending_code = None
+        
+        for account in ["xeniamilano.info@gmail.com", "videoxenia1@gmail.com", "videoxenia2@gmail.com", "videoxenia3@gmail.com", "videoxenia4@gmail.com"]:
+            if f"pending_auth_code_{account}" in st.session_state:
+                pending_account = account
+                pending_code = st.session_state[f"pending_auth_code_{account}"]
+                break
+        
+        if pending_code and pending_account:
+            print(f"🔧 DEBUG: Processing authentication for {pending_account}")
+            if authenticate_with_code(pending_account, pending_code):
+                st.success(f"✅ {pending_account} autenticato con successo!")
+                # Pulisci i dati di autenticazione
+                del st.session_state[f"pending_auth_code_{pending_account}"]
+                del st.session_state[f"pending_auth_account_{pending_account}"]
+                st.rerun()
+            else:
+                st.error("❌ Errore nell'autenticazione. Riprova.")
+                return
+        
         if youtube_status[0]:
             print("🔧 DEBUG: YouTube status is OK, starting upload")
             with st.spinner("Caricamento su YouTube..."):

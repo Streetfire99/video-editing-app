@@ -394,12 +394,13 @@ def show_authentication_banner(account):
             help="Copia il codice che ricevi dopo l'autenticazione"
         )
         
-        if auth_code and st.button(f"✅ Conferma Autenticazione", key=f"confirm_{account}"):
-            if authenticate_with_code(account, auth_code):
-                st.success(f"✅ {account} autenticato con successo!")
-                st.rerun()
-            else:
-                st.error("❌ Errore nell'autenticazione. Riprova.")
+        # Usa st.form_submit_button invece di st.button
+        if auth_code:
+            st.info("💡 Dopo aver inserito il codice, clicca '🚀 Carica su YouTube' per confermare l'autenticazione")
+            
+            # Salva il codice nella session state per usarlo dopo
+            st.session_state[f"pending_auth_code_{account}"] = auth_code
+            st.session_state[f"pending_auth_account_{account}"] = account
     else:
         st.error("❌ Errore nella configurazione OAuth2")
 
