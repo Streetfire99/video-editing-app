@@ -726,107 +726,91 @@ if st.session_state.processed_video and (st.session_state.segments or st.session
         )
     
     # Pulsanti per salvare i transcript
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        if st.button("💾 Salva Transcript Italiano"):
-            try:
-                # Crea il nome del file
-                filename = f"Istruzioni_{selected_video_type}_{selected_apartment}_ita.txt"
-                
-                # Salva su Google Drive
-                from drive_manager import get_drive_service, create_folder_if_not_exists
-                
-                service = get_drive_service()
-                
-                # Crea la cartella dell'appartamento se non esiste
-                apartment_folder_id = create_folder_if_not_exists(service, selected_apartment)
-                
-                # Crea la cartella del tipo video se non esiste
-                video_type_folder_id = create_folder_if_not_exists(service, selected_video_type, apartment_folder_id)
-                
-                # Carica il file su Drive
-                from googleapiclient.http import MediaIoBaseUpload
-                import io
-                
-                file_metadata = {
-                    'name': filename,
-                    'parents': [video_type_folder_id]
-                }
-                
-                file_content = io.BytesIO(edited_italian_text.encode('utf-8'))
-                media = MediaIoBaseUpload(file_content, mimetype='text/plain', resumable=True)
-                
-                file = service.files().create(
-                    body=file_metadata,
-                    media_body=media,
-                    fields='id,webViewLink'
-                ).execute()
-                
-                # Rendi il file pubblico e ottieni il link
-                service.permissions().create(
-                    fileId=file['id'],
-                    body={'type': 'anyone', 'role': 'reader'},
-                    fields='id'
-                ).execute()
-                
-                file_link = file['webViewLink']
-                
-                st.success(f"✅ Transcript italiano salvato su Drive: {filename}")
-                st.session_state.italian_transcript_path = file_link
-                
-            except Exception as e:
-                st.error(f"❌ Errore nel salvataggio del transcript italiano: {str(e)}")
-    
-    with col2:
-        if st.button("💾 Salva Transcript Inglese"):
-            try:
-                # Crea il nome del file
-                filename = f"Istruzioni_{selected_video_type}_{selected_apartment}_en.txt"
-                
-                # Salva su Google Drive
-                from drive_manager import get_drive_service, create_folder_if_not_exists
-                
-                service = get_drive_service()
-                
-                # Crea la cartella dell'appartamento se non esiste
-                apartment_folder_id = create_folder_if_not_exists(service, selected_apartment)
-                
-                # Crea la cartella del tipo video se non esiste
-                video_type_folder_id = create_folder_if_not_exists(service, selected_video_type, apartment_folder_id)
-                
-                # Carica il file su Drive
-                from googleapiclient.http import MediaIoBaseUpload
-                import io
-                
-                file_metadata = {
-                    'name': filename,
-                    'parents': [video_type_folder_id]
-                }
-                
-                file_content = io.BytesIO(edited_english_text.encode('utf-8'))
-                media = MediaIoBaseUpload(file_content, mimetype='text/plain', resumable=True)
-                
-                file = service.files().create(
-                    body=file_metadata,
-                    media_body=media,
-                    fields='id,webViewLink'
-                ).execute()
-                
-                # Rendi il file pubblico e ottieni il link
-                service.permissions().create(
-                    fileId=file['id'],
-                    body={'type': 'anyone', 'role': 'reader'},
-                    fields='id'
-                ).execute()
-                
-                file_link = file['webViewLink']
-                
-                st.success(f"✅ Transcript inglese salvato su Drive: {filename}")
-                st.session_state.english_transcript_path = file_link
-                
-            except Exception as e:
-                st.error(f"❌ Errore nel salvataggio del transcript inglese: {str(e)}")
+    if st.button("💾 Salva Entrambi i Transcript"):
+        try:
+            # Salva su Google Drive
+            from drive_manager import get_drive_service, create_folder_if_not_exists
+            
+            service = get_drive_service()
+            
+            # ID della cartella principale
+            main_folder_id = "1w9P2oiRfFgsOOj82V7xOruhjnl-APCCi"
+            
+            # Crea la cartella dell'appartamento se non esiste
+            apartment_folder_id = create_folder_if_not_exists(service, main_folder_id, selected_apartment)
+            if not apartment_folder_id:
+                st.error("❌ Errore nella creazione della cartella appartamento")
+                return
+            
+            # Crea la cartella del tipo video se non esiste
+            video_type_folder_id = create_folder_if_not_exists(service, apartment_folder_id, selected_video_type)
+            if not video_type_folder_id:
+                st.error("❌ Errore nella creazione della cartella tipo video")
+                return
+            
+            # Carica il file su Drive
+            from googleapiclient.http import MediaIoBaseUpload
+            import io
+            
+            # Salva transcript italiano
+            filename_it = f"Istruzioni_{selected_video_type}_{selected_apartment}_ita.txt"
+            file_metadata_it = {
+                'name': filename_it,
+                'parents': [video_type_folder_id]
+            }
+            
+            file_content_it = io.BytesIO(edited_italian_text.encode('utf-8'))
+            media_it = MediaIoBaseUpload(file_content_it, mimetype='text/plain', resumable=True)
+            
+            file_it = service.files().create(
+                body=file_metadata_it,
+                media_body=media_it,
+                fields='id,webViewLink'
+            ).execute()
+            
+            # Rendi il file pubblico
+            service.permissions().create(
+                fileId=file_it['id'],
+                body={'type': 'anyone', 'role': 'reader'},
+                fields='id'
+            ).execute()
+            
+            file_link_it = file_it['webViewLink']
+            
+            # Salva transcript inglese
+            filename_en = f"Istruzioni_{selected_video_type}_{selected_apartment}_en.txt"
+            file_metadata_en = {
+                'name': filename_en,
+                'parents': [video_type_folder_id]
+            }
+            
+            file_content_en = io.BytesIO(edited_english_text.encode('utf-8'))
+            media_en = MediaIoBaseUpload(file_content_en, mimetype='text/plain', resumable=True)
+            
+            file_en = service.files().create(
+                body=file_metadata_en,
+                media_body=media_en,
+                fields='id,webViewLink'
+            ).execute()
+            
+            # Rendi il file pubblico
+            service.permissions().create(
+                fileId=file_en['id'],
+                body={'type': 'anyone', 'role': 'reader'},
+                fields='id'
+            ).execute()
+            
+            file_link_en = file_en['webViewLink']
+            
+            st.success(f"✅ Entrambi i transcript salvati su Drive!")
+            st.info(f"🇮🇹 Italiano: {filename_it}")
+            st.info(f"🇬🇧 Inglese: {filename_en}")
+            
+            st.session_state.italian_transcript_path = file_link_it
+            st.session_state.english_transcript_path = file_link_en
+            
+        except Exception as e:
+            st.error(f"❌ Errore nel salvataggio dei transcript: {str(e)}")
 
 # Footer
 st.markdown("---")
