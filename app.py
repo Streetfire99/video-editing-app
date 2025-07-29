@@ -364,10 +364,13 @@ if uploaded_video is not None and selected_apartment and selected_video_type:
         
         with st.spinner("🔄 Elaborazione video in corso..."):
             try:
+                # Percorso del file musica
+                music_file = os.path.join("Elaborazione", "audio.mp3")
+                
                 # Elabora il video
                 result = process_video(
                     input_video=video_path,
-                    music_file=None,  # Per ora senza musica
+                    music_file=music_file,  # File musica di sottofondo
                     openai_api_key=openai_api_key,
                     output_dir=output_dir,
                     video_type=selected_video_type,
