@@ -31,6 +31,9 @@ from data_manager import (
     get_translation_prompt_for_video_type
 )
 
+# Importa le funzioni per Google Drive
+from drive_manager import upload_video_to_drive, add_tracking_entry
+
 # Configurazione della pagina
 st.set_page_config(
     page_title="Video Editor con Sottotitoli",
@@ -426,33 +429,27 @@ if st.session_state.processed_video:
         else:
             # Form per l'upload su YouTube
             with st.form("youtube_upload"):
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    video_title = st.text_input("Titolo del video", value=video_title)
-                    privacy_status = st.selectbox(
-                        "Privacy",
-                        options=["unlisted", "private", "public"],
-                        help="unlisted = solo con link, private = solo tu, public = tutti"
-                    )
-                
-                with col2:
-                    video_description = st.text_area("Descrizione", value=f"Video tutorial per {selected_apartment} - {selected_video_type}")
-                    video_tags = st.text_input("Tag (separati da virgole)", value=f"tutorial, {selected_apartment}, {selected_video_type}")
+                video_title = st.text_input("Titolo del video", value=video_title)
+                privacy_status = st.selectbox(
+                    "Privacy",
+                    options=["unlisted", "private", "public"],
+                    help="unlisted = solo con link, private = solo tu, public = tutti"
+                )
                 
                 if st.form_submit_button("🚀 Carica su YouTube"):
                     with st.spinner("Caricamento su YouTube..."):
                         result = upload_to_youtube(
                             video_path=st.session_state.processed_video["final_video"],
                             title=video_title,
-                            description=video_description,
-                            tags=video_tags,
                             privacy_status=privacy_status
                         )
                         
                         if result["success"]:
                             st.success("✅ Video caricato con successo!")
                             st.markdown(f"**Link:** {result['video_url']}")
+                            
+                            # Salva il link YouTube nel session state
+                            st.session_state.youtube_link = result['video_url']
                             
                             # Mostra informazioni aggiuntive
                             with st.expander("📊 Dettagli upload"):
@@ -534,6 +531,46 @@ if st.session_state.processed_video:
                                 3. Prova a riavviare l'app
                                 4. Contatta il supporto se il problema persiste
                                 """)
+
+    # Sezione per l'upload su Google Drive
+    st.subheader("☁️ Carica su Google Drive")
+    
+    if st.button("🚀 Carica su Drive"):
+        with st.spinner("Caricamento su Google Drive..."):
+            drive_link = upload_video_to_drive(
+                video_path=st.session_state.processed_video["final_video"],
+                apartment_name=selected_apartment,
+                video_type=selected_video_type
+            )
+            
+            if drive_link:
+                st.success("✅ Video caricato su Drive con successo!")
+                st.markdown(f"**Link Drive:** {drive_link}")
+                
+                # Salva nel tracking
+                youtube_link = st.session_state.get('youtube_link', '')
+                add_tracking_entry(
+                    apartment=selected_apartment,
+                    video_type=selected_video_type,
+                    youtube_link=youtube_link,
+                    drive_link=drive_link
+                )
+                
+                st.session_state.drive_link = drive_link
+                st.success("✅ Entry aggiunta al tracking!")
+            else:
+                st.error("❌ Errore durante il caricamento su Drive")
+                st.info("""
+                **Possibili cause:**
+                1. Problemi di autenticazione Google Drive
+                2. Permessi insufficienti sulla cartella
+                3. Connessione internet instabile
+                
+                **Soluzione:**
+                1. Verifica le credenziali Google Drive
+                2. Controlla i permessi sulla cartella condivisa
+                3. Riprova più tardi
+                """)
 
 # Footer
 st.markdown("---")

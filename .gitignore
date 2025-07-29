@@ -54,6 +54,9 @@ Thumbs.db
 # Logs
 *.log
 
+# Tracking CSV
+apartments_tracking.csv
+
 # Video files (opzionale, se vuoi escluderli)
 *.mp4
 *.avi

@@ -54,7 +54,7 @@ with col2:
     """)
     
     if st.button("📹 Inizia Editing", type="primary"):
-        st.switch_page("pages/2_📹_Editing_Video.py")
+        st.switch_page("app.py")
 
 st.markdown("---")
 

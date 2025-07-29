@@ -5,52 +5,64 @@ import os
 # Aggiungi il percorso per importare i moduli
 sys.path.append('..')
 from data_manager import load_apartments
+from drive_manager import get_processed_apartments
 
 # Configurazione della pagina
 st.set_page_config(
-    page_title="🏠 Appartamenti - Editing Video",
+    page_title="🏠 Appartamenti",
     page_icon="🏠",
     layout="wide"
 )
 
 # Titolo della pagina
 st.title("🏠 Appartamenti")
-st.markdown("Seleziona un appartamento per vedere i video editati o crearne di nuovi")
 
-# Carica gli appartamenti
-apartments = load_apartments()
+# Pulsanti di navigazione
+col1, col2 = st.columns([1, 4])
+with col1:
+    if st.button("🏠 Home"):
+        st.switch_page("Home.py")
 
-if not apartments:
-    st.warning("⚠️ Nessun appartamento trovato")
-    st.info("📋 Gli appartamenti vengono caricati dal Google Sheets. Verifica la connessione.")
+# Carica appartamenti elaborati
+processed_apartments = get_processed_apartments()
+
+if not processed_apartments:
+    st.info("📝 Nessun appartamento elaborato ancora. Vai alla pagina di editing per iniziare!")
 else:
-    # Mostra gli appartamenti in una griglia
-    cols = st.columns(3)
+    st.subheader("📋 Appartamenti con video elaborati")
     
-    for i, apartment in enumerate(apartments):
-        col = cols[i % 3]
-        
-        with col:
-            st.markdown(f"""
-            ### 🏢 {apartment}
+    # Dizionario delle emoji per le tipologie
+    video_type_icons = {
+        'spazzatura': '🗑️',
+        'caldaia': '🔥',
+        'forno': '🍕',
+        'frigorifero': '❄️',
+        'lavatrice': '👕',
+        'piano_cottura': '🍳',
+        'scaldabagno': '🚿',
+        'lavastoviglie': '🍽️',
+        'microonde': '⚡',
+        'asciugatrice': '🌬️',
+        'riscaldamento': '🌡️',
+        'condizionamento': '❄️',
+        'check-in': '🔑'
+    }
+    
+    # Mostra appartamenti elaborati con solo emoji
+    for apartment, video_types in processed_apartments.items():
+        with st.container():
+            col1, col2, col3 = st.columns([2, 3, 1])
             
-            **Video editati:** 0
+            with col1:
+                st.write(f"**{apartment}**")
             
-            **Tipologie disponibili:**
-            - 🗑️ Spazzatura
-            - 🔥 Caldaia
-            - 🧺 Lavatrice
-            - 🍳 Piano cottura
+            with col2:
+                # Mostra solo emoji per le tipologie di video
+                icons_text = " ".join([video_type_icons.get(vt, '📹') for vt in video_types])
+                st.write(icons_text)
             
-            ---
-            """)
-            
-            # Pulsante per andare alla pagina dell'appartamento
-            if st.button(f"📋 Gestisci {apartment}", key=f"btn_{apartment}"):
-                st.session_state.selected_apartment = apartment
-                st.switch_page("pages/2_📹_Editing_Video.py")
-
-# Pulsante per tornare alla pagina principale
-st.markdown("---")
-if st.button("🏠 Torna alla Home"):
-    st.switch_page("Home.py") 
+            with col3:
+                # Pulsante per andare alla pagina dei dettagli dell'appartamento
+                if st.button(f"📋 Gestisci", key=f"btn_{apartment}"):
+                    st.session_state.selected_apartment = apartment
+                    st.switch_page("pages/📋_Dettagli_Appartamento.py") 

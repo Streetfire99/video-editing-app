@@ -86,7 +86,7 @@ def get_youtube_credentials():
     
     return creds
 
-def upload_to_youtube(video_path, title, description, tags, privacy_status="unlisted"):
+def upload_to_youtube(video_path, title, privacy_status="unlisted", description="", tags=""):
     """Carica il video su YouTube e restituisce il link"""
     try:
         # Ottieni le credenziali
