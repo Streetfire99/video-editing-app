@@ -35,21 +35,30 @@ SCOPES = ['https://www.googleapis.com/auth/youtube.upload']
 
 def get_client_secrets():
     """Ottiene le credenziali OAuth2 da Streamlit secrets"""
+    print("🔧 DEBUG: Starting get_client_secrets")
     try:
         client_secrets = st.secrets.get("YOUTUBE_CLIENT_SECRETS")
+        print(f"🔧 DEBUG: Client secrets loaded: {client_secrets is not None}")
+        
         if client_secrets:
             # Se è una stringa JSON, convertila in dizionario
             if isinstance(client_secrets, str):
+                print("🔧 DEBUG: Converting string to JSON")
                 import json
                 client_secrets = json.loads(client_secrets)
+                print("✅ DEBUG: JSON conversion successful")
+            else:
+                print("🔧 DEBUG: Using secrets directly")
+            
+            print(f"🔧 DEBUG: Client secrets type: {type(client_secrets)}")
             return client_secrets
         else:
+            print("❌ DEBUG: No client secrets found")
             st.error("❌ Credenziali YouTube non configurate nei secrets")
             return None
     except Exception as e:
+        print(f"❌ DEBUG: Error loading client secrets: {e}")
         st.error(f"❌ Errore nel caricamento delle credenziali: {e}")
-        st.error(f"❌ Tipo di errore: {type(e)}")
-        st.error(f"❌ Dettagli: {str(e)}")
         return None
 
 def get_token_from_session_state(account):
@@ -79,132 +88,74 @@ def is_token_expired_session_state(account):
     # Token scade dopo 24 ore
     return (now - created_at) > 24 * 3600
 
-def authenticate_account(account):
-    """Autentica un account YouTube specifico"""
-    st.info(f"🔐 Autenticazione per: {account}")
+def is_account_authenticated(account):
+    """Controlla se un account è autenticato e valido"""
+    token_data = get_token_from_session_state(account)
+    if not token_data:
+        return False
+    
+    if is_token_expired_session_state(account):
+        return False
+    
+    return True
+
+def authenticate_account_simple(account):
+    """Autenticazione semplificata per un account"""
+    print(f"🔧 DEBUG: Starting simple authentication for: {account}")
     
     client_secrets = get_client_secrets()
     if not client_secrets:
-        return None
+        return False
     
     try:
-        # Assicurati che client_secrets sia un dizionario
-        if isinstance(client_secrets, str):
-            import json
-            client_secrets = json.loads(client_secrets)
-        
         # Crea un file temporaneo con le credenziali
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
             json.dump(client_secrets, f)
             client_secrets_file = f.name
         
-        # Configura il flow OAuth2 per web application
+        # Crea il flusso OAuth2 per web application
         flow = InstalledAppFlow.from_client_secrets_file(
             client_secrets_file, 
-            SCOPES,
-            redirect_uri='urn:ietf:wg:oauth:2.0:oob'
+            SCOPES
         )
         
         # Genera l'URL di autorizzazione
         auth_url, _ = flow.authorization_url(prompt='consent')
         
-        st.markdown(f"""
-        ### 🔐 Autenticazione per {account}
+        # Mostra l'URL e chiedi il codice
+        st.info(f"🔐 Autenticazione per: {account}")
+        st.markdown(f"**🔗 URL di Autorizzazione:**")
+        st.code(auth_url)
         
-        1. **Clicca sul link qui sotto** per autorizzare l'accesso
-        2. **Accedi con l'account**: {account}
-        3. **Copia il codice di autorizzazione** che appare
-        4. **Incolla il codice** nel campo qui sotto
-        
-        [🔗 Autorizza Accesso]({auth_url})
-        """)
-        
-        # Campo per inserire il codice di autorizzazione
         auth_code = st.text_input(
-            "📋 Codice di Autorizzazione",
+            f"Inserisci il codice per {account}:",
             key=f"auth_code_{account}",
-            help="Incolla qui il codice di autorizzazione che hai ricevuto"
+            help="1. Clicca sul link sopra\n2. Autorizza l'applicazione\n3. Copia il codice e incollalo qui"
         )
         
-        if auth_code and st.button("✅ Conferma Autenticazione", key=f"confirm_{account}"):
+        if auth_code and st.button(f"✅ Autentica {account}", key=f"auth_btn_{account}"):
             try:
                 # Scambia il codice per i token
                 flow.fetch_token(code=auth_code)
                 credentials = flow.credentials
                 
-                # Salva il token in session state
+                # Salva il token
                 save_token_to_session_state(account, credentials)
                 
-                st.success(f"✅ Autenticazione completata per {account}!")
+                st.success(f"✅ {account} autenticato con successo!")
                 st.rerun()
+                return True
                 
             except Exception as e:
                 st.error(f"❌ Errore nell'autenticazione: {e}")
-                st.error("💡 Assicurati che il codice sia corretto e non sia scaduto")
+                return False
         
         # Pulisci il file temporaneo
-        try:
-            os.unlink(client_secrets_file)
-        except:
-            pass
-            
-    except Exception as e:
-        st.error(f"❌ Errore nella configurazione OAuth2: {e}")
-        st.error("💡 Verifica che le credenziali nei secrets siano corrette")
-        return None
-
-def get_account_status(account):
-    """Ottiene lo stato di un account"""
-    token_data = get_token_from_session_state(account)
-    
-    if not token_data:
-        return "❌ Non autenticato"
-    
-    if is_token_expired_session_state(account):
-        return "⏰ Token scaduto"
-    
-    # Controlla la data di creazione
-    created_at = token_data.get('created_at', 0)
-    creation_date = datetime.fromtimestamp(created_at)
-    hours_remaining = 24 - (datetime.now() - creation_date).total_seconds() / 3600
-    
-    return f"✅ Attivo ({hours_remaining:.1f}h rimanenti)"
-
-def test_account_upload(account):
-    """Testa l'upload di un account"""
-    token_data = get_token_from_session_state(account)
-    
-    if not token_data or is_token_expired_session_state(account):
-        st.warning("⚠️ Account non autenticato o token scaduto")
+        os.unlink(client_secrets_file)
         return False
-    
-    try:
-        credentials = token_data['credentials']
         
-        # Rinnova il token se necessario
-        if credentials.expired and credentials.refresh_token:
-            credentials.refresh(Request())
-            save_token_to_session_state(account, credentials)
-        
-        # Testa la connessione
-        youtube = build('youtube', 'v3', credentials=credentials)
-        
-        # Ottieni informazioni sul canale
-        channels_response = youtube.channels().list(
-            part='snippet',
-            mine=True
-        ).execute()
-        
-        if channels_response['items']:
-            channel_name = channels_response['items'][0]['snippet']['title']
-            st.success(f"✅ Connessione riuscita: {channel_name}")
-            return True
-        else:
-            st.error("❌ Errore nel recupero delle informazioni del canale")
-            return False
-            
     except Exception as e:
-        st.error(f"❌ Errore nel test: {e}")
+        st.error(f"❌ Errore nella configurazione: {e}")
         return False
 
 def delete_account_token(account):
@@ -212,108 +163,55 @@ def delete_account_token(account):
     key = f"youtube_token_{account.replace('@', '_at_').replace('.', '_')}"
     if key in st.session_state:
         del st.session_state[key]
-        st.success(f"🗑️ Token eliminato per {account}")
-        st.rerun()
+        st.success(f"✅ Token eliminato per {account}")
 
 # Interfaccia principale
-st.header("📊 Stato Account")
+st.header("📋 Stato Account YouTube")
 
-# Tabella degli account
-col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
-
-with col1:
-    st.markdown("**Account**")
-with col2:
-    st.markdown("**Stato**")
-with col3:
-    st.markdown("**Azioni**")
-with col4:
-    st.markdown("**Test**")
-
+# Mostra lo stato di tutti gli account
 for account in YOUTUBE_ACCOUNTS:
+    col1, col2, col3 = st.columns([3, 1, 1])
+    
     with col1:
-        st.write(account)
+        st.write(f"**{account}**")
     
     with col2:
-        status = get_account_status(account)
-        st.write(status)
+        if is_account_authenticated(account):
+            st.success("✅ Autenticato")
+        else:
+            st.error("❌ Non autenticato")
     
     with col3:
-        if "Non autenticato" in status or "scaduto" in status:
-            if st.button("🔐 Autentica", key=f"auth_{account}"):
-                st.session_state[f"show_auth_{account}"] = True
-        else:
-            if st.button("🗑️ Elimina", key=f"delete_{account}"):
+        if is_account_authenticated(account):
+            if st.button(f"🗑️ Elimina", key=f"delete_{account}"):
                 delete_account_token(account)
-    
-    with col4:
-        if st.button("🧪 Test", key=f"test_{account}"):
-            test_account_upload(account)
-
-# Sezione di autenticazione
-st.header("🔐 Autenticazione Account")
-
-selected_account = st.selectbox(
-    "Seleziona account da autenticare:",
-    YOUTUBE_ACCOUNTS,
-    help="Scegli l'account per cui vuoi configurare l'autenticazione"
-)
-
-# Mostra l'interfaccia di autenticazione per l'account selezionato
-if st.session_state.get(f"show_auth_{selected_account}", False):
-    authenticate_account(selected_account)
-    
-    if st.button("❌ Annulla", key=f"cancel_{selected_account}"):
-        st.session_state[f"show_auth_{selected_account}"] = False
-        st.rerun()
-
-# Informazioni aggiuntive
-st.header("ℹ️ Informazioni")
-
-st.markdown("""
-### 📋 Come funziona:
-
-1. **Autenticazione Manuale**: Ogni account richiede un'autenticazione manuale
-2. **Token Giornalieri**: I token si resettano automaticamente ogni 24 ore
-3. **Rotazione Automatica**: Gli account vengono usati in ordine fino al limite
-4. **Test Connessione**: Puoi testare ogni account per verificare la funzionalità
-
-### 🔄 Reset Automatico:
-- I token scadono dopo 24 ore
-- Devi re-autenticare manualmente ogni account
-- Il sistema usa automaticamente l'account successivo disponibile
-
-### 📊 Monitoraggio:
-- Controlla lo stato di ogni account
-- Testa la connessione prima dell'uso
-- Elimina token non più necessari
-
-### ☁️ Compatibilità Streamlit Cloud:
-- I token vengono salvati in memoria (session state)
-- Non persistono tra i riavvii dell'app
-- Devi re-autenticare dopo ogni riavvio
-""")
+                st.rerun()
+        else:
+            if st.button(f"🔐 Autentica", key=f"auth_{account}"):
+                authenticate_account_simple(account)
 
 # Statistiche
-st.header("📈 Statistiche")
+st.header("📊 Statistiche")
+authenticated_count = sum(1 for account in YOUTUBE_ACCOUNTS if is_account_authenticated(account))
+total_count = len(YOUTUBE_ACCOUNTS)
 
-active_accounts = 0
-expired_accounts = 0
-unauthenticated_accounts = 0
+st.metric("Account Autenticati", f"{authenticated_count}/{total_count}")
 
-for account in YOUTUBE_ACCOUNTS:
-    status = get_account_status(account)
-    if "Attivo" in status:
-        active_accounts += 1
-    elif "scaduto" in status:
-        expired_accounts += 1
-    else:
-        unauthenticated_accounts += 1
+if authenticated_count == 0:
+    st.warning("⚠️ Nessun account autenticato. Autentica almeno un account per caricare video su YouTube.")
+elif authenticated_count < total_count:
+    st.info(f"ℹ️ {total_count - authenticated_count} account non ancora autenticati.")
+else:
+    st.success("🎉 Tutti gli account sono autenticati!")
 
-col1, col2, col3 = st.columns(3)
-with col1:
-    st.metric("✅ Attivi", active_accounts)
-with col2:
-    st.metric("⏰ Scaduti", expired_accounts)
-with col3:
-    st.metric("❌ Non autenticati", unauthenticated_accounts) 
+# Debug info
+with st.expander("🔧 Debug Info"):
+    st.write("**Token salvati in session state:**")
+    for account in YOUTUBE_ACCOUNTS:
+        key = f"youtube_token_{account.replace('@', '_at_').replace('.', '_')}"
+        token_data = st.session_state.get(key)
+        if token_data:
+            created_at = datetime.fromtimestamp(token_data.get('created_at', 0))
+            st.write(f"- {account}: ✅ (creato: {created_at.strftime('%H:%M:%S')})")
+        else:
+            st.write(f"- {account}: ❌") 

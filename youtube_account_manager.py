@@ -41,16 +41,21 @@ def get_token_from_session_state(account):
     """Ottiene il token da session state (per Streamlit Cloud)"""
     import streamlit as st
     key = f"youtube_token_{account.replace('@', '_at_').replace('.', '_')}"
-    return st.session_state.get(key)
+    token_data = st.session_state.get(key)
+    print(f"🔧 DEBUG: Getting token for {account}, key: {key}, found: {token_data is not None}")
+    return token_data
 
 def save_token_to_session_state(account, credentials):
     """Salva il token in session state (per Streamlit Cloud)"""
     import streamlit as st
     key = f"youtube_token_{account.replace('@', '_at_').replace('.', '_')}"
-    st.session_state[key] = {
+    token_data = {
         'credentials': credentials,
         'created_at': datetime.now().timestamp()
     }
+    st.session_state[key] = token_data
+    print(f"🔧 DEBUG: Saved token for {account}, key: {key}")
+    print(f"🔧 DEBUG: Session state keys: {list(st.session_state.keys())}")
 
 def is_token_expired_session_state(account):
     """Controlla se il token in session state è scaduto"""
@@ -58,50 +63,84 @@ def is_token_expired_session_state(account):
     key = f"youtube_token_{account.replace('@', '_at_').replace('.', '_')}"
     token_data = st.session_state.get(key)
     
+    print(f"🔧 DEBUG: Checking token expiry for {account}")
+    print(f"🔧 DEBUG: Token data exists: {token_data is not None}")
+    
     if not token_data:
+        print(f"❌ DEBUG: No token data for {account}")
         return True
     
     created_at = token_data.get('created_at', 0)
     now = datetime.now().timestamp()
+    time_diff = now - created_at
+    is_expired = time_diff > 24 * 3600
+    
+    print(f"🔧 DEBUG: Token age: {time_diff/3600:.1f}h, expired: {is_expired}")
     
     # Token scade dopo 24 ore
-    return (now - created_at) > 24 * 3600
+    return is_expired
 
 def get_available_account():
     """Ottiene il primo account disponibile con token valido"""
+    print("🔧 DEBUG: Starting get_available_account")
+    
     for account in YOUTUBE_ACCOUNTS:
-        if not is_token_expired_session_state(account):
+        print(f"🔧 DEBUG: Checking account: {account}")
+        is_expired = is_token_expired_session_state(account)
+        print(f"🔧 DEBUG: Token expired: {is_expired}")
+        
+        if not is_expired:
+            print(f"✅ DEBUG: Found available account: {account}")
             return account
+    
+    print("❌ DEBUG: No available accounts found")
     return None
 
 def get_youtube_service(account=None):
     """Ottiene il servizio YouTube per un account specifico o il primo disponibile"""
+    print("🔧 DEBUG: Starting get_youtube_service")
+    print(f"🔧 DEBUG: Account parameter: {account}")
+    
     if account is None:
         account = get_available_account()
+        print(f"🔧 DEBUG: Selected account: {account}")
     
     if account is None:
+        print("❌ DEBUG: No available account found")
         raise Exception("❌ Nessun account YouTube disponibile. Configura l'autenticazione nella pagina 'YouTube Accounts'.")
     
+    print(f"🔧 DEBUG: Getting token for account: {account}")
     token_data = get_token_from_session_state(account)
+    print(f"🔧 DEBUG: Token data: {token_data is not None}")
     
     if not token_data:
+        print("❌ DEBUG: No token data found")
         raise Exception(f"❌ Account {account} non autenticato")
     
     if is_token_expired_session_state(account):
+        print("❌ DEBUG: Token is expired")
         raise Exception(f"❌ Token scaduto per {account}. Re-autentica nella pagina 'YouTube Accounts'.")
     
     try:
+        print("🔧 DEBUG: Creating credentials from token")
         credentials = token_data['credentials']
+        print(f"🔧 DEBUG: Credentials type: {type(credentials)}")
         
         # Rinnova il token se necessario
         if credentials.expired and credentials.refresh_token:
+            print("🔧 DEBUG: Refreshing expired credentials")
             credentials.refresh(Request())
             save_token_to_session_state(account, credentials)
         
-        return build('youtube', 'v3', credentials=credentials), account
+        print("🔧 DEBUG: Building YouTube service")
+        youtube_service = build('youtube', 'v3', credentials=credentials)
+        print("✅ DEBUG: YouTube service created successfully")
+        
+        return youtube_service, account
         
     except Exception as e:
-        raise Exception(f"❌ Errore nell'accesso all'account {account}: {e}")
+        print(f"❌ DEBUG: Error creating YouTube service: {e}")
+        raise e
 
 def upload_video_with_rotation(video_path, title, privacy_status="unlisted", description="", tags=""):
     """Carica un video su YouTube usando la rotazione automatica degli account"""
