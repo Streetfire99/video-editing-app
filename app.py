@@ -10,7 +10,7 @@ import sys
 sys.path.append('Elaborazione')
 
 # Importa le funzioni da prova.py
-from prova import (
+from Elaborazione.prova import (
     process_video, 
     get_openai_client, 
     create_srt_file, 

@@ -20,76 +20,63 @@ def get_drive_service():
         print("🔧 DEBUG: Starting get_drive_service")
         
         # Prova prima da Streamlit secrets
-        google_credentials = st.secrets.get('GOOGLE_SHEETS_CREDENTIALS')
-        print(f"🔧 DEBUG: Got credentials from secrets: {type(google_credentials)}")
-        
-        if google_credentials:
+        credentials_str = st.secrets.get('GOOGLE_SHEETS_CREDENTIALS')
+        if credentials_str:
+            print("🔧 DEBUG: Got credentials from secrets:", type(credentials_str))
+            
             # Se è una stringa JSON, convertila in dizionario
-            if isinstance(google_credentials, str):
+            if isinstance(credentials_str, str):
                 print("🔧 DEBUG: Converting string to dict")
                 import json
-                try:
-                    google_credentials = json.loads(google_credentials)
-                    print("🔧 DEBUG: JSON parsing successful")
-                    print(f"🔧 DEBUG: Parsed credentials keys: {list(google_credentials.keys())}")
-                except json.JSONDecodeError as e:
-                    print(f"❌ DEBUG: JSON parsing failed: {e}")
-                    st.error(f"❌ Errore nel parsing JSON delle credenziali: {e}")
-                    return None
-            
-            print("🔧 DEBUG: Creating credentials from service account info")
-            # Crea le credenziali dal dizionario
-            from google.oauth2.service_account import Credentials
-            try:
-                print(f"🔧 DEBUG: Credentials dict keys: {list(google_credentials.keys())}")
-                print(f"🔧 DEBUG: private_key present: {'private_key' in google_credentials}")
-                if 'private_key' in google_credentials:
-                    print(f"🔧 DEBUG: private_key length: {len(google_credentials['private_key'])}")
-                    print(f"🔧 DEBUG: private_key starts with: {google_credentials['private_key'][:50]}...")
-                    # Sostituisci \\n con \n se necessario
-                    if '\\\\n' in google_credentials['private_key']:
-                        print("🔧 DEBUG: Replacing \\\\n with \\n")
-                        google_credentials['private_key'] = google_credentials['private_key'].replace('\\\\n', '\\n')
-                    elif '\\n' not in google_credentials['private_key']:
-                        print("🔧 DEBUG: No \\n found in private_key, this might be the issue")
-                
-                credentials = Credentials.from_service_account_info(google_credentials)
-                print("🔧 DEBUG: Credentials created successfully")
-            except Exception as e:
-                print(f"❌ DEBUG: Error creating credentials: {e}")
-                print(f"❌ DEBUG: Error type: {type(e)}")
-                st.error(f"❌ Errore nella creazione delle credenziali: {e}")
-                return None
-            
-            # Crea il client
-            print("🔧 DEBUG: Building drive service")
-            service = build('drive', 'v3', credentials=credentials)
-            print("🔧 DEBUG: Drive service built successfully")
-            return service
-        else:
-            print("🔧 DEBUG: No credentials in secrets, trying environment")
-            # Fallback alle variabili d'ambiente
-            google_credentials = os.getenv('GOOGLE_SHEETS_CREDENTIALS')
-            if google_credentials:
-                # Se è una stringa JSON, convertila in dizionario
-                if isinstance(google_credentials, str):
-                    import json
-                    google_credentials = json.loads(google_credentials)
-                
-                # Crea le credenziali dal dizionario
-                from google.oauth2.service_account import Credentials
-                credentials = Credentials.from_service_account_info(google_credentials)
-                
-                # Crea il client
-                service = build('drive', 'v3', credentials=credentials)
-                return service
+                credentials_dict = json.loads(credentials_str)
+                print("🔧 DEBUG: JSON parsing successful")
             else:
-                st.error("❌ Credenziali Google Drive non configurate")
+                credentials_dict = credentials_str
+        else:
+            # Fallback alle variabili d'ambiente
+            credentials_str = os.getenv('GOOGLE_SHEETS_CREDENTIALS')
+            if not credentials_str:
+                st.error("❌ GOOGLE_SHEETS_CREDENTIALS non trovata nei secrets o nelle variabili d'ambiente")
                 return None
+            
+            import json
+            credentials_dict = json.loads(credentials_str)
+        
+        print("🔧 DEBUG: Parsed credentials keys:", list(credentials_dict.keys()))
+        
+        # Correggi automaticamente la private_key se necessario
+        if 'private_key' in credentials_dict:
+            private_key = credentials_dict['private_key']
+            print("🔧 DEBUG: private_key present:", bool(private_key))
+            print("🔧 DEBUG: private_key length:", len(private_key))
+            print("🔧 DEBUG: private_key starts with:", private_key[:50])
+            
+            # Sostituisci \\n con \n se necessario
+            if '\\n' in private_key:
+                print("🔧 DEBUG: Fixing \\n in private_key")
+                private_key = private_key.replace('\\n', '\n')
+                credentials_dict['private_key'] = private_key
+        
+        print("🔧 DEBUG: Creating credentials from service account info")
+        print("🔧 DEBUG: Credentials dict keys:", list(credentials_dict.keys()))
+        
+        # Crea le credenziali
+        from google.oauth2.service_account import Credentials
+        credentials = Credentials.from_service_account_info(credentials_dict)
+        
+        print("🔧 DEBUG: Credentials created successfully")
+        
+        # Crea il servizio Drive
+        from googleapiclient.discovery import build
+        service = build('drive', 'v3', credentials=credentials)
+        
+        print("🔧 DEBUG: Service built successfully")
+        return service
+        
     except Exception as e:
+        print("❌ DEBUG: Error creating credentials:", str(e))
+        print("❌ DEBUG: Error type:", type(e))
         st.error(f"❌ Errore nel caricamento delle credenziali Google Drive: {e}")
-        st.error(f"❌ Tipo di errore: {type(e)}")
-        st.error(f"❌ Dettagli: {str(e)}")
         return None
 
 def create_folder_if_not_exists(service, parent_folder_id, folder_name):

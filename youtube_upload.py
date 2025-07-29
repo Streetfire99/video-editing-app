@@ -12,6 +12,7 @@ from youtube_account_manager import (
     upload_video_with_rotation,
     get_accounts_summary,
     get_available_account,
+    get_account_status,
     test_account
 )
 
