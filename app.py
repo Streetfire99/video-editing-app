@@ -498,7 +498,6 @@ with st.form("youtube_upload_form"):
                 st.rerun()
             else:
                 st.error("❌ Errore nell'autenticazione. Riprova.")
-                return
         
         if youtube_status[0]:
             print("🔧 DEBUG: YouTube status is OK, starting upload")
