@@ -740,13 +740,13 @@ if st.session_state.processed_video and (st.session_state.segments or st.session
             apartment_folder_id = create_folder_if_not_exists(service, main_folder_id, selected_apartment)
             if not apartment_folder_id:
                 st.error("❌ Errore nella creazione della cartella appartamento")
-                return
+                st.stop()
             
             # Crea la cartella del tipo video se non esiste
             video_type_folder_id = create_folder_if_not_exists(service, apartment_folder_id, selected_video_type)
             if not video_type_folder_id:
                 st.error("❌ Errore nella creazione della cartella tipo video")
-                return
+                st.stop()
             
             # Carica il file su Drive
             from googleapiclient.http import MediaIoBaseUpload
