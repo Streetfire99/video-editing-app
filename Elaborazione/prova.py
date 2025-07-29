@@ -26,14 +26,23 @@ def get_openai_client(api_key):
 
 def extract_audio_from_video(input_video, audio_file):
     """Estrae l'audio dal video"""
+    print(f"🔧 DEBUG: extract_audio_from_video - input: {input_video}, output: {audio_file}")
     # Usa solo ffmpeg-python
     try:
+        print("🔧 DEBUG: Importing ffmpeg...")
         import ffmpeg
+        print("🔧 DEBUG: ffmpeg imported successfully")
         stream = ffmpeg.input(input_video)
         stream = ffmpeg.output(stream, audio_file, vn=None, ac=1, ar=16000)
+        print("🔧 DEBUG: Running ffmpeg.run...")
         ffmpeg.run(stream, overwrite_output=True)
-    except ImportError:
+        print("🔧 DEBUG: ffmpeg.run completed successfully")
+    except ImportError as e:
+        print(f"❌ DEBUG: ImportError - {e}")
         raise Exception("ffmpeg-python non è disponibile. Installa ffmpeg-python.")
+    except Exception as e:
+        print(f"❌ DEBUG: Unexpected error in extract_audio_from_video - {e}")
+        raise e
     return audio_file
 
 def transcribe_audio(audio_file, client):
@@ -253,9 +262,12 @@ Translate the following Italian text to English, ensuring:
 
 def add_background_music(input_video, music_file, output_video):
     """Aggiunge musica di sottofondo"""
+    print(f"🔧 DEBUG: add_background_music - input: {input_video}, music: {music_file}, output: {output_video}")
     # Usa solo ffmpeg-python
     try:
+        print("🔧 DEBUG: Importing ffmpeg for background music...")
         import ffmpeg
+        print("🔧 DEBUG: ffmpeg imported successfully for background music")
         input_stream = ffmpeg.input(input_video)
         music_stream = ffmpeg.input(music_file, stream_loop=-1)
         stream = ffmpeg.output(
@@ -264,16 +276,27 @@ def add_background_music(input_video, music_file, output_video):
             output_video,
             shortest=None
         )
+        print("🔧 DEBUG: Running ffmpeg.run for background music...")
         ffmpeg.run(stream, overwrite_output=True)
-    except ImportError:
+        print("🔧 DEBUG: Background music added successfully")
+    except ImportError as e:
+        print(f"❌ DEBUG: ImportError in add_background_music - {e}")
         raise Exception("ffmpeg-python non è disponibile. Installa ffmpeg-python.")
+    except Exception as e:
+        print(f"❌ DEBUG: Unexpected error in add_background_music - {e}")
+        raise e
 
 def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, output_video):
     """Aggiunge sottotitoli duali al video"""
+    print(f"🔧 DEBUG: add_subtitles_to_video - input: {input_video}, it_subs: {subtitle_file_it}, en_subs: {subtitle_file_en}, output: {output_video}")
     # Usa solo ffmpeg-python
     try:
+        print("🔧 DEBUG: Importing ffmpeg for subtitles...")
         import ffmpeg
+        print("🔧 DEBUG: ffmpeg imported successfully for subtitles")
+        
         # Sottotitoli italiani
+        print("🔧 DEBUG: Adding Italian subtitles...")
         stream = ffmpeg.input(input_video)
         stream = ffmpeg.output(
             stream,
@@ -281,8 +304,10 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
             vf=f"subtitles={subtitle_file_it}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV=75'"
         )
         ffmpeg.run(stream, overwrite_output=True)
+        print("🔧 DEBUG: Italian subtitles added successfully")
         
         # Sottotitoli inglesi
+        print("🔧 DEBUG: Adding English subtitles...")
         stream = ffmpeg.input("temp_with_it_subs.mp4")
         stream = ffmpeg.output(
             stream,
@@ -290,16 +315,24 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
             vf=f"subtitles={subtitle_file_en}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV=50'"
         )
         ffmpeg.run(stream, overwrite_output=True)
+        print("🔧 DEBUG: English subtitles added successfully")
         
         # Rimuovi il file temporaneo
         if os.path.exists("temp_with_it_subs.mp4"):
             os.remove("temp_with_it_subs.mp4")
+            print("🔧 DEBUG: Temporary file removed")
             
-    except ImportError:
+    except ImportError as e:
+        print(f"❌ DEBUG: ImportError in add_subtitles_to_video - {e}")
         raise Exception("ffmpeg-python non è disponibile. Installa ffmpeg-python.")
+    except Exception as e:
+        print(f"❌ DEBUG: Unexpected error in add_subtitles_to_video - {e}")
+        raise e
 
 def process_video(input_video, music_file, openai_api_key, output_dir=".", custom_prompt=None, video_type=None):
     """Funzione principale per elaborare il video"""
+    print(f"🔧 DEBUG: process_video started - input: {input_video}, music: {music_file}, output_dir: {output_dir}")
+    
     # Configura file di output
     audio_file = os.path.join(output_dir, "audio.wav")
     subtitle_file_it = os.path.join(output_dir, "subtitles_it.srt")
@@ -307,45 +340,75 @@ def process_video(input_video, music_file, openai_api_key, output_dir=".", custo
     video_with_music = os.path.join(output_dir, "video_with_music.mp4")
     final_output = os.path.join(output_dir, "final_output.mp4")
     
+    print(f"🔧 DEBUG: Output files - audio: {audio_file}, it_subs: {subtitle_file_it}, en_subs: {subtitle_file_en}, video_music: {video_with_music}, final: {final_output}")
+    
     # Inizializza client OpenAI
     client = get_openai_client(openai_api_key)
     
     try:
+        print("🔧 DEBUG: Starting video processing steps...")
+        
         # 1. Estrai l'audio dal video
+        print("🔧 DEBUG: Step 1 - Extracting audio...")
         extract_audio_from_video(input_video, audio_file)
+        print("🔧 DEBUG: Step 1 completed - Audio extracted")
         
         # 2. Trascrivi l'audio
+        print("🔧 DEBUG: Step 2 - Transcribing audio...")
         transcript = transcribe_audio(audio_file, client)
+        print("🔧 DEBUG: Step 2 completed - Audio transcribed")
         
         # 3. Ottimizza la trascrizione
+        print("🔧 DEBUG: Step 3 - Optimizing transcription...")
         raw_transcription = "\n".join([seg.text for seg in transcript.segments])
         optimized_texts = optimize_transcription(raw_transcription, client, custom_prompt, video_type)
+        print("🔧 DEBUG: Step 3 completed - Transcription optimized")
         
         # 4. Distribuisci i sottotitoli
+        print("🔧 DEBUG: Step 4 - Distributing subtitles...")
         distributed_segments = distribute_subtitles(transcript.segments, optimized_texts)
+        print("🔧 DEBUG: Step 4 completed - Subtitles distributed")
         
         # 5. Crea file SRT italiani
+        print("🔧 DEBUG: Step 5 - Creating Italian SRT file...")
         create_srt_file(distributed_segments, subtitle_file_it, "IT")
+        print("🔧 DEBUG: Step 5 completed - Italian SRT created")
         
         # 6. Traduci e crea file SRT inglesi
+        print("🔧 DEBUG: Step 6 - Creating English SRT file...")
         translate_subtitles(distributed_segments, client, subtitle_file_en, video_type)
+        print("🔧 DEBUG: Step 6 completed - English SRT created")
         
         # 7. Aggiungi musica di sottofondo
+        print("🔧 DEBUG: Step 7 - Adding background music...")
         if music_file:
             add_background_music(input_video, music_file, video_with_music)
         else:
             # Se non c'è musica, copia il video originale
+            print(f"🔧 DEBUG: No music file, copying video - input: {input_video}, output: {video_with_music}")
             try:
+                print("🔧 DEBUG: Importing ffmpeg for video copy...")
                 import ffmpeg
+                print("🔧 DEBUG: ffmpeg imported successfully for video copy")
                 stream = ffmpeg.input(input_video)
                 stream = ffmpeg.output(stream, video_with_music, c='copy')
+                print("🔧 DEBUG: Running ffmpeg.run for video copy...")
                 ffmpeg.run(stream, overwrite_output=True)
-            except ImportError:
+                print("🔧 DEBUG: Video copy completed successfully")
+            except ImportError as e:
+                print(f"❌ DEBUG: ImportError in video copy - {e}")
                 raise Exception("ffmpeg-python non è disponibile. Installa ffmpeg-python.")
+            except Exception as e:
+                print(f"❌ DEBUG: Unexpected error in video copy - {e}")
+                raise e
+        print("🔧 DEBUG: Step 7 completed - Background music/video copy done")
         
         # 8. Aggiungi sottotitoli duali
+        print("🔧 DEBUG: Step 8 - Adding subtitles...")
         add_subtitles_to_video(video_with_music, subtitle_file_it, subtitle_file_en, final_output)
+        print("🔧 DEBUG: Step 8 completed - Subtitles added")
         
+        print("🔧 DEBUG: All steps completed successfully!")
         return {
             "success": True,
             "final_video": final_output,
@@ -356,6 +419,10 @@ def process_video(input_video, music_file, openai_api_key, output_dir=".", custo
         }
         
     except Exception as e:
+        print(f"❌ DEBUG: Error in process_video - {e}")
+        print(f"❌ DEBUG: Error type - {type(e)}")
+        import traceback
+        print(f"❌ DEBUG: Traceback - {traceback.format_exc()}")
         return {
             "success": False,
             "error": str(e)
