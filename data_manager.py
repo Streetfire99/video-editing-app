@@ -67,7 +67,7 @@ def get_google_sheets_client():
                 print("🔧 DEBUG: After fix - \n count:", private_key.count('\n'))
             
             # Sostituisci spazi con newline se necessario
-            if ' ' in private_key and '\n' not in private_key:
+            if ' ' in private_key:
                 print("🔧 DEBUG: Fixing spaces in private_key")
                 private_key = private_key.replace(' ', '\n')
                 credentials_dict['private_key'] = private_key
