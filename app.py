@@ -21,7 +21,7 @@ from prova import (
 )
 
 # Importa le funzioni per YouTube
-from youtube_upload import upload_to_youtube, check_youtube_setup
+from youtube_upload import upload_to_youtube, check_youtube_setup, get_youtube_status
 
 # Importa le funzioni per la gestione dei dati
 from data_manager import (
@@ -94,12 +94,17 @@ def load_config():
     """Carica la configurazione dalle variabili d'ambiente"""
     config = {}
     
-    # Carica OpenAI API Key dalle variabili d'ambiente
-    openai_api_key = os.getenv('OPENAI_API_KEY')
+    # Carica OpenAI API Key da Streamlit secrets
+    openai_api_key = st.secrets.get('OPENAI_API_KEY')
     if openai_api_key:
         config['openai_api_key'] = openai_api_key
     else:
-        st.error("❌ OPENAI_API_KEY non trovata nelle variabili d'ambiente")
+        # Fallback alle variabili d'ambiente
+        openai_api_key = os.getenv('OPENAI_API_KEY')
+        if openai_api_key:
+            config['openai_api_key'] = openai_api_key
+        else:
+            st.error("❌ OPENAI_API_KEY non trovata nei secrets o nelle variabili d'ambiente")
     
     return config
 
@@ -521,6 +526,16 @@ if st.session_state.processed_video:
                 **💡 Suggerimento:** Ogni account YouTube ha un limite di 5 video al giorno. Se raggiungi il limite, configura un altro account.
                 """)
         else:
+            # Mostra stato degli account YouTube
+            youtube_status = get_youtube_status()
+            if youtube_status:
+                st.info(f"📊 **Stato Account YouTube:** {youtube_status['active']} attivi, {youtube_status['expired']} scaduti, {youtube_status['unauthenticated']} non autenticati")
+                
+                # Mostra dettagli account
+                with st.expander("📋 Dettagli Account"):
+                    for account, status in youtube_status['accounts'].items():
+                        st.write(f"**{account}:** {status}")
+            
             # Form per l'upload su YouTube
             with st.form("youtube_upload"):
                 video_title = st.text_input("Titolo del video", value=video_title)
@@ -532,32 +547,35 @@ if st.session_state.processed_video:
                 
                 if st.form_submit_button("🚀 Carica su YouTube"):
                     with st.spinner("Caricamento su YouTube..."):
-                        result = upload_to_youtube(
-                            video_path=st.session_state.processed_video["final_video"],
-                            title=video_title,
-                            privacy_status=privacy_status
-                        )
-                        
-                        if result["success"]:
-                            st.success("✅ Video caricato con successo!")
-                            st.markdown(f"**Link:** {result['video_url']}")
+                        try:
+                            result = upload_to_youtube(
+                                video_path=st.session_state.processed_video["final_video"],
+                                title=video_title,
+                                privacy_status=privacy_status
+                            )
                             
-                            # Salva il link YouTube nel session state
-                            st.session_state.youtube_link = result['video_url']
+                            if result:
+                                st.success("✅ Video caricato con successo su YouTube!")
+                                st.markdown(f"**Link:** {result}")
+                                
+                                # Salva il link YouTube nel session state
+                                st.session_state.youtube_link = result
+                                
+                                # Mostra informazioni aggiuntive
+                                with st.expander("📊 Dettagli upload"):
+                                    st.json({
+                                        "title": video_title,
+                                        "privacy": privacy_status,
+                                        "url": result
+                                    })
+                            else:
+                                st.error("❌ Errore durante il caricamento su YouTube")
+                                
+                        except Exception as e:
+                            st.error(f"❌ Errore nell'upload YouTube: {e}")
                             
-                            # Mostra informazioni aggiuntive
-                            with st.expander("📊 Dettagli upload"):
-                                st.json({
-                                    "video_id": result['video_id'],
-                                    "title": video_title,
-                                    "privacy": privacy_status,
-                                    "url": result['video_url']
-                                })
-                        else:
-                            st.error(f"❌ Errore durante il caricamento: {result['error']}")
-                            
-                            # Gestione errori specifici per Streamlit Cloud
-                            error_msg = result['error'].lower()
+                            # Gestione errori specifici
+                            error_msg = str(e).lower()
                             
                             if "quota" in error_msg or "daily" in error_msg or "limit" in error_msg:
                                 st.warning("🚨 **Limite giornaliero raggiunto!**")
@@ -565,38 +583,20 @@ if st.session_state.processed_video:
                                 **Hai raggiunto il limite di 5 video al giorno per questo account YouTube.**
                                 
                                 **Soluzioni:**
-                                1. **Cambia account YouTube:** Elimina il file `token.pickle` e riavvia l'app
+                                1. **Configura altri account:** Vai alla pagina "YouTube Accounts" per aggiungere più account
                                 2. **Aspetta domani:** Il limite si resetta ogni giorno
-                                3. **Usa un altro account:** Configura un nuovo `client_secrets.json`
+                                3. **Rotazione automatica:** Il sistema proverà automaticamente il prossimo account disponibile
                                 """)
                                 
-                                with st.expander("🔧 Come cambiare account YouTube"):
-                                    st.markdown("""
-                                    ### Per cambiare account YouTube:
-                                    
-                                    1. **Elimina il token esistente:**
-                                       - Trova il file `token.pickle` nella cartella del progetto
-                                       - Eliminalo (verrà ricreato automaticamente)
-                                    
-                                    2. **Configura nuovo account:**
-                                       - Scarica un nuovo `client_secrets.json` da Google Cloud Console
-                                       - Sostituisci quello esistente
-                                    
-                                    3. **Riautenticati:**
-                                       - Riavvia l'app
-                                       - Prova di nuovo l'upload
-                                       - Si aprirà il browser per l'autenticazione del nuovo account
-                                    """)
-                                    
                             elif "authentication" in error_msg or "token" in error_msg:
                                 st.warning("🔐 **Problema di autenticazione!**")
                                 st.info("""
                                 **Il token di accesso è scaduto o non valido.**
                                 
                                 **Soluzione:**
-                                1. Elimina il file `token.pickle`
-                                2. Riavvia l'app
-                                3. Riprova l'upload (si aprirà il browser per riautenticarti)
+                                1. Vai alla pagina "YouTube Accounts"
+                                2. Re-autentica gli account scaduti
+                                3. Riprova l'upload
                                 """)
                                 
                             elif "forbidden" in error_msg or "access" in error_msg:

@@ -706,11 +706,15 @@ def get_file_id_from_url(url):
 def combine_instructions(existing_instructions, new_instructions):
     """Combina le istruzioni esistenti con le nuove usando OpenAI"""
     try:
-        # Carica la configurazione dalle variabili d'ambiente
-        openai_api_key = os.getenv('OPENAI_API_KEY')
+        # Carica la configurazione da Streamlit secrets
+        import streamlit as st
+        openai_api_key = st.secrets.get('OPENAI_API_KEY')
         if not openai_api_key:
-            print("❌ OPENAI_API_KEY non trovata nelle variabili d'ambiente")
-            return "Istruzioni non disponibili"
+            # Fallback alle variabili d'ambiente
+            openai_api_key = os.getenv('OPENAI_API_KEY')
+            if not openai_api_key:
+                print("❌ OPENAI_API_KEY non trovata nei secrets o nelle variabili d'ambiente")
+                return "Istruzioni non disponibili"
         
         client = openai.OpenAI(api_key=openai_api_key)
         

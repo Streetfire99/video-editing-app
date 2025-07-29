@@ -3,6 +3,9 @@ import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 import os
+from google.oauth2.credentials import Credentials
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
 
 # Configurazione Google Sheets
 SCOPES = [
@@ -11,35 +14,44 @@ SCOPES = [
 ]
 
 def get_google_sheets_client():
-    """Inizializza il client Google Sheets"""
+    """Ottiene il client per Google Sheets"""
     try:
-        google_credentials = os.getenv('GOOGLE_SHEETS_CREDENTIALS')
-        
+        # Prova prima da Streamlit secrets
+        google_credentials = st.secrets.get('GOOGLE_SHEETS_CREDENTIALS')
         if google_credentials:
-            import json
-            try:
-                credentials_dict = json.loads(google_credentials)
-                credentials = Credentials.from_service_account_info(
-                    credentials_dict,
-                    scopes=SCOPES
-                )
-            except json.JSONDecodeError as e:
-                st.error(f"❌ Errore nel parsing JSON delle credenziali: {e}")
-                return None
+            # Se è una stringa JSON, convertila in dizionario
+            if isinstance(google_credentials, str):
+                import json
+                google_credentials = json.loads(google_credentials)
+            
+            # Crea le credenziali dal dizionario
+            from google.oauth2.service_account import Credentials
+            credentials = Credentials.from_service_account_info(google_credentials)
+            
+            # Crea il client
+            service = build('sheets', 'v4', credentials=credentials)
+            return service
         else:
-            if os.path.exists('service_account_key.json'):
-                credentials = Credentials.from_service_account_file(
-                    'service_account_key.json',
-                    scopes=SCOPES
-                )
+            # Fallback alle variabili d'ambiente
+            google_credentials = os.getenv('GOOGLE_SHEETS_CREDENTIALS')
+            if google_credentials:
+                # Se è una stringa JSON, convertila in dizionario
+                if isinstance(google_credentials, str):
+                    import json
+                    google_credentials = json.loads(google_credentials)
+                
+                # Crea le credenziali dal dizionario
+                from google.oauth2.service_account import Credentials
+                credentials = Credentials.from_service_account_info(google_credentials)
+                
+                # Crea il client
+                service = build('sheets', 'v4', credentials=credentials)
+                return service
             else:
-                st.error("Nessuna credenziale Google trovata. Configura GOOGLE_SHEETS_CREDENTIALS nei secrets di Streamlit Cloud.")
+                st.error("❌ Credenziali Google Sheets non configurate")
                 return None
-        
-        client = gspread.authorize(credentials)
-        return client
     except Exception as e:
-        st.error(f"Errore nel caricamento delle credenziali Google: {e}")
+        st.error(f"❌ Errore nel caricamento delle credenziali Google: {e}")
         return None
 
 def load_apartments():
