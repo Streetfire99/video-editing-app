@@ -124,6 +124,44 @@ openai_api_key = st.text_input(
 with st.sidebar:
     st.header("⚙️ Configurazioni")
     
+    # Debug section
+    with st.expander("🔍 Debug Secrets"):
+        st.write("**Testing secrets loading...**")
+        
+        # Test OpenAI API Key
+        openai_secret = st.secrets.get('OPENAI_API_KEY')
+        st.write(f"OpenAI API Key loaded: {'✅' if openai_secret else '❌'}")
+        
+        # Test Google Sheets Credentials
+        google_secret = st.secrets.get('GOOGLE_SHEETS_CREDENTIALS')
+        st.write(f"Google Sheets Credentials loaded: {'✅' if google_secret else '❌'}")
+        
+        if google_secret:
+            st.write(f"Type: {type(google_secret)}")
+            if isinstance(google_secret, str):
+                st.write("Is string, attempting JSON parse...")
+                try:
+                    import json
+                    parsed = json.loads(google_secret)
+                    st.write("✅ JSON parsing successful")
+                    
+                    # Test private key
+                    private_key = parsed.get('private_key', '')
+                    if private_key:
+                        st.write(f"Private key length: {len(private_key)}")
+                        st.write(f"Private key starts with: {private_key[:50]}...")
+                        st.write(f"Contains \\n: {'✅' if '\\n' in private_key else '❌'}")
+                        st.write(f"Contains \\\\n: {'✅' if '\\\\n' in private_key else '❌'}")
+                    else:
+                        st.write("❌ No private_key found")
+                        
+                except Exception as e:
+                    st.write(f"❌ JSON parsing failed: {e}")
+        
+        # Test YouTube Credentials
+        youtube_secret = st.secrets.get('YOUTUBE_CLIENT_SECRETS')
+        st.write(f"YouTube Credentials loaded: {'✅' if youtube_secret else '❌'}")
+    
     # Mostra stato API Key
     if openai_api_key:
         # Test della chiave API

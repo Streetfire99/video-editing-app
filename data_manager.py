@@ -16,22 +16,43 @@ SCOPES = [
 def get_google_sheets_client():
     """Ottiene il client per Google Sheets"""
     try:
+        print("🔧 DEBUG: Starting get_google_sheets_client")
+        
         # Prova prima da Streamlit secrets
         google_credentials = st.secrets.get('GOOGLE_SHEETS_CREDENTIALS')
+        print(f"🔧 DEBUG: Got credentials from secrets: {type(google_credentials)}")
+        
         if google_credentials:
             # Se è una stringa JSON, convertila in dizionario
             if isinstance(google_credentials, str):
+                print("🔧 DEBUG: Converting string to dict")
                 import json
-                google_credentials = json.loads(google_credentials)
+                try:
+                    google_credentials = json.loads(google_credentials)
+                    print("🔧 DEBUG: JSON parsing successful")
+                except json.JSONDecodeError as e:
+                    print(f"❌ DEBUG: JSON parsing failed: {e}")
+                    st.error(f"❌ Errore nel parsing JSON delle credenziali: {e}")
+                    return None
             
+            print("🔧 DEBUG: Creating credentials from service account info")
             # Crea le credenziali dal dizionario
             from google.oauth2.service_account import Credentials
-            credentials = Credentials.from_service_account_info(google_credentials)
+            try:
+                credentials = Credentials.from_service_account_info(google_credentials)
+                print("🔧 DEBUG: Credentials created successfully")
+            except Exception as e:
+                print(f"❌ DEBUG: Error creating credentials: {e}")
+                st.error(f"❌ Errore nella creazione delle credenziali: {e}")
+                return None
             
             # Crea il client
+            print("🔧 DEBUG: Building service")
             service = build('sheets', 'v4', credentials=credentials)
+            print("🔧 DEBUG: Service built successfully")
             return service
         else:
+            print("🔧 DEBUG: No credentials in secrets, trying environment")
             # Fallback alle variabili d'ambiente
             google_credentials = os.getenv('GOOGLE_SHEETS_CREDENTIALS')
             if google_credentials:
