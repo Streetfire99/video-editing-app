@@ -84,6 +84,11 @@ def authenticate_account(account):
     try:
         # Crea un file temporaneo con le credenziali
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            # Assicurati che client_secrets sia un dizionario
+            if isinstance(client_secrets, str):
+                import json
+                client_secrets = json.loads(client_secrets)
+            
             json.dump(client_secrets, f)
             client_secrets_file = f.name
         
@@ -140,6 +145,8 @@ def authenticate_account(account):
         
     except Exception as e:
         st.error(f"❌ Errore nella configurazione OAuth2: {e}")
+        st.error(f"❌ Tipo di errore: {type(e)}")
+        st.error(f"❌ Dettagli: {str(e)}")
 
 def get_account_status(account):
     """Ottiene lo stato di un account"""
