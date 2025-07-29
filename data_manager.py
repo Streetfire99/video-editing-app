@@ -26,10 +26,14 @@ def get_google_sheets_client():
             )
         else:
             # Fallback al file locale (per sviluppo)
-            credentials = Credentials.from_service_account_file(
-                'service_account_key.json',
-                scopes=SCOPES
-            )
+            if os.path.exists('service_account_key.json'):
+                credentials = Credentials.from_service_account_file(
+                    'service_account_key.json',
+                    scopes=SCOPES
+                )
+            else:
+                st.error("Nessuna credenziale Google trovata. Configura GOOGLE_SHEETS_CREDENTIALS nei secrets di Streamlit Cloud.")
+                return None
         
         return gspread.authorize(credentials)
     except Exception as e:

@@ -88,18 +88,24 @@ st.success(f"📹 Titolo video: **{video_title}**")
 
 # Carica configurazioni
 def load_config():
-    try:
-        with open('config.json', 'r') as f:
-            return json.load(f)
-    except Exception as e:
-        st.error(f"Errore nel caricamento del file config.json: {e}")
-        return {}
+    """Carica la configurazione dalle variabili d'ambiente"""
+    config = {}
+    
+    # Carica OpenAI API Key dalle variabili d'ambiente
+    openai_api_key = os.getenv('OPENAI_API_KEY')
+    if openai_api_key:
+        config['openai_api_key'] = openai_api_key
+    else:
+        st.error("❌ OPENAI_API_KEY non trovata nelle variabili d'ambiente")
+    
+    return config
 
 config = load_config()
 
 # Campo per inserire la chiave API OpenAI
-openai_api_key = st.sidebar.text_input(
+openai_api_key = st.text_input(
     "🔑 OpenAI API Key",
+    value=config.get('openai_api_key', ''),
     type="password",
     help="Inserisci la tua chiave API OpenAI"
 )

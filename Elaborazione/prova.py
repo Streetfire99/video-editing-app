@@ -526,11 +526,13 @@ def get_file_id_from_url(url):
 def combine_instructions(existing_instructions, new_instructions):
     """Combina le istruzioni esistenti con le nuove usando OpenAI"""
     try:
-        # Carica la configurazione dal file config.json nella directory principale
-        config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config.json')
-        with open(config_path) as f:
-            config = json.load(f)
-            client = openai.OpenAI(api_key=config['openai_api_key'])
+        # Carica la configurazione dalle variabili d'ambiente
+        openai_api_key = os.getenv('OPENAI_API_KEY')
+        if not openai_api_key:
+            print("❌ OPENAI_API_KEY non trovata nelle variabili d'ambiente")
+            return "Istruzioni non disponibili"
+        
+        client = openai.OpenAI(api_key=openai_api_key)
         
         prompt = f"""Sei un assistente che combina e formatta istruzioni per elettrodomestici.
 Combina le istruzioni esistenti con le nuove istruzioni, creando una lista di step numerati.
