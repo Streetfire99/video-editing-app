@@ -26,17 +26,17 @@ def get_openai_client(api_key):
 
 def extract_audio_from_video(input_video, audio_file):
     """Estrae l'audio dal video"""
+    # Su Streamlit Cloud, usa direttamente ffmpeg-python
     try:
-        # Prova prima con ffmpeg
-        subprocess.run(["ffmpeg", "-y", "-i", input_video, "-vn", "-ac", "1", "-ar", "16000", audio_file], check=True)
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        # Se ffmpeg non è disponibile, prova con ffmpeg-python
+        import ffmpeg
+        stream = ffmpeg.input(input_video)
+        stream = ffmpeg.output(stream, audio_file, vn=None, ac=1, ar=16000)
+        ffmpeg.run(stream, overwrite_output=True)
+    except ImportError:
+        # Fallback a subprocess solo se ffmpeg-python non è disponibile
         try:
-            import ffmpeg
-            stream = ffmpeg.input(input_video)
-            stream = ffmpeg.output(stream, audio_file, vn=None, ac=1, ar=16000)
-            ffmpeg.run(stream, overwrite_output=True)
-        except ImportError:
+            subprocess.run(["ffmpeg", "-y", "-i", input_video, "-vn", "-ac", "1", "-ar", "16000", audio_file], check=True)
+        except (subprocess.CalledProcessError, FileNotFoundError):
             raise Exception("ffmpeg non è disponibile. Installa ffmpeg o ffmpeg-python.")
     return audio_file
 
@@ -257,86 +257,87 @@ Translate the following Italian text to English, ensuring:
 
 def add_background_music(input_video, music_file, output_video):
     """Aggiunge musica di sottofondo"""
+    # Su Streamlit Cloud, usa direttamente ffmpeg-python
     try:
-        # Prova prima con ffmpeg
-        subprocess.run([
-            "ffmpeg", "-y",
-            "-i", input_video,
-            "-stream_loop", "-1",  # Loop infinito dell'audio
-            "-i", music_file,
-            "-filter_complex", "[1:a]volume=0.7[a1]",
-            "-map", "0:v", "-map", "[a1]",
-            "-c:v", "copy", "-shortest",
-            output_video
-        ], check=True)
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        # Se ffmpeg non è disponibile, prova con ffmpeg-python
+        import ffmpeg
+        input_stream = ffmpeg.input(input_video)
+        music_stream = ffmpeg.input(music_file, stream_loop=-1)
+        stream = ffmpeg.output(
+            input_stream['v'],
+            ffmpeg.filter(music_stream['a'], 'volume', 0.7),
+            output_video,
+            shortest=None
+        )
+        ffmpeg.run(stream, overwrite_output=True)
+    except ImportError:
+        # Fallback a subprocess solo se ffmpeg-python non è disponibile
         try:
-            import ffmpeg
-            input_stream = ffmpeg.input(input_video)
-            music_stream = ffmpeg.input(music_file, stream_loop=-1)
-            stream = ffmpeg.output(
-                input_stream['v'],
-                ffmpeg.filter(music_stream['a'], 'volume', 0.7),
-                output_video,
-                shortest=None
-            )
-            ffmpeg.run(stream, overwrite_output=True)
-        except ImportError:
+            subprocess.run([
+                "ffmpeg", "-y",
+                "-i", input_video,
+                "-stream_loop", "-1",  # Loop infinito dell'audio
+                "-i", music_file,
+                "-filter_complex", "[1:a]volume=0.7[a1]",
+                "-map", "0:v", "-map", "[a1]",
+                "-c:v", "copy", "-shortest",
+                output_video
+            ], check=True)
+        except (subprocess.CalledProcessError, FileNotFoundError):
             raise Exception("ffmpeg non è disponibile. Installa ffmpeg o ffmpeg-python.")
 
 def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, output_video):
     """Aggiunge sottotitoli duali al video"""
+    # Su Streamlit Cloud, usa direttamente ffmpeg-python
     try:
-        # Sottotitoli italiani - posizionati più in alto
-        subprocess.run([
-            "ffmpeg", "-y",
-            "-i", input_video,
-            "-vf", f"subtitles={subtitle_file_it}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV=75'",
-            "-c:a", "copy",
-            "temp_with_it_subs.mp4"
-        ], check=True)
-
-        # Sottotitoli inglesi - posizionati sotto quelli italiani
-        subprocess.run([
-            "ffmpeg", "-y",
-            "-i", "temp_with_it_subs.mp4",
-            "-vf", f"subtitles={subtitle_file_en}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV=50'",
-            "-c:a", "copy",
-            output_video
-        ], check=True)
-
+        import ffmpeg
+        # Sottotitoli italiani
+        stream = ffmpeg.input(input_video)
+        stream = ffmpeg.output(
+            stream,
+            "temp_with_it_subs.mp4",
+            vf=f"subtitles={subtitle_file_it}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV=75'"
+        )
+        ffmpeg.run(stream, overwrite_output=True)
+        
+        # Sottotitoli inglesi
+        stream = ffmpeg.input("temp_with_it_subs.mp4")
+        stream = ffmpeg.output(
+            stream,
+            output_video,
+            vf=f"subtitles={subtitle_file_en}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV=50'"
+        )
+        ffmpeg.run(stream, overwrite_output=True)
+        
         # Rimuovi il file temporaneo
         if os.path.exists("temp_with_it_subs.mp4"):
             os.remove("temp_with_it_subs.mp4")
             
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        # Se ffmpeg non è disponibile, prova con ffmpeg-python
+    except ImportError:
+        # Fallback a subprocess solo se ffmpeg-python non è disponibile
         try:
-            import ffmpeg
-            # Sottotitoli italiani
-            stream = ffmpeg.input(input_video)
-            stream = ffmpeg.output(
-                stream,
-                "temp_with_it_subs.mp4",
-                vf=f"subtitles={subtitle_file_it}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV=75'"
-            )
-            ffmpeg.run(stream, overwrite_output=True)
-            
-            # Sottotitoli inglesi
-            stream = ffmpeg.input("temp_with_it_subs.mp4")
-            stream = ffmpeg.output(
-                stream,
-                output_video,
-                vf=f"subtitles={subtitle_file_en}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV=50'"
-            )
-            ffmpeg.run(stream, overwrite_output=True)
-            
+            # Sottotitoli italiani - posizionati più in alto
+            subprocess.run([
+                "ffmpeg", "-y",
+                "-i", input_video,
+                "-vf", f"subtitles={subtitle_file_it}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV=75'",
+                "-c:a", "copy",
+                "temp_with_it_subs.mp4"
+            ], check=True)
+
+            # Sottotitoli inglesi - posizionati sotto quelli italiani
+            subprocess.run([
+                "ffmpeg", "-y",
+                "-i", "temp_with_it_subs.mp4",
+                "-vf", f"subtitles={subtitle_file_en}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV=50'",
+                "-c:a", "copy",
+                output_video
+            ], check=True)
+
             # Rimuovi il file temporaneo
             if os.path.exists("temp_with_it_subs.mp4"):
                 os.remove("temp_with_it_subs.mp4")
                 
-        except ImportError:
+        except (subprocess.CalledProcessError, FileNotFoundError):
             raise Exception("ffmpeg non è disponibile. Installa ffmpeg o ffmpeg-python.")
 
 def process_video(input_video, music_file, openai_api_key, output_dir=".", custom_prompt=None, video_type=None):
@@ -377,14 +378,15 @@ def process_video(input_video, music_file, openai_api_key, output_dir=".", custo
         else:
             # Se non c'è musica, copia il video originale
             try:
-                subprocess.run(["ffmpeg", "-y", "-i", input_video, "-c", "copy", video_with_music], check=True)
-            except (subprocess.CalledProcessError, FileNotFoundError):
+                import ffmpeg
+                stream = ffmpeg.input(input_video)
+                stream = ffmpeg.output(stream, video_with_music, c='copy')
+                ffmpeg.run(stream, overwrite_output=True)
+            except ImportError:
+                # Fallback a subprocess solo se ffmpeg-python non è disponibile
                 try:
-                    import ffmpeg
-                    stream = ffmpeg.input(input_video)
-                    stream = ffmpeg.output(stream, video_with_music, c='copy')
-                    ffmpeg.run(stream, overwrite_output=True)
-                except ImportError:
+                    subprocess.run(["ffmpeg", "-y", "-i", input_video, "-c", "copy", video_with_music], check=True)
+                except (subprocess.CalledProcessError, FileNotFoundError):
                     raise Exception("ffmpeg non è disponibile. Installa ffmpeg o ffmpeg-python.")
         
         # 8. Aggiungi sottotitoli duali
