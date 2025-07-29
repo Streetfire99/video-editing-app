@@ -53,6 +53,7 @@ def get_google_sheets_client():
     except Exception as e:
         st.error(f"❌ Errore nel caricamento delle credenziali Google: {e}")
         st.error(f"❌ Tipo di errore: {type(e)}")
+        st.error(f"❌ Dettagli: {str(e)}")
         return None
 
 def load_apartments():

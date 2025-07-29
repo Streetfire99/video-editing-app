@@ -29,7 +29,7 @@ def get_drive_service():
             from google.oauth2.service_account import Credentials
             credentials = Credentials.from_service_account_info(google_credentials)
             
-            # Crea il servizio Drive
+            # Crea il client
             service = build('drive', 'v3', credentials=credentials)
             return service
         else:
@@ -45,7 +45,7 @@ def get_drive_service():
                 from google.oauth2.service_account import Credentials
                 credentials = Credentials.from_service_account_info(google_credentials)
                 
-                # Crea il servizio Drive
+                # Crea il client
                 service = build('drive', 'v3', credentials=credentials)
                 return service
             else:
@@ -53,6 +53,8 @@ def get_drive_service():
                 return None
     except Exception as e:
         st.error(f"❌ Errore nel caricamento delle credenziali Google Drive: {e}")
+        st.error(f"❌ Tipo di errore: {type(e)}")
+        st.error(f"❌ Dettagli: {str(e)}")
         return None
 
 def create_folder_if_not_exists(service, parent_folder_id, folder_name):
