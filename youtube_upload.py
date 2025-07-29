@@ -11,9 +11,9 @@ from googleapiclient.errors import HttpError
 from youtube_account_manager import (
     upload_video_with_rotation,
     get_accounts_summary,
-    get_available_account,
-    get_account_status,
-    test_account
+    is_account_authenticated,
+    get_next_account_to_authenticate,
+    show_authentication_banner
 )
 
 # Configurazione OAuth2 per YouTube
@@ -24,29 +24,32 @@ SCOPES = [
 
 def check_youtube_setup():
     """Controlla se YouTube è configurato correttamente"""
-    print("🔧 DEBUG: Starting check_youtube_setup")
     try:
-        # Controlla se ci sono account disponibili
-        available_account = get_available_account()
-        print(f"🔧 DEBUG: Available account: {available_account}")
+        # Controlla se ci sono account autenticati
+        authenticated_accounts = [acc for acc in ["xeniamilano.info@gmail.com", "videoxenia1@gmail.com", "videoxenia2@gmail.com", "videoxenia3@gmail.com", "videoxenia4@gmail.com"] if is_account_authenticated(acc)]
         
-        if available_account:
-            print("✅ DEBUG: YouTube setup OK")
-            return True, f"✅ YouTube configurato con account: {available_account}"
+        if authenticated_accounts:
+            return True, f"✅ YouTube configurato con {len(authenticated_accounts)} account autenticati"
         else:
-            print("❌ DEBUG: No available accounts")
-            return False, "❌ Nessun account YouTube disponibile"
+            return False, "❌ Nessun account YouTube autenticato"
     except Exception as e:
-        print(f"❌ DEBUG: Error in check_youtube_setup: {e}")
         return False, f"❌ Errore nella configurazione YouTube: {e}"
 
 def upload_to_youtube(video_path, title, privacy_status="unlisted", description="", tags=""):
     """Carica il video su YouTube usando la rotazione automatica degli account"""
-    print("🔧 DEBUG: Starting upload_to_youtube")
-    print(f"🔧 DEBUG: Video path: {video_path}")
-    print(f"🔧 DEBUG: Title: {title}")
-    
     try:
+        # Controlla se ci sono account autenticati
+        if not any(is_account_authenticated(acc) for acc in ["xeniamilano.info@gmail.com", "videoxenia1@gmail.com", "videoxenia2@gmail.com", "videoxenia3@gmail.com", "videoxenia4@gmail.com"]):
+            # Nessun account autenticato, mostra banner per il primo
+            next_account = get_next_account_to_authenticate()
+            if next_account:
+                show_authentication_banner(next_account)
+                return None
+            else:
+                st.error("❌ Nessun account YouTube disponibile")
+                return None
+        
+        # Prova l'upload
         result = upload_video_with_rotation(
             video_path=video_path,
             title=title,
@@ -55,21 +58,16 @@ def upload_to_youtube(video_path, title, privacy_status="unlisted", description=
             tags=tags
         )
         
-        print(f"🔧 DEBUG: Upload result: {result}")
-        
         if result["success"]:
-            print("✅ DEBUG: Upload successful")
             st.success(f"✅ Video caricato con successo su YouTube!")
             st.info(f"📺 Account utilizzato: {result['account_used']}")
             st.info(f"🔗 Link: {result['video_url']}")
             return result['video_url']
         else:
-            print("❌ DEBUG: Upload failed")
             st.error("❌ Errore nel caricamento su YouTube")
             return None
             
     except Exception as e:
-        print(f"❌ DEBUG: Exception in upload_to_youtube: {e}")
         st.error(f"❌ Errore nell'upload YouTube: {e}")
         return None
 
@@ -85,6 +83,7 @@ def get_youtube_status():
 def test_youtube_account(account):
     """Testa un account YouTube specifico"""
     try:
+        from youtube_account_manager import test_account
         success, message = test_account(account)
         if success:
             st.success(message)
