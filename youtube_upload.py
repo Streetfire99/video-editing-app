@@ -45,7 +45,32 @@ def get_youtube_credentials():
                 try:
                     flow = InstalledAppFlow.from_client_secrets_file(
                         temp_file_path, SCOPES)
-                    creds = flow.run_local_server(port=0)
+                    
+                    # Su Streamlit Cloud, usa un approccio diverso per l'autenticazione
+                    if os.getenv('STREAMLIT_SERVER_PORT'):  # Siamo su Streamlit Cloud
+                        # Per ora, mostra un messaggio per configurare manualmente
+                        st.error("❌ Autenticazione YouTube richiesta!")
+                        st.info("""
+                        **Per completare l'autenticazione YouTube su Streamlit Cloud:**
+                        
+                        1. **Configura le credenziali OAuth2:**
+                           - Vai su [Google Cloud Console](https://console.cloud.google.com/)
+                           - Crea credenziali OAuth2 (tipo: Web application)
+                           - Aggiungi l'URL della tua app Streamlit agli URI autorizzati
+                           - Scarica il file JSON
+                        
+                        2. **Aggiungi alle Secrets di Streamlit Cloud:**
+                           - Vai su [Streamlit Cloud](https://share.streamlit.io/)
+                           - Seleziona il tuo repository
+                           - Vai su "Settings" > "Secrets"
+                           - Aggiungi: `YOUTUBE_CLIENT_SECRETS = '{"web": {...}}'`
+                        
+                        3. **Riavvia l'app** e riprova l'upload
+                        """)
+                        return None
+                    else:
+                        # Ambiente locale
+                        creds = flow.run_local_server(port=0)
                 finally:
                     # Pulisci il file temporaneo
                     os.unlink(temp_file_path)
@@ -205,11 +230,17 @@ def check_youtube_setup():
         for file in os.listdir('.')
     )
     
+    # Controlla se esistono le credenziali nelle variabili d'ambiente (Streamlit Cloud)
+    env_client_secrets = os.getenv('YOUTUBE_CLIENT_SECRETS') is not None
+    
     # Controlla se esiste il file token.pickle (credenziali salvate)
     token_exists = os.path.exists('token.pickle')
     
+    # YouTube è pronto se abbiamo credenziali (file locale OPPURE variabili d'ambiente)
+    ready = client_secrets_exists or env_client_secrets
+    
     return {
-        "client_secrets_configured": client_secrets_exists,
+        "client_secrets_configured": client_secrets_exists or env_client_secrets,
         "authenticated": token_exists,
-        "ready": client_secrets_exists
+        "ready": ready
     } 
