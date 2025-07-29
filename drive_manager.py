@@ -45,55 +45,6 @@ def get_drive_service():
         
         print("🔧 DEBUG: Parsed credentials keys:", list(credentials_dict.keys()))
         
-        # Correggi automaticamente la private_key se necessario
-        if 'private_key' in credentials_dict:
-            private_key = credentials_dict['private_key']
-            print("🔧 DEBUG: private_key present:", bool(private_key))
-            print("🔧 DEBUG: private_key length:", len(private_key))
-            print("🔧 DEBUG: private_key starts with:", private_key[:50])
-            print("🔧 DEBUG: private_key ends with:", private_key[-50:])
-            
-            # Conta i \\n e \n
-            double_backslash_count = private_key.count('\\n')
-            single_backslash_count = private_key.count('\n')
-            print("🔧 DEBUG: \\n count:", double_backslash_count)
-            print("🔧 DEBUG: \n count:", single_backslash_count)
-            
-            # Sostituisci \\n con \n se necessario
-            if '\\n' in private_key:
-                print("🔧 DEBUG: Fixing \\n in private_key")
-                private_key = private_key.replace('\\n', '\n')
-                credentials_dict['private_key'] = private_key
-                print("🔧 DEBUG: After fix - \\n count:", private_key.count('\\n'))
-                print("🔧 DEBUG: After fix - \n count:", private_key.count('\n'))
-            
-            # Sostituisci spazi con newline se necessario
-            if ' ' in private_key:
-                print("🔧 DEBUG: Fixing spaces in private_key")
-                private_key = private_key.replace(' ', '\n')
-                credentials_dict['private_key'] = private_key
-                print("🔧 DEBUG: After space fix - space count:", private_key.count(' '))
-                print("🔧 DEBUG: After space fix - \n count:", private_key.count('\n'))
-            
-            # Assicurati che la chiave finisca correttamente
-            if not private_key.endswith('-----END PRIVATE KEY-----'):
-                print("🔧 DEBUG: Fixing private_key ending")
-                # Rimuovi spazi extra alla fine
-                private_key = private_key.rstrip()
-                if not private_key.endswith('-----END PRIVATE KEY-----'):
-                    private_key += '\n-----END PRIVATE KEY-----\n'
-                credentials_dict['private_key'] = private_key
-            
-            # Verifica che la chiave inizi e finisca correttamente
-            if not private_key.startswith('-----BEGIN PRIVATE KEY-----'):
-                print("❌ DEBUG: private_key doesn't start with BEGIN")
-            if not private_key.endswith('-----END PRIVATE KEY-----'):
-                print("❌ DEBUG: private_key doesn't end with END")
-            
-            # Verifica che non ci siano caratteri strani
-            print("🔧 DEBUG: private_key contains \\r:", '\\r' in private_key)
-            print("🔧 DEBUG: private_key contains \\t:", '\\t' in private_key)
-        
         print("🔧 DEBUG: Creating credentials from service account info")
         print("🔧 DEBUG: Credentials dict keys:", list(credentials_dict.keys()))
         
