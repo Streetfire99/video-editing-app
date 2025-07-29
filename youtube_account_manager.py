@@ -26,7 +26,10 @@ def get_client_secrets():
         import streamlit as st
         client_secrets = st.secrets.get("YOUTUBE_CLIENT_SECRETS")
         if client_secrets:
-            # I secrets sono già in formato dizionario
+            # Se è una stringa JSON, convertila in dizionario
+            if isinstance(client_secrets, str):
+                import json
+                client_secrets = json.loads(client_secrets)
             return client_secrets
         else:
             return None

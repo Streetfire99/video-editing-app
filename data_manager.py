@@ -23,9 +23,15 @@ def get_google_sheets_client():
         if credentials_str:
             print("🔧 DEBUG: Got credentials from secrets:", type(credentials_str))
             
-            # I secrets sono già in formato dizionario
-            credentials_dict = credentials_str
-            print("🔧 DEBUG: Using secrets directly")
+            # Se è una stringa JSON, convertila in dizionario
+            if isinstance(credentials_str, str):
+                print("🔧 DEBUG: Converting string to dict")
+                import json
+                credentials_dict = json.loads(credentials_str)
+                print("🔧 DEBUG: JSON parsing successful")
+            else:
+                credentials_dict = credentials_str
+                print("🔧 DEBUG: Using secrets directly")
         else:
             # Fallback alle variabili d'ambiente
             credentials_str = os.getenv('GOOGLE_SHEETS_CREDENTIALS')
