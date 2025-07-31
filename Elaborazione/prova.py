@@ -71,16 +71,8 @@ def transcribe_audio(audio_file, client):
 def optimize_transcription(raw_transcription, client, custom_prompt=None, video_type=None):
     """Ottimizza la trascrizione con descrizione visiva"""
     
-    # Importa le funzioni per i prompt personalizzati
-    import sys
-    sys.path.append('..')
-    from data_manager import get_prompt_for_video_type
-    
-    # Ottieni il prompt base per la tipologia di video
-    if video_type:
-        base_prompt = get_prompt_for_video_type(video_type)
-    else:
-        base_prompt = "You are a video subtitle editor specializing in instructional videos."
+    # Prompt base per la tipologia di video
+    base_prompt = "You are a video subtitle editor specializing in instructional videos."
     
     base_prompt += """
 Your task is to optimize the following raw transcription of an instructional video. The video shows a person performing the actions described in the audio. Follow these steps:
@@ -405,16 +397,8 @@ def create_unified_srt_file(segments, output_file):
 def translate_subtitles(segments, client, output_file, video_type=None):
     """Traduce i sottotitoli in inglese"""
     
-    # Importa le funzioni per i prompt personalizzati
-    import sys
-    sys.path.append('..')
-    from data_manager import get_translation_prompt_for_video_type
-    
-    # Ottieni il prompt di traduzione per la tipologia di video
-    if video_type:
-        translation_prompt = get_translation_prompt_for_video_type(video_type)
-    else:
-        translation_prompt = "You are a translator specializing in instructional videos."
+    # Prompt di traduzione per la tipologia di video
+    translation_prompt = "You are a translator specializing in instructional videos."
     
     translation_prompt += """
 Translate the following Italian text to English, ensuring:
@@ -492,6 +476,19 @@ def add_background_music(input_video, music_file, output_video):
 def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, output_video, italian_height=120, english_height=60):
     """Aggiunge sottotitoli duali al video"""
     print(f"🔧 DEBUG: add_subtitles_to_video - input: {input_video}, it_subs: {subtitle_file_it}, en_subs: {subtitle_file_en}, output: {output_video}, it_height: {italian_height}, en_height: {english_height}")
+    
+    # Verifica che i file SRT esistano
+    if not os.path.exists(subtitle_file_it):
+        print(f"❌ DEBUG: Italian SRT file NOT found: {subtitle_file_it}")
+        raise FileNotFoundError(f"File SRT italiano non trovato: {subtitle_file_it}")
+    else:
+        print(f"✅ DEBUG: Italian SRT file exists: {os.path.getsize(subtitle_file_it)} bytes")
+    
+    if not os.path.exists(subtitle_file_en):
+        print(f"❌ DEBUG: English SRT file NOT found: {subtitle_file_en}")
+        raise FileNotFoundError(f"File SRT inglese non trovato: {subtitle_file_en}")
+    else:
+        print(f"✅ DEBUG: English SRT file exists: {os.path.getsize(subtitle_file_en)} bytes")
     
     try:
         print("🔧 DEBUG: Importing ffmpeg for subtitles...")
@@ -629,12 +626,22 @@ def process_video(input_video, music_file, openai_api_key, output_dir=".", custo
             # 5. Crea file SRT italiani
             print("🔧 DEBUG: Step 5 - Creating Italian SRT file...")
             create_srt_file(distributed_segments, subtitle_file_it, "IT")
-            print("🔧 DEBUG: Step 5 completed - Italian SRT created")
+            print(f"🔧 DEBUG: Step 5 completed - Italian SRT created at {subtitle_file_it}")
+            # Verifica che il file sia stato creato
+            if os.path.exists(subtitle_file_it):
+                print(f"✅ DEBUG: Italian SRT file exists: {os.path.getsize(subtitle_file_it)} bytes")
+            else:
+                print(f"❌ DEBUG: Italian SRT file NOT found: {subtitle_file_it}")
             
             # 6. Traduci e crea file SRT inglesi
             print("🔧 DEBUG: Step 6 - Creating English SRT file...")
             translate_subtitles(distributed_segments, client, subtitle_file_en, video_type)
-            print("🔧 DEBUG: Step 6 completed - English SRT created")
+            print(f"🔧 DEBUG: Step 6 completed - English SRT created at {subtitle_file_en}")
+            # Verifica che il file sia stato creato
+            if os.path.exists(subtitle_file_en):
+                print(f"✅ DEBUG: English SRT file exists: {os.path.getsize(subtitle_file_en)} bytes")
+            else:
+                print(f"❌ DEBUG: English SRT file NOT found: {subtitle_file_en}")
             has_voice = True
         
         # 7. Aggiungi musica di sottofondo
