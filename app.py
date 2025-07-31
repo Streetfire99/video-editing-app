@@ -475,7 +475,7 @@ if st.session_state.processed_video and st.session_state.segments and st.session
             "🇮🇹 Altezza Sottotitoli Italiani",
             min_value=10,
             max_value=90,
-            value=75,
+            value=85,
             help="Posizione verticale dei sottotitoli italiani (10=alto, 90=basso)"
         )
     

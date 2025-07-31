@@ -366,67 +366,9 @@ def add_background_music(input_video, music_file, output_video):
         print(f"❌ DEBUG: Unexpected error in add_background_music - {e}")
         raise e
 
-def combine_srt_files(subtitle_file_it, subtitle_file_en, combined_file):
-    """Combina i file SRT italiani e inglesi in un unico file"""
-    print(f"🔧 DEBUG: Combining SRT files - IT: {subtitle_file_it}, EN: {subtitle_file_en}, Combined: {combined_file}")
-    
-    with open(subtitle_file_it, 'r', encoding='utf-8') as f_it, \
-         open(subtitle_file_en, 'r', encoding='utf-8') as f_en, \
-         open(combined_file, 'w', encoding='utf-8') as f_out:
-        
-        lines_it = f_it.readlines()
-        lines_en = f_en.readlines()
-        
-        i = 0
-        subtitle_num = 1
-        
-        while i < len(lines_it):
-            # Leggi il numero del sottotitolo
-            if lines_it[i].strip().isdigit():
-                # Scrivi il numero del sottotitolo
-                f_out.write(f"{subtitle_num}\n")
-                
-                # Leggi il timestamp
-                i += 1
-                if i < len(lines_it):
-                    timestamp = lines_it[i].strip()
-                    f_out.write(f"{timestamp}\n")
-                
-                # Leggi il testo italiano
-                i += 1
-                italian_lines = []
-                while i < len(lines_it) and lines_it[i].strip() and not lines_it[i].strip().isdigit():
-                    italian_lines.append(lines_it[i].strip())
-                    i += 1
-                
-                # Scrivi il testo italiano
-                for line in italian_lines:
-                    f_out.write(f"{line}\n")
-                
-                # Leggi il testo inglese corrispondente
-                j = i
-                english_lines = []
-                while j < len(lines_en) and not lines_en[j].strip().isdigit():
-                    j += 1
-                if j < len(lines_en):
-                    j += 1  # Salta il numero
-                    j += 1  # Salta il timestamp
-                    while j < len(lines_en) and lines_en[j].strip() and not lines_en[j].strip().isdigit():
-                        english_lines.append(lines_en[j].strip())
-                        j += 1
-                
-                # Scrivi il testo inglese
-                for line in english_lines:
-                    f_out.write(f"{line}\n")
-                
-                f_out.write("\n")
-                subtitle_num += 1
-            else:
-                i += 1
-    
-    print("🔧 DEBUG: SRT files combined successfully")
 
-def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, output_video, italian_height=70, english_height=45):
+
+def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, output_video, italian_height=85, english_height=50):
     """Aggiunge sottotitoli duali al video"""
     print(f"🔧 DEBUG: add_subtitles_to_video - input: {input_video}, it_subs: {subtitle_file_it}, en_subs: {subtitle_file_en}, output: {output_video}, it_height: {italian_height}, en_height: {english_height}")
     
@@ -435,33 +377,44 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
         import ffmpeg
         print("🔧 DEBUG: ffmpeg imported successfully for subtitles")
         
-        # Combina i file SRT in un unico file
-        combined_srt = "combined_subtitles.srt"
-        combine_srt_files(subtitle_file_it, subtitle_file_en, combined_srt)
-        
         # Ottieni informazioni sul video per gestire meglio i codec
         video_info = get_video_info(input_video)
         print(f"🔧 DEBUG: Video codec detected: {video_info['video_codec'] if video_info else 'unknown'}")
         
-        # Aggiungi i sottotitoli combinati al video
-        print("🔧 DEBUG: Adding combined subtitles...")
+        # Aggiungi i sottotitoli italiani prima
+        print("🔧 DEBUG: Adding Italian subtitles...")
         stream = ffmpeg.input(input_video)
         stream = ffmpeg.output(
             stream,
-            output_video,
-            vf=f"subtitles={combined_srt}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height},MarginL=50,MarginR=50'",
+            "temp_with_it_subs.mp4",
+            vf=f"subtitles={subtitle_file_it}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height},MarginL=50,MarginR=50'",
             vcodec='libx264',
             acodec='aac',
             preset='medium',
             crf=23
         )
         ffmpeg.run(stream, overwrite_output=True)
-        print("🔧 DEBUG: Combined subtitles added successfully")
+        print("🔧 DEBUG: Italian subtitles added successfully")
+
+        # Aggiungi i sottotitoli inglesi sopra
+        print("🔧 DEBUG: Adding English subtitles...")
+        stream = ffmpeg.input("temp_with_it_subs.mp4")
+        stream = ffmpeg.output(
+            stream,
+            output_video,
+            vf=f"subtitles={subtitle_file_en}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height},MarginL=50,MarginR=50'",
+            vcodec='libx264',
+            acodec='aac',
+            preset='medium',
+            crf=23
+        )
+        ffmpeg.run(stream, overwrite_output=True)
+        print("🔧 DEBUG: English subtitles added successfully")
 
         # Rimuovi il file temporaneo
-        if os.path.exists(combined_srt):
-            os.remove(combined_srt)
-            print("🔧 DEBUG: Temporary combined SRT file removed")
+        if os.path.exists("temp_with_it_subs.mp4"):
+            os.remove("temp_with_it_subs.mp4")
+            print("🔧 DEBUG: Temporary file removed")
             
     except ImportError as e:
         print(f"❌ DEBUG: ImportError in add_subtitles_to_video - {e}")
@@ -498,7 +451,7 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
             print(f"❌ DEBUG: Fallback method also failed - {fallback_error}")
             raise e  # Rilancia l'errore originale
 
-def process_video(input_video, music_file, openai_api_key, output_dir=".", custom_prompt=None, video_type=None, italian_height=70, english_height=45):
+def process_video(input_video, music_file, openai_api_key, output_dir=".", custom_prompt=None, video_type=None, italian_height=85, english_height=50):
     """Funzione principale per elaborare il video"""
     print(f"🔧 DEBUG: process_video started - input: {input_video}, music: {music_file}, output_dir: {output_dir}, it_height: {italian_height}, en_height: {english_height}")
     
