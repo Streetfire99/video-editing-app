@@ -210,10 +210,19 @@ def distribute_subtitles(segments, texts):
     for i in range(num_subtitles):
         start_time = i * duration_per_subtitle
         end_time = (i + 1) * duration_per_subtitle
+        
+        # Processa il testo per assicurarsi che sia adatto per i sottotitoli
+        raw_text = texts[i]['text']
+        # Rimuovi eventuali \n e processa con split_text
+        processed_text = raw_text.replace('\n', ' ').strip()
+        lines = split_text(processed_text, max_length=30, max_lines=2)
+        # Ricombina in un singolo testo (le righe saranno separate da \n nel file SRT)
+        final_text = lines[0] + (f"\n{lines[1]}" if lines[1] else "")
+        
         distributed_segments.append({
             'start': start_time,
             'end': end_time,
-            'text': texts[i]['text']
+            'text': final_text
         })
     
     return distributed_segments
