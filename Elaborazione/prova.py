@@ -261,7 +261,7 @@ def create_srt_file(segments, output_file, language="IT"):
             lines = split_text(text)
             srt.write(f"{i}\n{start} --> {end}\n{prefix}{lines[0]}\n{lines[1] if len(lines) > 1 else ''}\n\n")
 
-def create_ass_file(segments, output_file, language="IT", margin_v=85):
+def create_ass_file(segments, output_file, language="IT", margin_v=85, video_width=478, video_height=850):
     """Crea file ASS con posizione specifica"""
     with open(output_file, "w", encoding="utf-8") as ass:
         # Header ASS
@@ -269,12 +269,14 @@ def create_ass_file(segments, output_file, language="IT", margin_v=85):
         ass.write("Title: Subtitles\n")
         ass.write("ScriptType: v4.00+\n")
         ass.write("WrapStyle: 1\n")
-        ass.write("ScaledBorderAndShadow: yes\n\n")
+        ass.write("ScaledBorderAndShadow: yes\n")
+        ass.write(f"PlayResX: {video_width}\n")
+        ass.write(f"PlayResY: {video_height}\n\n")
         
         # Stili
         ass.write("[V4+ Styles]\n")
         ass.write("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
-        ass.write(f"Style: Default,Arial,12,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,50,50,{margin_v},1\n\n")
+        ass.write(f"Style: Default,Arial,12,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,100,100,{margin_v},1\n\n")
         
         # Eventi
         ass.write("[Events]\n")
@@ -298,7 +300,7 @@ def create_ass_file(segments, output_file, language="IT", margin_v=85):
             
             ass.write(f"Dialogue: 0,{start},{end},Default,,100,100,0,,{full_text}\n")
 
-def create_ass_file_from_srt(srt_file, ass_file, margin_v=85):
+def create_ass_file_from_srt(srt_file, ass_file, margin_v=85, video_width=478, video_height=850):
     """Converte un file SRT in ASS con posizione specifica"""
     with open(srt_file, 'r', encoding='utf-8') as srt, open(ass_file, 'w', encoding='utf-8') as ass:
         # Header ASS
@@ -306,12 +308,14 @@ def create_ass_file_from_srt(srt_file, ass_file, margin_v=85):
         ass.write("Title: Subtitles\n")
         ass.write("ScriptType: v4.00+\n")
         ass.write("WrapStyle: 1\n")
-        ass.write("ScaledBorderAndShadow: yes\n\n")
+        ass.write("ScaledBorderAndShadow: yes\n")
+        ass.write(f"PlayResX: {video_width}\n")
+        ass.write(f"PlayResY: {video_height}\n\n")
         
         # Stili
         ass.write("[V4+ Styles]\n")
         ass.write("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
-        ass.write(f"Style: Default,Arial,12,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,50,50,{margin_v},1\n\n")
+        ass.write(f"Style: Default,Arial,12,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,100,100,{margin_v},1\n\n")
         
         # Eventi
         ass.write("[Events]\n")
@@ -484,10 +488,17 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
         segments_it = []
         segments_en = []
         
+        # Ottieni le dimensioni del video
+        video_width = 478
+        video_height = 850
+        if video_info and 'width' in video_info and 'height' in video_info:
+            video_width = video_info['width']
+            video_height = video_info['height']
+        
         # Per ora usiamo i file SRT esistenti, ma convertiamoli in ASS
         # Questo è un workaround temporaneo
-        create_ass_file_from_srt(subtitle_file_it, ass_file_it, italian_height)
-        create_ass_file_from_srt(subtitle_file_en, ass_file_en, english_height)
+        create_ass_file_from_srt(subtitle_file_it, ass_file_it, italian_height, video_width, video_height)
+        create_ass_file_from_srt(subtitle_file_en, ass_file_en, english_height, video_width, video_height)
         
         # Usa il filtro ass per un controllo migliore
         stream = ffmpeg.output(
