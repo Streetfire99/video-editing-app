@@ -89,7 +89,7 @@ Your task is to optimize the following raw transcription of an instructional vid
 2. Write short, complete sentences that describe exactly what is shown in the video.
 3. Each sentence should be self-contained and not reference previous or next actions.
 4. Avoid long explanations or multiple actions in one sentence.
-5. Keep each line under 30 characters to prevent overlap.
+5. Keep each line under 25 characters to prevent overlap.
 6. Each subtitle should be exactly 2 lines maximum.
 7. DO NOT add any prefix to the text - just write the Italian text as is.
 8. Provide the output as a JSON array of segments, where each segment has:
@@ -140,13 +140,13 @@ Example output:
     if not isinstance(optimized_texts, list):
         raise ValueError("La risposta di OpenAI non è una lista di segmenti")
 
-    # Post-processing: assicurati che ogni testo sia adatto per i sottotitoli
-    for segment in optimized_texts:
-        if 'text' in segment:
-            # Usa split_text per forzare il limite di 2 righe
-            lines = split_text(segment['text'], max_length=25, max_lines=2)
-            # Ricombina in un singolo testo (le righe saranno separate da \n nel file SRT)
-            segment['text'] = lines[0] + (f"\n{lines[1]}" if lines[1] else "")
+            # Post-processing: assicurati che ogni testo sia adatto per i sottotitoli
+        for segment in optimized_texts:
+            if 'text' in segment:
+                # Usa process_subtitle_text per coerenza
+                lines = process_subtitle_text(segment['text'])
+                # Ricombina in un singolo testo (le righe saranno separate da \n nel file SRT)
+                segment['text'] = lines[0] + (f"\n{lines[1]}" if lines[1] else "")
 
     return optimized_texts
 
@@ -156,8 +156,19 @@ def format_timestamp(seconds):
     millis = int((td.total_seconds() % 1) * 1000)
     return str(td).split('.')[0].replace('.', ',') + f',{millis:03d}'
 
-def split_text(text, max_length=30, max_lines=2):
-    """Divide il testo per i sottotitoli - SEMPRE massimo 2 righe, max 30 caratteri per riga"""
+def process_subtitle_text(text):
+    """Processa il testo per i sottotitoli - funzione unificata"""
+    if not text:
+        return ["", ""]
+    
+    # Pulisci il testo
+    text = text.replace('\n', ' ').strip()
+    
+    # Usa split_text per garantire sempre 2 righe
+    return split_text(text, max_length=25, max_lines=2)
+
+def split_text(text, max_length=25, max_lines=2):
+    """Divide il testo per i sottotitoli - SEMPRE massimo 2 righe, max 25 caratteri per riga"""
     if not text:
         return ["", ""]
     
@@ -213,9 +224,7 @@ def distribute_subtitles(segments, texts):
         
         # Processa il testo per assicurarsi che sia adatto per i sottotitoli
         raw_text = texts[i]['text']
-        # Rimuovi eventuali \n e processa con split_text
-        processed_text = raw_text.replace('\n', ' ').strip()
-        lines = split_text(processed_text, max_length=30, max_lines=2)
+        lines = process_subtitle_text(raw_text)
         # Ricombina in un singolo testo (le righe saranno separate da \n nel file SRT)
         final_text = lines[0] + (f"\n{lines[1]}" if lines[1] else "")
         
@@ -242,9 +251,8 @@ def create_srt_file(segments, output_file, language="IT"):
                 text = segment.get('text_en', segment['text'])  # Fallback al testo italiano se non c'è inglese
                 prefix = "[EN] "
             
-            # Rimuovi eventuali \n dal testo e usa split_text
-            text = text.replace('\n', ' ').strip()
-            lines = split_text(text)
+            # Processa il testo con funzione unificata
+            lines = process_subtitle_text(text)
             # Assicurati che ci siano sempre esattamente 2 righe
             line1 = lines[0] if len(lines) > 0 else ""
             line2 = lines[1] if len(lines) > 1 else ""
@@ -269,7 +277,7 @@ def translate_subtitles(segments, client, output_file, video_type=None):
 Translate the following Italian text to English, ensuring:
 - The translation is clear, concise, and suitable for subtitles.
 - Use an imperative tone, avoiding questions or incomplete sentences.
-- Keep each line under 30 characters to prevent overlap.
+- Keep each line under 25 characters to prevent overlap.
 - IMPORTANT: Always translate to English, never leave any Italian text.
 - DO NOT add any prefix to the translation.
 """
@@ -294,9 +302,8 @@ Translate the following Italian text to English, ensuring:
             # Aggiungi il testo inglese al segmento
             segment['text_en'] = text
             
-            # Rimuovi eventuali \n dal testo e usa split_text
-            text = text.replace('\n', ' ').strip()
-            lines = split_text(text)
+            # Processa il testo con funzione unificata
+            lines = process_subtitle_text(text)
             # Assicurati che ci siano sempre esattamente 2 righe
             line1 = lines[0] if len(lines) > 0 else ""
             line2 = lines[1] if len(lines) > 1 else ""
@@ -352,7 +359,7 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
         stream = ffmpeg.output(
             stream,
             "temp_with_it_subs.mp4",
-            vf=f"subtitles={subtitle_file_it}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height}'",
+            vf=f"subtitles={subtitle_file_it}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height},MarginL=50,MarginR=50'",
             vcodec='libx264',
             acodec='aac',
             preset='medium',
@@ -367,7 +374,7 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
         stream = ffmpeg.output(
             stream,
             output_video,
-            vf=f"subtitles={subtitle_file_en}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height}'",
+            vf=f"subtitles={subtitle_file_en}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height},MarginL=50,MarginR=50'",
             vcodec='libx264',
             acodec='aac',
             preset='medium',
@@ -400,7 +407,7 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
             stream = ffmpeg.output(
                 stream,
                 output_video,
-                vf=f"subtitles={subtitle_file_it}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height}',subtitles={subtitle_file_en}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height}'",
+                vf=f"subtitles={subtitle_file_it}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height},MarginL=50,MarginR=50',subtitles={subtitle_file_en}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height},MarginL=50,MarginR=50'",
                 vcodec='libx264',
                 acodec='aac',
                 preset='medium',
