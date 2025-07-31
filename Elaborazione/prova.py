@@ -89,7 +89,7 @@ Your task is to optimize the following raw transcription of an instructional vid
 2. Write short, complete sentences that describe exactly what is shown in the video.
 3. Each sentence should be self-contained and not reference previous or next actions.
 4. Avoid long explanations or multiple actions in one sentence.
-5. Keep each line under 25 characters to prevent overlap.
+5. Keep each line under 30 characters to prevent overlap.
 6. Each subtitle should be exactly 2 lines maximum.
 7. DO NOT add any prefix to the text - just write the Italian text as is.
 8. Provide the output as a JSON array of segments, where each segment has:
@@ -140,6 +140,14 @@ Example output:
     if not isinstance(optimized_texts, list):
         raise ValueError("La risposta di OpenAI non è una lista di segmenti")
 
+    # Post-processing: assicurati che ogni testo sia adatto per i sottotitoli
+    for segment in optimized_texts:
+        if 'text' in segment:
+            # Usa split_text per forzare il limite di 2 righe
+            lines = split_text(segment['text'], max_length=25, max_lines=2)
+            # Ricombina in un singolo testo (le righe saranno separate da \n nel file SRT)
+            segment['text'] = lines[0] + (f"\n{lines[1]}" if lines[1] else "")
+
     return optimized_texts
 
 def format_timestamp(seconds):
@@ -148,8 +156,8 @@ def format_timestamp(seconds):
     millis = int((td.total_seconds() % 1) * 1000)
     return str(td).split('.')[0].replace('.', ',') + f',{millis:03d}'
 
-def split_text(text, max_length=25, max_lines=2):
-    """Divide il testo per i sottotitoli - SEMPRE massimo 2 righe"""
+def split_text(text, max_length=30, max_lines=2):
+    """Divide il testo per i sottotitoli - SEMPRE massimo 2 righe, max 30 caratteri per riga"""
     if not text:
         return ["", ""]
     
@@ -163,50 +171,26 @@ def split_text(text, max_length=25, max_lines=2):
     # Dividi in parole
     words = text.split()
     
-    # Se abbiamo troppe parole, forziamo la divisione
-    total_chars = len(text)
-    if total_chars > max_length * 2:
-        # Calcola quanti caratteri per riga
-        chars_per_line = total_chars // 2
-        
-        # Prima riga
-        line1_chars = 0
-        line1_words = []
-        
-        for word in words:
-            if line1_chars + len(word) + 1 <= chars_per_line:
-                line1_words.append(word)
-                line1_chars += len(word) + 1
-            else:
-                break
-        
-        line1 = " ".join(line1_words)
-        
-        # Seconda riga con tutto il resto
-        remaining_words = words[len(line1_words):]
-        line2 = " ".join(remaining_words)
-        
-        # Se ancora troppo lunga, troncala
-        if len(line2) > max_length:
-            line2 = line2[:max_length-3] + "..."
-        
-        return [line1, line2]
-    
-    # Algoritmo normale per testi più corti
-    line1_words = []
+    # Trova il punto di divisione migliore per mantenere frasi complete
+    best_split = 0
     current_length = 0
     
-    for word in words:
-        if current_length + len(word) + 1 <= max_length:
-            line1_words.append(word)
-            current_length += len(word) + 1
-        else:
+    for i, word in enumerate(words):
+        # Se aggiungendo questa parola superiamo il limite
+        if current_length + len(word) + 1 > max_length:
+            # Se è la prima parola e è troppo lunga, troncala
+            if i == 0:
+                return [word[:max_length-3] + "...", ""]
             break
+        else:
+            current_length += len(word) + 1
+            best_split = i + 1
     
-    line1 = " ".join(line1_words)
+    # Prima riga
+    line1 = " ".join(words[:best_split])
     
     # Seconda riga con le parole rimanenti
-    remaining_words = words[len(line1_words):]
+    remaining_words = words[best_split:]
     line2 = " ".join(remaining_words)
     
     # Se la seconda riga è troppo lunga, troncala
@@ -249,6 +233,8 @@ def create_srt_file(segments, output_file, language="IT"):
                 text = segment.get('text_en', segment['text'])  # Fallback al testo italiano se non c'è inglese
                 prefix = "[EN] "
             
+            # Rimuovi eventuali \n dal testo e usa split_text
+            text = text.replace('\n', ' ').strip()
             lines = split_text(text)
             # Assicurati che ci siano sempre esattamente 2 righe
             line1 = lines[0] if len(lines) > 0 else ""
@@ -274,7 +260,7 @@ def translate_subtitles(segments, client, output_file, video_type=None):
 Translate the following Italian text to English, ensuring:
 - The translation is clear, concise, and suitable for subtitles.
 - Use an imperative tone, avoiding questions or incomplete sentences.
-- Keep each line under 25 characters to prevent overlap.
+- Keep each line under 30 characters to prevent overlap.
 - IMPORTANT: Always translate to English, never leave any Italian text.
 - DO NOT add any prefix to the translation.
 """
@@ -299,6 +285,8 @@ Translate the following Italian text to English, ensuring:
             # Aggiungi il testo inglese al segmento
             segment['text_en'] = text
             
+            # Rimuovi eventuali \n dal testo e usa split_text
+            text = text.replace('\n', ' ').strip()
             lines = split_text(text)
             # Assicurati che ci siano sempre esattamente 2 righe
             line1 = lines[0] if len(lines) > 0 else ""
@@ -528,6 +516,7 @@ def process_video(input_video, music_file, openai_api_key, output_dir=".", custo
         return {
             "success": True,
             "final_video": final_output,
+            "video_with_music": video_with_music,
             "subtitles_it": subtitle_file_it if has_voice else None,
             "subtitles_en": subtitle_file_en if has_voice else None,
             "transcript": raw_transcription,
