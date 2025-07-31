@@ -222,14 +222,21 @@ def create_srt_file(segments, output_file, language="IT"):
         for i, segment in enumerate(segments, start=1):
             start = format_timestamp(segment['start'])
             end = format_timestamp(segment['end'])
-            text = segment['text']
-            lines = split_text(text)
-            # Aggiungi il prefisso solo alla prima riga
+            
+            # Usa il testo appropriato in base alla lingua
             if language == "IT":
+                text = segment['text']
                 prefix = "[IT] "
             else:
+                text = segment.get('text_en', segment['text'])  # Fallback al testo italiano se non c'è inglese
                 prefix = "[EN] "
-            srt.write(f"{i}\n{start} --> {end}\n{prefix}{lines[0]}\n{lines[1] if len(lines) > 1 else ''}\n\n")
+            
+            lines = split_text(text)
+            # Assicurati che ci siano sempre esattamente 2 righe
+            line1 = lines[0] if len(lines) > 0 else ""
+            line2 = lines[1] if len(lines) > 1 else ""
+            
+            srt.write(f"{i}\n{start} --> {end}\n{prefix}{line1}\n{line2}\n\n")
 
 def translate_subtitles(segments, client, output_file, video_type=None):
     """Traduce i sottotitoli in inglese"""
@@ -270,8 +277,16 @@ Translate the following Italian text to English, ensuring:
                 ]
             )
             text = translation.choices[0].message.content.strip()
+            
+            # Aggiungi il testo inglese al segmento
+            segment['text_en'] = text
+            
             lines = split_text(text)
-            srt.write(f"{i}\n{start} --> {end}\n[EN] {lines[0]}\n{lines[1] if len(lines) > 1 else ''}\n\n")
+            # Assicurati che ci siano sempre esattamente 2 righe
+            line1 = lines[0] if len(lines) > 0 else ""
+            line2 = lines[1] if len(lines) > 1 else ""
+            
+            srt.write(f"{i}\n{start} --> {end}\n[EN] {line1}\n{line2}\n\n")
 
 def add_background_music(input_video, music_file, output_video):
     """Aggiunge musica di sottofondo"""
