@@ -242,7 +242,7 @@ def distribute_subtitles(segments, texts):
     return distributed_segments
 
 def create_srt_file(segments, output_file, language="IT"):
-    """Crea file SRT"""
+    """Crea file SRT - identica al test che funzionava"""
     with open(output_file, "w", encoding="utf-8") as srt:
         for i, segment in enumerate(segments, start=1):
             start = format_timestamp(segment['start'])
@@ -256,9 +256,8 @@ def create_srt_file(segments, output_file, language="IT"):
                 text = segment.get('text_en', segment['text'])  # Fallback al testo italiano se non c'è inglese
                 prefix = "[EN] "
             
-            # Usa split_text direttamente senza riprocessare
-            lines = split_text(text)
-            srt.write(f"{i}\n{start} --> {end}\n{prefix}{lines[0]}\n{lines[1] if len(lines) > 1 else ''}\n\n")
+            # Usa il testo direttamente senza split_text (come nel test)
+            srt.write(f"{i}\n{start} --> {end}\n{prefix}{text}\n\n")
 
 def create_ass_file(segments, output_file, language="IT", margin_v=85, video_width=478, video_height=850):
     """Crea file ASS con posizione specifica"""
@@ -395,7 +394,7 @@ def create_unified_srt_file(segments, output_file):
             srt.write("\n")
 
 def translate_subtitles(segments, client, output_file, video_type=None):
-    """Traduce i sottotitoli in inglese"""
+    """Traduce i sottotitoli in inglese - identica al test che funzionava"""
     
     # Prompt di traduzione per la tipologia di video
     translation_prompt = "You are a translator specializing in instructional videos."
@@ -432,13 +431,8 @@ Translate the following Italian text to English, ensuring:
             # Aggiungi il testo inglese al segmento
             segment['text_en'] = text
             
-            # Processa il testo con funzione unificata
-            lines = process_subtitle_text(text)
-            # Assicurati che ci siano sempre esattamente 2 righe
-            line1 = lines[0] if len(lines) > 0 else ""
-            line2 = lines[1] if len(lines) > 1 else ""
-            
-            srt.write(f"{i}\n{start} --> {end}\n[EN] {line1}\n{line2}\n\n")
+            # Usa il testo direttamente senza process_subtitle_text (come nel test)
+            srt.write(f"{i}\n{start} --> {end}\n[EN] {text}\n\n")
 
 def add_background_music(input_video, music_file, output_video):
     """Aggiunge musica di sottofondo"""
