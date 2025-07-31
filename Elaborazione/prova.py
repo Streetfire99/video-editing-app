@@ -164,15 +164,20 @@ def process_subtitle_text(text):
     # Pulisci il testo aggressivamente
     text = text.replace('\n', ' ').replace('\r', ' ').strip()
     
+    # Debug: stampa il testo per vedere cosa contiene
+    print(f"🔧 DEBUG: Processing text: '{text}' (length: {len(text)})")
+    
     # Se il testo è troppo lungo, troncalo
     if len(text) > 40:  # 2 righe x 20 caratteri
         text = text[:37] + "..."
     
     # Usa split_text per garantire sempre 2 righe
-    return split_text(text, max_length=20, max_lines=2)
+    result = split_text(text, max_length=20, max_lines=2)
+    print(f"🔧 DEBUG: Split result: '{result[0]}' | '{result[1]}'")
+    return result
 
 def split_text(text, max_length=20, max_lines=2):
-    """Divide il testo per i sottotitoli - SEMPRE massimo 2 righe, max 20 caratteri per riga"""
+    """Divide il testo per i sottotitoli - SEMPRE massimo 2 righe, max 15 caratteri per riga"""
     if not text:
         return ["", ""]
     
@@ -255,12 +260,13 @@ def create_srt_file(segments, output_file, language="IT"):
                 text = segment.get('text_en', segment['text'])  # Fallback al testo italiano se non c'è inglese
                 prefix = "[EN] "
             
-            # Processa il testo con funzione unificata
+            # Processa il testo con funzione unificata, riducendo la lunghezza per compensare il prefisso
             lines = process_subtitle_text(text)
             # Assicurati che ci siano sempre esattamente 2 righe
             line1 = lines[0] if len(lines) > 0 else ""
             line2 = lines[1] if len(lines) > 1 else ""
             
+            # Aggiungi il prefisso solo alla prima riga
             srt.write(f"{i}\n{start} --> {end}\n{prefix}{line1}\n{line2}\n\n")
 
 def translate_subtitles(segments, client, output_file, video_type=None):
@@ -344,7 +350,7 @@ def add_background_music(input_video, music_file, output_video):
         print(f"❌ DEBUG: Unexpected error in add_background_music - {e}")
         raise e
 
-def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, output_video, italian_height=80, english_height=45):
+def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, output_video, italian_height=70, english_height=45):
     """Aggiunge sottotitoli duali al video"""
     print(f"🔧 DEBUG: add_subtitles_to_video - input: {input_video}, it_subs: {subtitle_file_it}, en_subs: {subtitle_file_en}, output: {output_video}, it_height: {italian_height}, en_height: {english_height}")
     # Usa solo ffmpeg-python
@@ -427,7 +433,7 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
             print(f"❌ DEBUG: Fallback method also failed - {fallback_error}")
             raise e  # Rilancia l'errore originale
 
-def process_video(input_video, music_file, openai_api_key, output_dir=".", custom_prompt=None, video_type=None, italian_height=80, english_height=45):
+def process_video(input_video, music_file, openai_api_key, output_dir=".", custom_prompt=None, video_type=None, italian_height=70, english_height=45):
     """Funzione principale per elaborare il video"""
     print(f"🔧 DEBUG: process_video started - input: {input_video}, music: {music_file}, output_dir: {output_dir}, it_height: {italian_height}, en_height: {english_height}")
     
