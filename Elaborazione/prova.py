@@ -92,7 +92,8 @@ Your task is to optimize the following raw transcription of an instructional vid
 5. Keep each line under 20 characters to prevent overlap.
 6. Each subtitle should be exactly 2 lines maximum.
 7. DO NOT add any prefix to the text - just write the Italian text as is.
-8. Provide the output as a JSON array of segments, where each segment has:
+8. DO NOT add periods, exclamation marks, or question marks at the end of sentences.
+9. Provide the output as a JSON array of segments, where each segment has:
    - text: subtitle text in Italian (complete sentence, ready for subtitles)
 
 Raw transcription:
@@ -273,7 +274,7 @@ def create_ass_file(segments, output_file, language="IT", margin_v=85):
         # Stili
         ass.write("[V4+ Styles]\n")
         ass.write("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
-        ass.write(f"Style: Default,Arial,12,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,2,2,50,50,{margin_v},1\n\n")
+        ass.write(f"Style: Default,Arial,12,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,50,50,{margin_v},1\n\n")
         
         # Eventi
         ass.write("[Events]\n")
@@ -295,7 +296,7 @@ def create_ass_file(segments, output_file, language="IT", margin_v=85):
             if lines[1]:
                 full_text += "\\N" + lines[1]
             
-            ass.write(f"Dialogue: 0,{start},{end},Default,,0,0,0,,{full_text}\n")
+            ass.write(f"Dialogue: 0,{start},{end},Default,,100,100,0,,{full_text}\n")
 
 def create_ass_file_from_srt(srt_file, ass_file, margin_v=85):
     """Converte un file SRT in ASS con posizione specifica"""
@@ -310,7 +311,7 @@ def create_ass_file_from_srt(srt_file, ass_file, margin_v=85):
         # Stili
         ass.write("[V4+ Styles]\n")
         ass.write("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
-        ass.write(f"Style: Default,Arial,12,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,2,2,50,50,{margin_v},1\n\n")
+        ass.write(f"Style: Default,Arial,12,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,50,50,{margin_v},1\n\n")
         
         # Eventi
         ass.write("[Events]\n")
@@ -341,7 +342,7 @@ def create_ass_file_from_srt(srt_file, ass_file, margin_v=85):
                             if len(text_lines) > 1:
                                 full_text += "\\N" + text_lines[1]
                             
-                            ass.write(f"Dialogue: 0,{start},{end},Default,,0,0,0,,{full_text}\n")
+                            ass.write(f"Dialogue: 0,{start},{end},Default,,100,100,0,,{full_text}\n")
             i += 1
 
 def create_unified_srt_file(segments, output_file):
