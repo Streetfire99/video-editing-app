@@ -162,8 +162,12 @@ def process_subtitle_text(text):
     if not text:
         return ["", ""]
     
-    # Pulisci il testo aggressivamente
-    text = text.replace('\n', ' ').replace('\r', ' ').strip()
+    # Pulisci il testo aggressivamente da caratteri problematici
+    text = text.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ').strip()
+    
+    # Rimuovi spazi multipli
+    import re
+    text = re.sub(r'\s+', ' ', text)
     
     # Se il testo è troppo lungo, troncalo
     if len(text) > 40:  # 2 righe x 20 caratteri
@@ -501,16 +505,8 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
             print("🔧 DEBUG: Removed existing output file")
         
         stream = ffmpeg.input(input_video)
-        # Creiamo file ASS temporanei per un controllo migliore delle posizioni
-        ass_file_it = "temp_it.ass"
-        ass_file_en = "temp_en.ass"
         
-        # Crea file ASS con posizioni specifiche
-        # Leggi i segmenti dai file SRT esistenti
-        segments_it = []
-        segments_en = []
-        
-        # Ottieni le dimensioni del video
+        # Ottieni le dimensioni del video per debug
         video_width = 478
         video_height = 850
         if video_info and 'width' in video_info and 'height' in video_info:
@@ -520,16 +516,11 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
         else:
             print(f"🔧 DEBUG: Using default dimensions: {video_width}x{video_height}")
         
-        # Per ora usiamo i file SRT esistenti, ma convertiamoli in ASS
-        # Questo è un workaround temporaneo
-        create_ass_file_from_srt(subtitle_file_it, ass_file_it, italian_height, video_width, video_height)
-        create_ass_file_from_srt(subtitle_file_en, ass_file_en, english_height, video_width, video_height)
-        
-        # Usa il filtro ass per un controllo migliore
+        # Usa il filtro subtitles con parametri ottimizzati per evitare wrapping
         stream = ffmpeg.output(
             stream,
             output_video,
-            vf=f"ass={ass_file_it},ass={ass_file_en}",
+            vf=f"subtitles={subtitle_file_it}:force_style='FontSize=18,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height},MarginL=100,MarginR=100,WrapStyle=0',subtitles={subtitle_file_en}:force_style='FontSize=18,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height},MarginL=100,MarginR=100,WrapStyle=0'",
             vcodec='libx264',
             acodec='aac',
             preset='medium',
@@ -538,13 +529,6 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
         )
         ffmpeg.run(stream, overwrite_output=True)
         print("🔧 DEBUG: Both subtitles added successfully")
-        
-        # Rimuovi i file temporanei
-        if os.path.exists(ass_file_it):
-            os.remove(ass_file_it)
-        if os.path.exists(ass_file_en):
-            os.remove(ass_file_en)
-        print("🔧 DEBUG: Temporary ASS files removed")
 
 
             
