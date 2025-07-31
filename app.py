@@ -7,6 +7,16 @@ from pathlib import Path
 import sys
 import random
 
+# Rimuovi il file di log se esiste (per evitare loop infinito)
+try:
+    if os.path.exists("logs/app_debug.log"):
+        os.remove("logs/app_debug.log")
+    if os.path.exists("logs"):
+        import shutil
+        shutil.rmtree("logs")
+except:
+    pass
+
 # Aggiungi il percorso del modulo Elaborazione
 sys.path.append('Elaborazione')
 
