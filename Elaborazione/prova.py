@@ -483,7 +483,7 @@ def add_background_music(input_video, music_file, output_video):
 
 
 
-def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, output_video, italian_height=120, english_height=40):
+def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, output_video, italian_height=120, english_height=60):
     """Aggiunge sottotitoli duali al video"""
     print(f"🔧 DEBUG: add_subtitles_to_video - input: {input_video}, it_subs: {subtitle_file_it}, en_subs: {subtitle_file_en}, output: {output_video}, it_height: {italian_height}, en_height: {english_height}")
     
@@ -516,11 +516,11 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
         else:
             print(f"🔧 DEBUG: Using default dimensions: {video_width}x{video_height}")
         
-        # Usa il filtro subtitles con parametri ottimizzati per evitare wrapping
+        # Usa il filtro subtitles con la configurazione ottimale del test
         stream = ffmpeg.output(
             stream,
             output_video,
-            vf=f"subtitles={subtitle_file_it}:force_style='FontSize=18,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height},MarginL=100,MarginR=100,WrapStyle=0',subtitles={subtitle_file_en}:force_style='FontSize=18,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height},MarginL=100,MarginR=100,WrapStyle=0'",
+            vf=f"subtitles={subtitle_file_it}:force_style='FontSize=18,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height},MarginL=0,MarginR=0,WrapStyle=0',subtitles={subtitle_file_en}:force_style='FontSize=18,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height},MarginL=0,MarginR=0,WrapStyle=0'",
             vcodec='libx264',
             acodec='aac',
             preset='medium',
@@ -551,7 +551,7 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
             stream = ffmpeg.output(
                 stream,
                 output_video,
-                vf=f"subtitles={subtitle_file_it}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height},MarginL=50,MarginR=50',subtitles={subtitle_file_en}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height},MarginL=50,MarginR=50'",
+                vf=f"subtitles={subtitle_file_it}:force_style='FontSize=18,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height},MarginL=0,MarginR=0,WrapStyle=0',subtitles={subtitle_file_en}:force_style='FontSize=18,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height},MarginL=0,MarginR=0,WrapStyle=0'",
                 vcodec='libx264',
                 acodec='aac',
                 preset='medium',
@@ -568,7 +568,7 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
             print(f"❌ DEBUG: Fallback method also failed - {fallback_error}")
             raise e  # Rilancia l'errore originale
 
-def process_video(input_video, music_file, openai_api_key, output_dir=".", custom_prompt=None, video_type=None, italian_height=120, english_height=40):
+def process_video(input_video, music_file, openai_api_key, output_dir=".", custom_prompt=None, video_type=None, italian_height=120, english_height=60):
     """Funzione principale per elaborare il video"""
     print(f"🔧 DEBUG: process_video started - input: {input_video}, music: {music_file}, output_dir: {output_dir}, it_height: {italian_height}, en_height: {english_height}")
     
