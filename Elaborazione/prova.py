@@ -164,6 +164,10 @@ def process_subtitle_text(text):
     # Pulisci il testo aggressivamente
     text = text.replace('\n', ' ').replace('\r', ' ').strip()
     
+    # Aggiungi punto alla fine se non c'è già
+    if text and not text.endswith(('.', '!', '?')):
+        text += '.'
+    
     # Se il testo è troppo lungo, troncalo
     if len(text) > 40:  # 2 righe x 20 caratteri
         text = text[:37] + "..."
@@ -381,40 +385,28 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
         video_info = get_video_info(input_video)
         print(f"🔧 DEBUG: Video codec detected: {video_info['video_codec'] if video_info else 'unknown'}")
         
-        # Aggiungi i sottotitoli italiani prima
-        print("🔧 DEBUG: Adding Italian subtitles...")
+        # Aggiungi entrambi i sottotitoli in un unico passaggio
+        print("🔧 DEBUG: Adding both subtitles in single pass...")
+        
+        # Rimuovi il file di output se esiste già
+        if os.path.exists(output_video):
+            os.remove(output_video)
+            print("🔧 DEBUG: Removed existing output file")
+        
         stream = ffmpeg.input(input_video)
         stream = ffmpeg.output(
             stream,
-            "temp_with_it_subs.mp4",
-            vf=f"subtitles={subtitle_file_it}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height},MarginL=50,MarginR=50'",
-            vcodec='libx264',
-            acodec='aac',
-            preset='medium',
-            crf=23
-        )
-        ffmpeg.run(stream, overwrite_output=True)
-        print("🔧 DEBUG: Italian subtitles added successfully")
-
-        # Aggiungi i sottotitoli inglesi sopra
-        print("🔧 DEBUG: Adding English subtitles...")
-        stream = ffmpeg.input("temp_with_it_subs.mp4")
-        stream = ffmpeg.output(
-            stream,
             output_video,
-            vf=f"subtitles={subtitle_file_en}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height},MarginL=50,MarginR=50'",
+            vf=f"subtitles={subtitle_file_it}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height},MarginL=50,MarginR=50',subtitles={subtitle_file_en}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height},MarginL=50,MarginR=50'",
             vcodec='libx264',
             acodec='aac',
             preset='medium',
             crf=23
         )
         ffmpeg.run(stream, overwrite_output=True)
-        print("🔧 DEBUG: English subtitles added successfully")
+        print("🔧 DEBUG: Both subtitles added successfully")
 
-        # Rimuovi il file temporaneo
-        if os.path.exists("temp_with_it_subs.mp4"):
-            os.remove("temp_with_it_subs.mp4")
-            print("🔧 DEBUG: Temporary file removed")
+
             
     except ImportError as e:
         print(f"❌ DEBUG: ImportError in add_subtitles_to_video - {e}")
