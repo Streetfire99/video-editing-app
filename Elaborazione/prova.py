@@ -149,54 +149,43 @@ def format_timestamp(seconds):
     return str(td).split('.')[0].replace('.', ',') + f',{millis:03d}'
 
 def split_text(text, max_length=25, max_lines=2):
-    """Divide il testo per i sottotitoli"""
-    # First, try to split on natural sentence boundaries
-    sentences = re.split(r'([.!?])\s+', text)
-    # Recombine the punctuation with the sentences
-    sentences = [''.join(i) for i in zip(sentences[::2], sentences[1::2] + [''])]
+    """Divide il testo per i sottotitoli - SEMPRE massimo 2 righe"""
+    if not text:
+        return ["", ""]
     
-    lines = []
-    current_line = []
+    # Pulisci il testo
+    text = text.strip()
+    
+    # Se il testo è già corto, mettilo tutto in una riga
+    if len(text) <= max_length:
+        return [text, ""]
+    
+    # Dividi in parole
+    words = text.split()
+    
+    # Prima riga
+    line1_words = []
     current_length = 0
     
-    for sentence in sentences:
-        words = sentence.split()
-        for word in words:
-            if current_length + len(word) + 1 <= max_length:
-                current_line.append(word)
-                current_length += len(word) + 1
-            else:
-                if current_line:
-                    lines.append(' '.join(current_line))
-                current_line = [word]
-                current_length = len(word) + 1
+    for word in words:
+        if current_length + len(word) + 1 <= max_length:
+            line1_words.append(word)
+            current_length += len(word) + 1
+        else:
+            break
     
-    if current_line:
-        lines.append(' '.join(current_line))
+    line1 = " ".join(line1_words)
     
-    # If we have more than 2 lines, try to combine them intelligently
-    if len(lines) > max_lines:
-        # Try to combine lines while respecting sentence boundaries
-        combined = []
-        current = []
-        current_length = 0
-        
-        for line in lines:
-            if current_length + len(line) + 1 <= max_length:
-                current.append(line)
-                current_length += len(line) + 1
-            else:
-                if current:
-                    combined.append(' '.join(current))
-                current = [line]
-                current_length = len(line) + 1
-        
-        if current:
-            combined.append(' '.join(current))
-        
-        lines = combined[:max_lines]
+    # Seconda riga con le parole rimanenti
+    remaining_words = words[len(line1_words):]
+    line2 = " ".join(remaining_words)
     
-    return lines[:max_lines]
+    # Se la seconda riga è troppo lunga, troncala
+    if len(line2) > max_length:
+        line2 = line2[:max_length-3] + "..."
+    
+    # Assicurati di restituire sempre esattamente 2 righe
+    return [line1, line2]
 
 def distribute_subtitles(segments, texts):
     """Distribuisce i sottotitoli in modo uniforme"""
