@@ -516,11 +516,11 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
         else:
             print(f"🔧 DEBUG: Using default dimensions: {video_width}x{video_height}")
         
-        # Usa il filtro subtitles con la configurazione ottimale del test (valori fissi)
+        # Usa il filtro subtitles con la configurazione ottimale del test
         stream = ffmpeg.output(
             stream,
             output_video,
-            vf=f"subtitles={subtitle_file_it}:force_style='FontSize=18,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV=120,MarginL=0,MarginR=0,WrapStyle=0',subtitles={subtitle_file_en}:force_style='FontSize=18,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV=60,MarginL=0,MarginR=0,WrapStyle=0'",
+            vf=f"subtitles={subtitle_file_it}:force_style='FontSize=18,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height},MarginL=0,MarginR=0,WrapStyle=0',subtitles={subtitle_file_en}:force_style='FontSize=18,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height},MarginL=0,MarginR=0,WrapStyle=0'",
             vcodec='libx264',
             acodec='aac',
             preset='medium',
@@ -551,7 +551,7 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
             stream = ffmpeg.output(
                 stream,
                 output_video,
-                vf=f"subtitles={subtitle_file_it}:force_style='FontSize=18,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV=120,MarginL=0,MarginR=0,WrapStyle=0',subtitles={subtitle_file_en}:force_style='FontSize=18,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV=60,MarginL=0,MarginR=0,WrapStyle=0'",
+                vf=f"subtitles={subtitle_file_it}:force_style='FontSize=18,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height},MarginL=0,MarginR=0,WrapStyle=0',subtitles={subtitle_file_en}:force_style='FontSize=18,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height},MarginL=0,MarginR=0,WrapStyle=0'",
                 vcodec='libx264',
                 acodec='aac',
                 preset='medium',
