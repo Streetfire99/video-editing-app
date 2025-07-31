@@ -164,10 +164,6 @@ def process_subtitle_text(text):
     # Pulisci il testo aggressivamente
     text = text.replace('\n', ' ').replace('\r', ' ').strip()
     
-    # Aggiungi punto alla fine se non c'è già
-    if text and not text.endswith(('.', '!', '?')):
-        text += '.'
-    
     # Se il testo è troppo lungo, troncalo
     if len(text) > 40:  # 2 righe x 20 caratteri
         text = text[:37] + "..."
@@ -263,6 +259,90 @@ def create_srt_file(segments, output_file, language="IT"):
             # Usa split_text direttamente senza riprocessare
             lines = split_text(text)
             srt.write(f"{i}\n{start} --> {end}\n{prefix}{lines[0]}\n{lines[1] if len(lines) > 1 else ''}\n\n")
+
+def create_ass_file(segments, output_file, language="IT", margin_v=85):
+    """Crea file ASS con posizione specifica"""
+    with open(output_file, "w", encoding="utf-8") as ass:
+        # Header ASS
+        ass.write("[Script Info]\n")
+        ass.write("Title: Subtitles\n")
+        ass.write("ScriptType: v4.00+\n")
+        ass.write("WrapStyle: 1\n")
+        ass.write("ScaledBorderAndShadow: yes\n\n")
+        
+        # Stili
+        ass.write("[V4+ Styles]\n")
+        ass.write("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
+        ass.write(f"Style: Default,Arial,12,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,2,2,50,50,{margin_v},1\n\n")
+        
+        # Eventi
+        ass.write("[Events]\n")
+        ass.write("Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
+        
+        for i, segment in enumerate(segments, start=1):
+            start = format_timestamp(segment['start'])
+            end = format_timestamp(segment['end'])
+            
+            # Usa il testo appropriato in base alla lingua
+            if language == "IT":
+                text = segment['text']
+            else:
+                text = segment.get('text_en', segment['text'])
+            
+            # Usa split_text direttamente
+            lines = split_text(text)
+            full_text = lines[0]
+            if lines[1]:
+                full_text += "\\N" + lines[1]
+            
+            ass.write(f"Dialogue: 0,{start},{end},Default,,0,0,0,,{full_text}\n")
+
+def create_ass_file_from_srt(srt_file, ass_file, margin_v=85):
+    """Converte un file SRT in ASS con posizione specifica"""
+    with open(srt_file, 'r', encoding='utf-8') as srt, open(ass_file, 'w', encoding='utf-8') as ass:
+        # Header ASS
+        ass.write("[Script Info]\n")
+        ass.write("Title: Subtitles\n")
+        ass.write("ScriptType: v4.00+\n")
+        ass.write("WrapStyle: 1\n")
+        ass.write("ScaledBorderAndShadow: yes\n\n")
+        
+        # Stili
+        ass.write("[V4+ Styles]\n")
+        ass.write("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
+        ass.write(f"Style: Default,Arial,12,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,2,2,50,50,{margin_v},1\n\n")
+        
+        # Eventi
+        ass.write("[Events]\n")
+        ass.write("Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
+        
+        lines = srt.readlines()
+        i = 0
+        while i < len(lines):
+            line = lines[i].strip()
+            if line.isdigit():  # Numero del sottotitolo
+                i += 1
+                if i < len(lines):
+                    timestamp_line = lines[i].strip()
+                    if ' --> ' in timestamp_line:
+                        start, end = timestamp_line.split(' --> ')
+                        # Converti formato timestamp
+                        start = start.replace(',', '.')
+                        end = end.replace(',', '.')
+                        
+                        i += 1
+                        text_lines = []
+                        while i < len(lines) and lines[i].strip():
+                            text_lines.append(lines[i].strip())
+                            i += 1
+                        
+                        if text_lines:
+                            full_text = text_lines[0]
+                            if len(text_lines) > 1:
+                                full_text += "\\N" + text_lines[1]
+                            
+                            ass.write(f"Dialogue: 0,{start},{end},Default,,0,0,0,,{full_text}\n")
+            i += 1
 
 def create_unified_srt_file(segments, output_file):
     """Crea file SRT unificato con italiano e inglese insieme"""
@@ -394,10 +474,25 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
             print("🔧 DEBUG: Removed existing output file")
         
         stream = ffmpeg.input(input_video)
+        # Creiamo file ASS temporanei per un controllo migliore delle posizioni
+        ass_file_it = "temp_it.ass"
+        ass_file_en = "temp_en.ass"
+        
+        # Crea file ASS con posizioni specifiche
+        # Leggi i segmenti dai file SRT esistenti
+        segments_it = []
+        segments_en = []
+        
+        # Per ora usiamo i file SRT esistenti, ma convertiamoli in ASS
+        # Questo è un workaround temporaneo
+        create_ass_file_from_srt(subtitle_file_it, ass_file_it, italian_height)
+        create_ass_file_from_srt(subtitle_file_en, ass_file_en, english_height)
+        
+        # Usa il filtro ass per un controllo migliore
         stream = ffmpeg.output(
             stream,
             output_video,
-            vf=f"subtitles={subtitle_file_it}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height},MarginL=50,MarginR=50',subtitles={subtitle_file_en}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height},MarginL=50,MarginR=50'",
+            vf=f"ass={ass_file_it},ass={ass_file_en}",
             vcodec='libx264',
             acodec='aac',
             preset='medium',
@@ -405,6 +500,13 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
         )
         ffmpeg.run(stream, overwrite_output=True)
         print("🔧 DEBUG: Both subtitles added successfully")
+        
+        # Rimuovi i file temporanei
+        if os.path.exists(ass_file_it):
+            os.remove(ass_file_it)
+        if os.path.exists(ass_file_en):
+            os.remove(ass_file_en)
+        print("🔧 DEBUG: Temporary ASS files removed")
 
 
             
