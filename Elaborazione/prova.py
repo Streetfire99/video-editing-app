@@ -35,7 +35,6 @@ def get_video_info(input_video):
             'duration': float(probe.get('format', {}).get('duration', 0))
         }
     except Exception as e:
-        print(f"🔧 DEBUG: Error getting video info - {e}")
         return None
 
 # === CONFIG ===

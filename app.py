@@ -3,34 +3,9 @@ import os
 import tempfile
 import json
 import time
-import logging
 from pathlib import Path
 import sys
 import random
-
-# Configurazione logging per debug
-def setup_logging():
-    """Configura il logging per debug"""
-    # Crea directory logs se non esiste
-    log_dir = "logs"
-    if not os.path.exists(log_dir):
-        os.makedirs(log_dir)
-    
-    # Configura logging
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler(f'{log_dir}/app_debug.log', mode='a'),  # Append mode
-            logging.StreamHandler()  # Anche su console
-        ]
-    )
-    
-    return logging.getLogger(__name__)
-
-# Inizializza logger
-logger = setup_logging()
-logger.info("🚀 App avviata - Logging configurato")
 
 # Aggiungi il percorso del modulo Elaborazione
 sys.path.append('Elaborazione')
