@@ -53,6 +53,7 @@ Thumbs.db
 
 # Logs
 *.log
+logs/
 
 # Video files (opzionale, se vuoi escluderli)
 *.mp4
