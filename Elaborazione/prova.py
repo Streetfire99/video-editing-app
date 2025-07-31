@@ -164,61 +164,63 @@ def process_subtitle_text(text):
     # Pulisci il testo aggressivamente
     text = text.replace('\n', ' ').replace('\r', ' ').strip()
     
-    # Debug: stampa il testo per vedere cosa contiene
-    print(f"🔧 DEBUG: Processing text: '{text}' (length: {len(text)})")
-    
     # Se il testo è troppo lungo, troncalo
     if len(text) > 40:  # 2 righe x 20 caratteri
         text = text[:37] + "..."
     
     # Usa split_text per garantire sempre 2 righe
-    result = split_text(text, max_length=20, max_lines=2)
-    print(f"🔧 DEBUG: Split result: '{result[0]}' | '{result[1]}'")
-    return result
+    return split_text(text, max_length=25, max_lines=2)
 
-def split_text(text, max_length=20, max_lines=2):
-    """Divide il testo per i sottotitoli - SEMPRE massimo 2 righe, max 15 caratteri per riga"""
-    if not text:
-        return ["", ""]
+def split_text(text, max_length=25, max_lines=2):
+    """Divide il testo per i sottotitoli - versione che funzionava bene"""
+    # First, try to split on natural sentence boundaries
+    import re
+    sentences = re.split(r'([.!?])\s+', text)
+    # Recombine the punctuation with the sentences
+    sentences = [''.join(i) for i in zip(sentences[::2], sentences[1::2] + [''])]
     
-    # Pulisci il testo
-    text = text.strip()
-    
-    # Se il testo è già corto, mettilo tutto in una riga
-    if len(text) <= max_length:
-        return [text, ""]
-    
-    # Dividi in parole
-    words = text.split()
-    
-    # Trova il punto di divisione migliore per mantenere frasi complete
-    best_split = 0
+    lines = []
+    current_line = []
     current_length = 0
     
-    for i, word in enumerate(words):
-        # Se aggiungendo questa parola superiamo il limite
-        if current_length + len(word) + 1 > max_length:
-            # Se è la prima parola e è troppo lunga, troncala
-            if i == 0:
-                return [word[:max_length-3] + "...", ""]
-            break
-        else:
-            current_length += len(word) + 1
-            best_split = i + 1
+    for sentence in sentences:
+        words = sentence.split()
+        for word in words:
+            if current_length + len(word) + 1 <= max_length:
+                current_line.append(word)
+                current_length += len(word) + 1
+            else:
+                if current_line:
+                    lines.append(' '.join(current_line))
+                current_line = [word]
+                current_length = len(word) + 1
     
-    # Prima riga
-    line1 = " ".join(words[:best_split])
+    if current_line:
+        lines.append(' '.join(current_line))
     
-    # Seconda riga con le parole rimanenti
-    remaining_words = words[best_split:]
-    line2 = " ".join(remaining_words)
+    # If we have more than 2 lines, try to combine them intelligently
+    if len(lines) > max_lines:
+        # Try to combine lines while respecting sentence boundaries
+        combined = []
+        current = []
+        current_length = 0
+        
+        for line in lines:
+            if current_length + len(line) + 1 <= max_length:
+                current.append(line)
+                current_length += len(line) + 1
+            else:
+                if current:
+                    combined.append(' '.join(current))
+                current = [line]
+                current_length = len(line) + 1
+        
+        if current:
+            combined.append(' '.join(current))
+        
+        lines = combined[:max_lines]
     
-    # Se la seconda riga è troppo lunga, troncala
-    if len(line2) > max_length:
-        line2 = line2[:max_length-3] + "..."
-    
-    # Assicurati di restituire sempre esattamente 2 righe
-    return [line1, line2]
+    return lines[:max_lines]
 
 def distribute_subtitles(segments, texts):
     """Distribuisce i sottotitoli in modo uniforme"""
@@ -231,16 +233,10 @@ def distribute_subtitles(segments, texts):
         start_time = i * duration_per_subtitle
         end_time = (i + 1) * duration_per_subtitle
         
-        # Processa il testo per assicurarsi che sia adatto per i sottotitoli
-        raw_text = texts[i]['text']
-        lines = process_subtitle_text(raw_text)
-        # Ricombina in un singolo testo (le righe saranno separate da \n nel file SRT)
-        final_text = lines[0] + (f"\n{lines[1]}" if lines[1] else "")
-        
         distributed_segments.append({
             'start': start_time,
             'end': end_time,
-            'text': final_text
+            'text': texts[i]['text']
         })
     
     return distributed_segments
@@ -260,14 +256,9 @@ def create_srt_file(segments, output_file, language="IT"):
                 text = segment.get('text_en', segment['text'])  # Fallback al testo italiano se non c'è inglese
                 prefix = "[EN] "
             
-            # Processa il testo con funzione unificata, riducendo la lunghezza per compensare il prefisso
-            lines = process_subtitle_text(text)
-            # Assicurati che ci siano sempre esattamente 2 righe
-            line1 = lines[0] if len(lines) > 0 else ""
-            line2 = lines[1] if len(lines) > 1 else ""
-            
-            # Aggiungi il prefisso solo alla prima riga
-            srt.write(f"{i}\n{start} --> {end}\n{prefix}{line1}\n{line2}\n\n")
+            # Usa split_text direttamente senza riprocessare
+            lines = split_text(text)
+            srt.write(f"{i}\n{start} --> {end}\n{prefix}{lines[0]}\n{lines[1] if len(lines) > 1 else ''}\n\n")
 
 def translate_subtitles(segments, client, output_file, video_type=None):
     """Traduce i sottotitoli in inglese"""
