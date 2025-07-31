@@ -6,7 +6,6 @@ import re
 from datetime import timedelta
 import pickle
 import tempfile
-import logging
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload, MediaFileUpload
 import google_auth_oauthlib.flow
@@ -14,10 +13,6 @@ import threading
 import glob
 import random
 from google.auth.transport.requests import Request
-
-# Configurazione logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 def get_video_info(input_video):
     """Ottiene informazioni sul video per gestire meglio i codec"""
@@ -699,7 +694,6 @@ def get_file_id_from_url(url):
     try:
         return url.split('/d/')[1].split('/')[0]
     except Exception as e:
-        logger.error(f"Errore nell'estrazione dell'ID del file: {e}")
         return None
 
 def combine_instructions(existing_instructions, new_instructions):

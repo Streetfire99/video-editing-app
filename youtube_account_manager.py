@@ -4,7 +4,6 @@ import tempfile
 import secrets
 import hashlib
 import base64
-import logging
 from datetime import datetime, timedelta
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
@@ -15,9 +14,6 @@ import streamlit as st
 import json
 import io
 import urllib.parse
-
-# Configurazione logging
-logger = logging.getLogger(__name__)
 
 # Configurazione degli account
 YOUTUBE_ACCOUNTS = [
@@ -43,7 +39,6 @@ def get_drive_service():
         from drive_manager import get_drive_service
         return get_drive_service()
     except Exception as e:
-        logger.error(f"❌ Errore nel caricamento del servizio Drive: {e}")
         return None
 
 def get_client_secrets():
@@ -58,7 +53,6 @@ def get_client_secrets():
         else:
             return None
     except Exception as e:
-        logger.error(f"❌ Errore nel caricamento delle credenziali: {e}")
         return None
 
 def generate_pkce():
@@ -146,11 +140,9 @@ def save_token_to_drive(account, credentials):
                 fields='id'
             ).execute()
         
-        logger.info(f"✅ Token salvato per {account}")
         return True
         
     except Exception as e:
-        logger.error(f"❌ Errore nel salvataggio del token per {account}: {e}")
         return False
 
 def is_token_expired(credentials):
@@ -238,7 +230,6 @@ def create_modern_auth_url(account):
         return auth_url
         
     except Exception as e:
-        logger.error(f"❌ Errore nella creazione dell'URL di autenticazione: {e}")
         return None
 
 def authenticate_with_code_modern(account, auth_code):
@@ -282,7 +273,6 @@ def authenticate_with_code_modern(account, auth_code):
             return False
         
     except Exception as e:
-        logger.error(f"❌ Errore nell'autenticazione: {e}")
         return False
 
 def get_youtube_service(account=None):

@@ -1,15 +1,11 @@
 import os
 import pickle
 import streamlit as st
-import logging
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from googleapiclient.errors import HttpError
-
-# Configurazione logging
-logger = logging.getLogger(__name__)
 
 # Importa il nuovo sistema di gestione account
 from youtube_account_manager import (
