@@ -276,7 +276,7 @@ def create_ass_file(segments, output_file, language="IT", margin_v=85, video_wid
         # Stili
         ass.write("[V4+ Styles]\n")
         ass.write("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
-        ass.write(f"Style: Default,Arial,12,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,100,100,{margin_v},1\n\n")
+        ass.write(f"Style: Default,Arial,18,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,100,100,{margin_v},1\n\n")
         
         # Eventi
         ass.write("[Events]\n")
@@ -301,7 +301,7 @@ def create_ass_file(segments, output_file, language="IT", margin_v=85, video_wid
             ass.write(f"Dialogue: 0,{start},{end},Default,,100,100,0,,{full_text}\n")
 
 def create_ass_file_from_srt(srt_file, ass_file, margin_v=85, video_width=478, video_height=850):
-    """Converte un file SRT in ASS con posizione specifica"""
+    """Converte un file SRT in ASS con posizione specifica e risolve sovrapposizioni temporali"""
     with open(srt_file, 'r', encoding='utf-8') as srt, open(ass_file, 'w', encoding='utf-8') as ass:
         # Header ASS
         ass.write("[Script Info]\n")
@@ -315,7 +315,7 @@ def create_ass_file_from_srt(srt_file, ass_file, margin_v=85, video_width=478, v
         # Stili
         ass.write("[V4+ Styles]\n")
         ass.write("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
-        ass.write(f"Style: Default,Arial,12,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,100,100,{margin_v},1\n\n")
+        ass.write(f"Style: Default,Arial,18,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,100,100,{margin_v},1\n\n")
         
         # Eventi
         ass.write("[Events]\n")
@@ -323,6 +323,9 @@ def create_ass_file_from_srt(srt_file, ass_file, margin_v=85, video_width=478, v
         
         lines = srt.readlines()
         i = 0
+        segments = []
+        
+        # Prima leggi tutti i segmenti
         while i < len(lines):
             line = lines[i].strip()
             if line.isdigit():  # Numero del sottotitolo
@@ -346,8 +349,26 @@ def create_ass_file_from_srt(srt_file, ass_file, margin_v=85, video_width=478, v
                             if len(text_lines) > 1:
                                 full_text += "\\N" + text_lines[1]
                             
-                            ass.write(f"Dialogue: 0,{start},{end},Default,,100,100,0,,{full_text}\n")
+                            segments.append({
+                                'start': start,
+                                'end': end,
+                                'text': full_text
+                            })
             i += 1
+        
+        # Risolvi sovrapposizioni temporali
+        for j in range(len(segments) - 1):
+            current_end = float(segments[j]['end'])
+            next_start = float(segments[j + 1]['start'])
+            
+            # Se c'è sovrapposizione, riduci la durata del primo
+            if next_start < current_end:
+                new_end = next_start - 0.5  # Lascia 0.5 secondi di gap
+                segments[j]['end'] = f"{new_end:.3f}"
+        
+        # Scrivi i segmenti risolti
+        for segment in segments:
+            ass.write(f"Dialogue: 0,{segment['start']},{segment['end']},Default,,100,100,0,,{segment['text']}\n")
 
 def create_unified_srt_file(segments, output_file):
     """Crea file SRT unificato con italiano e inglese insieme"""
@@ -443,7 +464,8 @@ def add_background_music(input_video, music_file, output_video):
             vcodec='libx264',
             acodec='aac',
             preset='medium',
-            crf=23
+            crf=18,
+            pix_fmt='yuv420p'
         )
         print("🔧 DEBUG: Running ffmpeg.run for background music...")
         ffmpeg.run(stream, overwrite_output=True)
@@ -457,7 +479,7 @@ def add_background_music(input_video, music_file, output_video):
 
 
 
-def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, output_video, italian_height=85, english_height=50):
+def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, output_video, italian_height=120, english_height=40):
     """Aggiunge sottotitoli duali al video"""
     print(f"🔧 DEBUG: add_subtitles_to_video - input: {input_video}, it_subs: {subtitle_file_it}, en_subs: {subtitle_file_en}, output: {output_video}, it_height: {italian_height}, en_height: {english_height}")
     
@@ -494,6 +516,9 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
         if video_info and 'width' in video_info and 'height' in video_info:
             video_width = video_info['width']
             video_height = video_info['height']
+            print(f"🔧 DEBUG: Video dimensions: {video_width}x{video_height}")
+        else:
+            print(f"🔧 DEBUG: Using default dimensions: {video_width}x{video_height}")
         
         # Per ora usiamo i file SRT esistenti, ma convertiamoli in ASS
         # Questo è un workaround temporaneo
@@ -508,7 +533,8 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
             vcodec='libx264',
             acodec='aac',
             preset='medium',
-            crf=23
+            crf=18,
+            pix_fmt='yuv420p'
         )
         ffmpeg.run(stream, overwrite_output=True)
         print("🔧 DEBUG: Both subtitles added successfully")
@@ -545,7 +571,8 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
                 vcodec='libx264',
                 acodec='aac',
                 preset='medium',
-                crf=23
+                crf=18,
+                pix_fmt='yuv420p'
             )
             ffmpeg.run(stream, overwrite_output=True)
             
@@ -557,7 +584,7 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
             print(f"❌ DEBUG: Fallback method also failed - {fallback_error}")
             raise e  # Rilancia l'errore originale
 
-def process_video(input_video, music_file, openai_api_key, output_dir=".", custom_prompt=None, video_type=None, italian_height=85, english_height=50):
+def process_video(input_video, music_file, openai_api_key, output_dir=".", custom_prompt=None, video_type=None, italian_height=120, english_height=40):
     """Funzione principale per elaborare il video"""
     print(f"🔧 DEBUG: process_video started - input: {input_video}, music: {music_file}, output_dir: {output_dir}, it_height: {italian_height}, en_height: {english_height}")
     

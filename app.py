@@ -474,18 +474,18 @@ if st.session_state.processed_video and st.session_state.segments and st.session
         italian_height = st.slider(
             "🇮🇹 Altezza Sottotitoli Italiani",
             min_value=10,
-            max_value=90,
-            value=85,
-            help="Posizione verticale dei sottotitoli italiani (10=alto, 90=basso)"
+            max_value=150,
+            value=120,
+            help="Posizione verticale dei sottotitoli italiani (10=alto, 150=basso)"
         )
     
     with col2:
         english_height = st.slider(
             "🇬🇧 Altezza Sottotitoli Inglesi",
             min_value=10,
-            max_value=90,
-            value=50,
-            help="Posizione verticale dei sottotitoli inglesi (10=alto, 90=basso)"
+            max_value=150,
+            value=40,
+            help="Posizione verticale dei sottotitoli inglesi (10=alto, 150=basso)"
         )
     
     if st.button("🔄 Rielabora con Nuove Altezze"):
