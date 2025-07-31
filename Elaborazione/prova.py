@@ -163,7 +163,36 @@ def split_text(text, max_length=25, max_lines=2):
     # Dividi in parole
     words = text.split()
     
-    # Prima riga
+    # Se abbiamo troppe parole, forziamo la divisione
+    total_chars = len(text)
+    if total_chars > max_length * 2:
+        # Calcola quanti caratteri per riga
+        chars_per_line = total_chars // 2
+        
+        # Prima riga
+        line1_chars = 0
+        line1_words = []
+        
+        for word in words:
+            if line1_chars + len(word) + 1 <= chars_per_line:
+                line1_words.append(word)
+                line1_chars += len(word) + 1
+            else:
+                break
+        
+        line1 = " ".join(line1_words)
+        
+        # Seconda riga con tutto il resto
+        remaining_words = words[len(line1_words):]
+        line2 = " ".join(remaining_words)
+        
+        # Se ancora troppo lunga, troncala
+        if len(line2) > max_length:
+            line2 = line2[:max_length-3] + "..."
+        
+        return [line1, line2]
+    
+    # Algoritmo normale per testi più corti
     line1_words = []
     current_length = 0
     
