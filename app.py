@@ -27,14 +27,7 @@ from Elaborazione.prova import (
     create_srt_file, 
     add_subtitles_to_video,
     format_timestamp,
-    split_text,
-    # Nuove funzioni per posizionamento fisso
-    create_fixed_position_ass_file,
-    add_subtitles_with_fixed_position,
-    add_subtitles_with_subtitles_filter,
-    create_dual_ass_with_custom_height,
-    modify_subtitle_height,
-    get_video_info
+    split_text
 )
 
 # Importa le funzioni per YouTube
@@ -475,18 +468,6 @@ if st.session_state.processed_video and st.session_state.segments and st.session
     st.markdown("---")
     st.header("🎛️ Personalizza Altezza Sottotitoli")
     
-    # Selettore del metodo di posizionamento
-    positioning_method = st.selectbox(
-        "🎯 Metodo di Posizionamento Sottotitoli",
-        options=[
-            "Metodo Attuale (subtitles filter)",
-            "Nuovo Metodo (ass filter) - Posizione Fissa",
-            "Metodo Unificato (dual ass) - Ottimizzato",
-            "Metodo Stabile (subtitles filter) - No Wrapping"
-        ],
-        help="Scegli il metodo per posizionare i sottotitoli"
-    )
-    
     col1, col2 = st.columns(2)
     
     with col1:
@@ -507,228 +488,38 @@ if st.session_state.processed_video and st.session_state.segments and st.session
             help="Posizione verticale dei sottotitoli inglesi (10=alto, 150=basso)"
         )
     
-    # Controlli aggiuntivi per il nuovo metodo
-    if "ass filter" in positioning_method or "dual ass" in positioning_method:
-        col3, col4 = st.columns(2)
-        
-        with col3:
-            font_size = st.slider(
-                "📝 Dimensione Font",
-                min_value=12,
-                max_value=24,
-                value=16,
-                help="Dimensione del font dei sottotitoli"
-            )
-        
-        with col4:
-            enable_fixed_position = st.checkbox(
-                "🔒 Posizione Fissa",
-                value=True,
-                help="Mantiene i sottotitoli in posizione fissa senza sovrapposizioni"
-            )
-    
     if st.button("🔄 Rielabora con Nuove Altezze"):
         with st.spinner("Rielaborazione con nuove altezze..."):
             try:
                 segments_to_use = st.session_state.get('edited_segments', st.session_state.segments)
                 
-                if "ass filter" in positioning_method or "dual ass" in positioning_method:
-                    # Nuovo metodo con file ASS
-                    temp_ass_it = tempfile.NamedTemporaryFile(mode='w', suffix='.ass', delete=False)
-                    temp_ass_en = tempfile.NamedTemporaryFile(mode='w', suffix='.ass', delete=False)
-                    
-                    # Ottieni dimensioni video
-                    video_info = get_video_info(st.session_state.processed_video['video_with_music'])
-                    video_width = video_info['width'] if video_info else 478
-                    video_height = video_info['height'] if video_info else 850
-                    
-                    if "dual ass" in positioning_method:
-                        # Metodo unificato
-                        create_dual_ass_with_custom_height(
-                            segments_to_use,
-                            temp_ass_it.name,
-                            temp_ass_en.name,
-                            video_width,
-                            video_height,
-                            italian_height,
-                            english_height,
-                            font_size
-                        )
-                    else:
-                        # Metodo ass separato
-                        create_fixed_position_ass_file(segments_to_use, temp_ass_it.name, "IT", italian_height, video_width, video_height, font_size)
-                        create_fixed_position_ass_file(segments_to_use, temp_ass_en.name, "EN", english_height, video_width, video_height, font_size)
-                    
-                    # Aggiungi sottotitoli con il nuovo metodo
-                    result = add_subtitles_with_fixed_position(
-                        st.session_state.processed_video['video_with_music'],
-                        temp_ass_it.name,
-                        temp_ass_en.name,
-                        st.session_state.processed_video['final_video']
-                    )
-                    
-                    # Pulisci i file temporanei
-                    os.unlink(temp_ass_it.name)
-                    os.unlink(temp_ass_en.name)
-                    
-                elif "No Wrapping" in positioning_method:
-                    # Metodo stabile con filtro subtitles e WrapStyle=0
-                    temp_srt_it = tempfile.NamedTemporaryFile(mode='w', suffix='.srt', delete=False)
-                    temp_srt_en = tempfile.NamedTemporaryFile(mode='w', suffix='.srt', delete=False)
-                    
-                    create_srt_file(segments_to_use, temp_srt_it.name, "IT")
-                    create_srt_file(segments_to_use, temp_srt_en.name, "EN")
-                    
-                    result = add_subtitles_with_subtitles_filter(
-                        st.session_state.processed_video['video_with_music'],
-                        temp_srt_it.name,
-                        temp_srt_en.name,
-                        st.session_state.processed_video['final_video'],
-                        italian_height,
-                        english_height
-                    )
-                    
-                    # Pulisci i file temporanei
-                    os.unlink(temp_srt_it.name)
-                    os.unlink(temp_srt_en.name)
-                    
-                else:
-                    # Metodo attuale con file SRT
-                    temp_srt_it = tempfile.NamedTemporaryFile(mode='w', suffix='.srt', delete=False)
-                    temp_srt_en = tempfile.NamedTemporaryFile(mode='w', suffix='.srt', delete=False)
-                    
-                    create_srt_file(segments_to_use, temp_srt_it.name, "IT")
-                    create_srt_file(segments_to_use, temp_srt_en.name, "EN")
-                    
-                    result = add_subtitles_to_video(
-                        input_video=st.session_state.processed_video['video_with_music'],
-                        subtitle_file_it=temp_srt_it.name,
-                        subtitle_file_en=temp_srt_en.name,
-                        output_video=st.session_state.processed_video['final_video'],
-                        italian_height=italian_height,
-                        english_height=english_height
-                    )
-                    
-                    # Pulisci i file temporanei
-                    os.unlink(temp_srt_it.name)
-                    os.unlink(temp_srt_en.name)
+                # Metodo semplice con file SRT
+                temp_srt_it = tempfile.NamedTemporaryFile(mode='w', suffix='.srt', delete=False)
+                temp_srt_en = tempfile.NamedTemporaryFile(mode='w', suffix='.srt', delete=False)
+                
+                create_srt_file(segments_to_use, temp_srt_it.name, "IT")
+                create_srt_file(segments_to_use, temp_srt_en.name, "EN")
+                
+                result = add_subtitles_to_video(
+                    input_video=st.session_state.processed_video['video_with_music'],
+                    subtitle_file_it=temp_srt_it.name,
+                    subtitle_file_en=temp_srt_en.name,
+                    output_video=st.session_state.processed_video['final_video'],
+                    italian_height=italian_height,
+                    english_height=english_height
+                )
+                
+                # Pulisci i file temporanei
+                os.unlink(temp_srt_it.name)
+                os.unlink(temp_srt_en.name)
                 
                 st.success("✅ Video rielaborato con nuove altezze!")
                 st.rerun()
                 
             except Exception as e:
                 st.error(f"❌ Errore durante la rielaborazione: {str(e)}")
-                st.error(f"🔧 Dettagli: {e}")
 
-# Sezione per testare i metodi di posizionamento
-st.markdown("---")
-st.header("🧪 Test Metodi Posizionamento Sottotitoli")
 
-if st.session_state.processed_video and st.session_state.segments:
-    if st.button("🧪 Testa Tutti i Metodi"):
-        with st.spinner("Testando i diversi metodi di posizionamento..."):
-            try:
-                segments_to_use = st.session_state.get('edited_segments', st.session_state.segments)
-                
-                # Crea directory di test
-                test_dir = "test_subtitles_app"
-                os.makedirs(test_dir, exist_ok=True)
-                
-                # Test 1: Metodo attuale
-                st.info("🔧 Test 1: Metodo attuale (subtitles filter)")
-                temp_srt_it = tempfile.NamedTemporaryFile(mode='w', suffix='.srt', delete=False)
-                temp_srt_en = tempfile.NamedTemporaryFile(mode='w', suffix='.srt', delete=False)
-                output_video_1 = os.path.join(test_dir, "test1_subtitles.mp4")
-                
-                create_srt_file(segments_to_use, temp_srt_it.name, "IT")
-                create_srt_file(segments_to_use, temp_srt_en.name, "EN")
-                
-                add_subtitles_to_video(
-                    st.session_state.processed_video['video_with_music'],
-                    temp_srt_it.name,
-                    temp_srt_en.name,
-                    output_video_1,
-                    120, 60
-                )
-                
-                os.unlink(temp_srt_it.name)
-                os.unlink(temp_srt_en.name)
-                
-                # Test 2: Nuovo metodo ASS
-                st.info("🔧 Test 2: Nuovo metodo (ass filter)")
-                temp_ass_it = tempfile.NamedTemporaryFile(mode='w', suffix='.ass', delete=False)
-                temp_ass_en = tempfile.NamedTemporaryFile(mode='w', suffix='.ass', delete=False)
-                output_video_2 = os.path.join(test_dir, "test2_ass.mp4")
-                
-                video_info = get_video_info(st.session_state.processed_video['video_with_music'])
-                video_width = video_info['width'] if video_info else 478
-                video_height = video_info['height'] if video_info else 850
-                
-                create_fixed_position_ass_file(segments_to_use, temp_ass_it.name, "IT", 120, video_width, video_height)
-                create_fixed_position_ass_file(segments_to_use, temp_ass_en.name, "EN", 60, video_width, video_height)
-                
-                add_subtitles_with_fixed_position(
-                    st.session_state.processed_video['video_with_music'],
-                    temp_ass_it.name,
-                    temp_ass_en.name,
-                    output_video_2
-                )
-                
-                os.unlink(temp_ass_it.name)
-                os.unlink(temp_ass_en.name)
-                
-                # Test 3: Metodo unificato
-                st.info("🔧 Test 3: Metodo unificato (dual ass)")
-                temp_ass_it_3 = tempfile.NamedTemporaryFile(mode='w', suffix='.ass', delete=False)
-                temp_ass_en_3 = tempfile.NamedTemporaryFile(mode='w', suffix='.ass', delete=False)
-                output_video_3 = os.path.join(test_dir, "test3_dual.mp4")
-                
-                create_dual_ass_with_custom_height(
-                    segments_to_use,
-                    temp_ass_it_3.name,
-                    temp_ass_en_3.name,
-                    video_width,
-                    video_height,
-                    120, 60, 16
-                )
-                
-                add_subtitles_with_fixed_position(
-                    st.session_state.processed_video['video_with_music'],
-                    temp_ass_it_3.name,
-                    temp_ass_en_3.name,
-                    output_video_3
-                )
-                
-                os.unlink(temp_ass_it_3.name)
-                os.unlink(temp_ass_en_3.name)
-                
-                # Test 4: Metodo stabile (subtitles filter con WrapStyle=0)
-                st.info("🔧 Test 4: Metodo stabile (subtitles filter - No Wrapping)")
-                temp_srt_it_4 = tempfile.NamedTemporaryFile(mode='w', suffix='.srt', delete=False)
-                temp_srt_en_4 = tempfile.NamedTemporaryFile(mode='w', suffix='.srt', delete=False)
-                output_video_4 = os.path.join(test_dir, "test4_stable.mp4")
-                
-                create_srt_file(segments_to_use, temp_srt_it_4.name, "IT")
-                create_srt_file(segments_to_use, temp_srt_en_4.name, "EN")
-                
-                add_subtitles_with_subtitles_filter(
-                    st.session_state.processed_video['video_with_music'],
-                    temp_srt_it_4.name,
-                    temp_srt_en_4.name,
-                    output_video_4,
-                    120, 60
-                )
-                
-                os.unlink(temp_srt_it_4.name)
-                os.unlink(temp_srt_en_4.name)
-                
-                st.success("✅ Tutti i test completati!")
-                st.info(f"📁 File di test in: {test_dir}")
-                st.info("🎯 Controlla i video generati per confrontare i metodi")
-                
-            except Exception as e:
-                st.error(f"❌ Errore durante i test: {str(e)}")
-                st.error(f"🔧 Dettagli: {e}")
 
 # Sezione per modifiche personalizzate al prompt
 st.markdown("---")
