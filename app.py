@@ -31,6 +31,7 @@ from Elaborazione.prova import (
     # Nuove funzioni per posizionamento fisso
     create_fixed_position_ass_file,
     add_subtitles_with_fixed_position,
+    add_subtitles_with_subtitles_filter,
     create_dual_ass_with_custom_height,
     modify_subtitle_height,
     get_video_info
@@ -480,7 +481,8 @@ if st.session_state.processed_video and st.session_state.segments and st.session
         options=[
             "Metodo Attuale (subtitles filter)",
             "Nuovo Metodo (ass filter) - Posizione Fissa",
-            "Metodo Unificato (dual ass) - Ottimizzato"
+            "Metodo Unificato (dual ass) - Ottimizzato",
+            "Metodo Stabile (subtitles filter) - No Wrapping"
         ],
         help="Scegli il metodo per posizionare i sottotitoli"
     )
@@ -568,6 +570,27 @@ if st.session_state.processed_video and st.session_state.segments and st.session
                     # Pulisci i file temporanei
                     os.unlink(temp_ass_it.name)
                     os.unlink(temp_ass_en.name)
+                    
+                elif "No Wrapping" in positioning_method:
+                    # Metodo stabile con filtro subtitles e WrapStyle=0
+                    temp_srt_it = tempfile.NamedTemporaryFile(mode='w', suffix='.srt', delete=False)
+                    temp_srt_en = tempfile.NamedTemporaryFile(mode='w', suffix='.srt', delete=False)
+                    
+                    create_srt_file(segments_to_use, temp_srt_it.name, "IT")
+                    create_srt_file(segments_to_use, temp_srt_en.name, "EN")
+                    
+                    result = add_subtitles_with_subtitles_filter(
+                        st.session_state.processed_video['video_with_music'],
+                        temp_srt_it.name,
+                        temp_srt_en.name,
+                        st.session_state.processed_video['final_video'],
+                        italian_height,
+                        english_height
+                    )
+                    
+                    # Pulisci i file temporanei
+                    os.unlink(temp_srt_it.name)
+                    os.unlink(temp_srt_en.name)
                     
                 else:
                     # Metodo attuale con file SRT
@@ -678,6 +701,26 @@ if st.session_state.processed_video and st.session_state.segments:
                 
                 os.unlink(temp_ass_it_3.name)
                 os.unlink(temp_ass_en_3.name)
+                
+                # Test 4: Metodo stabile (subtitles filter con WrapStyle=0)
+                st.info("🔧 Test 4: Metodo stabile (subtitles filter - No Wrapping)")
+                temp_srt_it_4 = tempfile.NamedTemporaryFile(mode='w', suffix='.srt', delete=False)
+                temp_srt_en_4 = tempfile.NamedTemporaryFile(mode='w', suffix='.srt', delete=False)
+                output_video_4 = os.path.join(test_dir, "test4_stable.mp4")
+                
+                create_srt_file(segments_to_use, temp_srt_it_4.name, "IT")
+                create_srt_file(segments_to_use, temp_srt_en_4.name, "EN")
+                
+                add_subtitles_with_subtitles_filter(
+                    st.session_state.processed_video['video_with_music'],
+                    temp_srt_it_4.name,
+                    temp_srt_en_4.name,
+                    output_video_4,
+                    120, 60
+                )
+                
+                os.unlink(temp_srt_it_4.name)
+                os.unlink(temp_srt_en_4.name)
                 
                 st.success("✅ Tutti i test completati!")
                 st.info(f"📁 File di test in: {test_dir}")

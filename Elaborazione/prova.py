@@ -566,28 +566,23 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
             raise e  # Rilancia l'errore originale
 
 def create_fixed_position_ass_file(segments, output_file, language="IT", margin_v=85, video_width=478, video_height=850):
-    """Crea file ASS con posizione fissa e controllo completo"""
+    """Crea file ASS con posizione fissa - SOLUZIONE MIGLIORATA"""
     with open(output_file, "w", encoding="utf-8") as ass:
-        # Header ASS con dimensioni video corrette
+        # Header ASS
         ass.write("[Script Info]\n")
         ass.write("Title: Fixed Position Subtitles\n")
         ass.write("ScriptType: v4.00+\n")
-        ass.write("WrapStyle: 0\n")  # No wrapping
+        ass.write("WrapStyle: 0\n")  # NO WRAPPING - Forza testo su una riga
         ass.write("ScaledBorderAndShadow: yes\n")
         ass.write(f"PlayResX: {video_width}\n")
         ass.write(f"PlayResY: {video_height}\n\n")
         
-        # Stili separati per italiano e inglese
+        # Stili - Margini più ampi e font più grande
         ass.write("[V4+ Styles]\n")
         ass.write("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
         
-        # Stile italiano - posizione fissa in basso
-        italian_margin_v = margin_v
-        ass.write(f"Style: Italian,Arial,16,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,1,0,2,50,50,{italian_margin_v},1\n")
-        
-        # Stile inglese - posizione fissa sopra l'italiano
-        english_margin_v = margin_v - 40  # 40px sopra l'italiano
-        ass.write(f"Style: English,Arial,16,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,1,0,2,50,50,{english_margin_v},1\n\n")
+        # Stile con margini più ampi (200 invece di 50) e font più grande (18 invece di 16)
+        ass.write(f"Style: Default,Arial,18,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,0,2,200,200,{margin_v},1\n\n")
         
         # Eventi
         ass.write("[Events]\n")
@@ -600,18 +595,47 @@ def create_fixed_position_ass_file(segments, output_file, language="IT", margin_
             # Usa il testo appropriato in base alla lingua
             if language == "IT":
                 text = segment['text']
-                style = "Italian"
+                prefix = "[IT] "
             else:
                 text = segment.get('text_en', segment['text'])
-                style = "English"
+                prefix = "[EN] "
             
-            # Assicurati che il testo sia su massimo 2 righe
-            lines = split_text(text, max_length=20, max_lines=2)
-            full_text = lines[0]
-            if lines[1]:
-                full_text += "\\N" + lines[1]
+            # Pulisci il testo da caratteri problematici
+            text = text.replace("\n", "").replace("\r", "").strip()
             
-            ass.write(f"Dialogue: 0,{start},{end},{style},,0,0,0,,{full_text}\n")
+            # Gestione intelligente del testo lungo
+            max_chars_per_line = 25  # Ridotto per sicurezza
+            if len(text) > max_chars_per_line:
+                # Dividi in modo intelligente mantenendo le parole intere
+                words = text.split()
+                lines = []
+                current_line = ""
+                
+                for word in words:
+                    test_line = current_line + (" " + word) if current_line else word
+                    if len(test_line) <= max_chars_per_line:
+                        current_line = test_line
+                    else:
+                        if current_line:
+                            lines.append(current_line)
+                        current_line = word
+                
+                if current_line:
+                    lines.append(current_line)
+                
+                # Assicurati di avere massimo 2 righe
+                if len(lines) > 2:
+                    # Combina le righe in eccesso
+                    lines = [lines[0], " ".join(lines[1:])]
+                    # Tronca se ancora troppo lungo
+                    if len(lines[1]) > max_chars_per_line:
+                        lines[1] = lines[1][:max_chars_per_line-3] + "..."
+                
+                full_text = "\\N".join(lines)
+            else:
+                full_text = text
+            
+            ass.write(f"Dialogue: 0,{start},{end},Default,,200,200,0,,{prefix}{full_text}\n")
 
 def add_subtitles_with_fixed_position(input_video, subtitle_file_it, subtitle_file_en, output_video):
     """Aggiunge sottotitoli con posizione fissa usando il filtro ass"""
@@ -659,6 +683,40 @@ def add_subtitles_with_fixed_position(input_video, subtitle_file_it, subtitle_fi
         
     except Exception as e:
         print(f"❌ DEBUG: Error in add_subtitles_with_fixed_position - {e}")
+        raise e
+
+def add_subtitles_with_subtitles_filter(input_video, subtitle_file_it, subtitle_file_en, output_video, italian_height=120, english_height=60):
+    """Aggiunge sottotitoli usando il filtro subtitles (più stabile)"""
+    print(f"🔧 DEBUG: add_subtitles_with_subtitles_filter - input: {input_video}, it_subs: {subtitle_file_it}, en_subs: {subtitle_file_en}, output: {output_video}")
+    
+    try:
+        import ffmpeg
+        
+        # Rimuovi il file di output se esiste già
+        if os.path.exists(output_video):
+            os.remove(output_video)
+        
+        stream = ffmpeg.input(input_video)
+        
+        # Usa il filtro subtitles con WrapStyle=0 per evitare wrapping
+        vf = f"subtitles={subtitle_file_it}:force_style='FontSize=18,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height},MarginL=200,MarginR=200,WrapStyle=0',subtitles={subtitle_file_en}:force_style='FontSize=18,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height},MarginL=200,MarginR=200,WrapStyle=0'"
+        
+        stream = ffmpeg.output(
+            stream,
+            output_video,
+            vf=vf,
+            vcodec='libx264',
+            acodec='aac',
+            preset='medium',
+            crf=18,
+            pix_fmt='yuv420p'
+        )
+        
+        ffmpeg.run(stream, overwrite_output=True)
+        print("🔧 DEBUG: Subtitles filter subtitles added successfully")
+        
+    except Exception as e:
+        print(f"❌ DEBUG: Error in add_subtitles_with_subtitles_filter - {e}")
         raise e
 
 def create_dual_ass_files(segments, output_file_it, output_file_en, video_width=478, video_height=850):
