@@ -517,7 +517,7 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
         stream = ffmpeg.output(
             stream,
             output_video,
-            vf=f"subtitles={subtitle_file_it}:force_style='FontSize=18,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height},MarginL=0,MarginR=0,WrapStyle=0',subtitles={subtitle_file_en}:force_style='FontSize=18,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height},MarginL=0,MarginR=0,WrapStyle=0'",
+            vf=f"subtitles={subtitle_file_it}:force_style='FontSize=16,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height},MarginL=0,MarginR=0,WrapStyle=0',subtitles={subtitle_file_en}:force_style='FontSize=16,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height},MarginL=0,MarginR=0,WrapStyle=0'",
             vcodec='libx264',
             acodec='aac',
             preset='medium',
@@ -548,7 +548,7 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
             stream = ffmpeg.output(
                 stream,
                 output_video,
-                vf=f"subtitles={subtitle_file_it}:force_style='FontSize=18,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height},MarginL=0,MarginR=0,WrapStyle=0',subtitles={subtitle_file_en}:force_style='FontSize=18,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height},MarginL=0,MarginR=0,WrapStyle=0'",
+                vf=f"subtitles={subtitle_file_it}:force_style='FontSize=16,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height},MarginL=0,MarginR=0,WrapStyle=0',subtitles={subtitle_file_en}:force_style='FontSize=16,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height},MarginL=0,MarginR=0,WrapStyle=0'",
                 vcodec='libx264',
                 acodec='aac',
                 preset='medium',
@@ -564,6 +564,194 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
         except Exception as fallback_error:
             print(f"❌ DEBUG: Fallback method also failed - {fallback_error}")
             raise e  # Rilancia l'errore originale
+
+def create_fixed_position_ass_file(segments, output_file, language="IT", margin_v=85, video_width=478, video_height=850):
+    """Crea file ASS con posizione fissa e controllo completo"""
+    with open(output_file, "w", encoding="utf-8") as ass:
+        # Header ASS con dimensioni video corrette
+        ass.write("[Script Info]\n")
+        ass.write("Title: Fixed Position Subtitles\n")
+        ass.write("ScriptType: v4.00+\n")
+        ass.write("WrapStyle: 0\n")  # No wrapping
+        ass.write("ScaledBorderAndShadow: yes\n")
+        ass.write(f"PlayResX: {video_width}\n")
+        ass.write(f"PlayResY: {video_height}\n\n")
+        
+        # Stili separati per italiano e inglese
+        ass.write("[V4+ Styles]\n")
+        ass.write("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
+        
+        # Stile italiano - posizione fissa in basso
+        italian_margin_v = margin_v
+        ass.write(f"Style: Italian,Arial,16,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,1,0,2,50,50,{italian_margin_v},1\n")
+        
+        # Stile inglese - posizione fissa sopra l'italiano
+        english_margin_v = margin_v - 40  # 40px sopra l'italiano
+        ass.write(f"Style: English,Arial,16,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,1,0,2,50,50,{english_margin_v},1\n\n")
+        
+        # Eventi
+        ass.write("[Events]\n")
+        ass.write("Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
+        
+        for i, segment in enumerate(segments, start=1):
+            start = format_timestamp(segment['start'])
+            end = format_timestamp(segment['end'])
+            
+            # Usa il testo appropriato in base alla lingua
+            if language == "IT":
+                text = segment['text']
+                style = "Italian"
+            else:
+                text = segment.get('text_en', segment['text'])
+                style = "English"
+            
+            # Assicurati che il testo sia su massimo 2 righe
+            lines = split_text(text, max_length=20, max_lines=2)
+            full_text = lines[0]
+            if lines[1]:
+                full_text += "\\N" + lines[1]
+            
+            ass.write(f"Dialogue: 0,{start},{end},{style},,0,0,0,,{full_text}\n")
+
+def add_subtitles_with_fixed_position(input_video, subtitle_file_it, subtitle_file_en, output_video):
+    """Aggiunge sottotitoli con posizione fissa usando il filtro ass"""
+    print(f"🔧 DEBUG: add_subtitles_with_fixed_position - input: {input_video}, it_subs: {subtitle_file_it}, en_subs: {subtitle_file_en}, output: {output_video}")
+    
+    # Verifica che i file ASS esistano
+    if not os.path.exists(subtitle_file_it):
+        print(f"❌ DEBUG: Italian ASS file NOT found: {subtitle_file_it}")
+        raise FileNotFoundError(f"File ASS italiano non trovato: {subtitle_file_it}")
+    
+    if not os.path.exists(subtitle_file_en):
+        print(f"❌ DEBUG: English ASS file NOT found: {subtitle_file_en}")
+        raise FileNotFoundError(f"File ASS inglese non trovato: {subtitle_file_en}")
+    
+    try:
+        import ffmpeg
+        
+        # Ottieni informazioni sul video
+        video_info = get_video_info(input_video)
+        video_width = video_info['width'] if video_info else 478
+        video_height = video_info['height'] if video_info else 850
+        
+        print(f"🔧 DEBUG: Video dimensions: {video_width}x{video_height}")
+        
+        # Rimuovi il file di output se esiste già
+        if os.path.exists(output_video):
+            os.remove(output_video)
+        
+        stream = ffmpeg.input(input_video)
+        
+        # Usa il filtro ass per controllo completo della posizione
+        stream = ffmpeg.output(
+            stream,
+            output_video,
+            vf=f"ass={subtitle_file_it},ass={subtitle_file_en}",
+            vcodec='libx264',
+            acodec='aac',
+            preset='medium',
+            crf=18,
+            pix_fmt='yuv420p'
+        )
+        
+        ffmpeg.run(stream, overwrite_output=True)
+        print("🔧 DEBUG: Fixed position subtitles added successfully")
+        
+    except Exception as e:
+        print(f"❌ DEBUG: Error in add_subtitles_with_fixed_position - {e}")
+        raise e
+
+def create_dual_ass_files(segments, output_file_it, output_file_en, video_width=478, video_height=850):
+    """Crea file ASS separati per italiano e inglese con posizione fissa"""
+    print(f"🔧 DEBUG: create_dual_ass_files - it: {output_file_it}, en: {output_file_en}")
+    
+    # Crea file ASS italiano
+    create_fixed_position_ass_file(segments, output_file_it, "IT", margin_v=120, video_width=video_width, video_height=video_height)
+    
+    # Crea file ASS inglese
+    create_fixed_position_ass_file(segments, output_file_en, "EN", margin_v=60, video_width=video_width, video_height=video_height)
+    
+    print("🔧 DEBUG: Dual ASS files created successfully")
+
+def create_customizable_ass_file(segments, output_file, language="IT", margin_v=85, video_width=478, video_height=850, font_size=16):
+    """Crea file ASS con parametri personalizzabili"""
+    with open(output_file, "w", encoding="utf-8") as ass:
+        # Header ASS
+        ass.write("[Script Info]\n")
+        ass.write("Title: Customizable Subtitles\n")
+        ass.write("ScriptType: v4.00+\n")
+        ass.write("WrapStyle: 0\n")  # No wrapping
+        ass.write("ScaledBorderAndShadow: yes\n")
+        ass.write(f"PlayResX: {video_width}\n")
+        ass.write(f"PlayResY: {video_height}\n\n")
+        
+        # Stili con parametri personalizzabili
+        ass.write("[V4+ Styles]\n")
+        ass.write("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n")
+        
+        # Stile personalizzabile
+        ass.write(f"Style: Custom,Arial,{font_size},&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,1,0,2,50,50,{margin_v},1\n\n")
+        
+        # Eventi
+        ass.write("[Events]\n")
+        ass.write("Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
+        
+        for i, segment in enumerate(segments, start=1):
+            start = format_timestamp(segment['start'])
+            end = format_timestamp(segment['end'])
+            
+            # Usa il testo appropriato in base alla lingua
+            if language == "IT":
+                text = segment['text']
+            else:
+                text = segment.get('text_en', segment['text'])
+            
+            # Assicurati che il testo sia su massimo 2 righe
+            lines = split_text(text, max_length=20, max_lines=2)
+            full_text = lines[0]
+            if lines[1]:
+                full_text += "\\N" + lines[1]
+            
+            ass.write(f"Dialogue: 0,{start},{end},Custom,,0,0,0,,{full_text}\n")
+
+def modify_subtitle_height(ass_file, new_margin_v, new_font_size=None):
+    """Modifica l'altezza e dimensione font di un file ASS esistente"""
+    print(f"🔧 DEBUG: modify_subtitle_height - file: {ass_file}, new_margin: {new_margin_v}, new_font: {new_font_size}")
+    
+    try:
+        # Leggi il file ASS
+        with open(ass_file, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # Modifica il MarginV
+        import re
+        content = re.sub(r'MarginV,\d+', f'MarginV,{new_margin_v}', content)
+        
+        # Modifica il FontSize se specificato
+        if new_font_size:
+            content = re.sub(r'Fontsize,\d+', f'Fontsize,{new_font_size}', content)
+        
+        # Scrivi il file modificato
+        with open(ass_file, 'w', encoding='utf-8') as f:
+            f.write(content)
+        
+        print(f"✅ File ASS modificato: margin_v={new_margin_v}, font_size={new_font_size}")
+        
+    except Exception as e:
+        print(f"❌ Errore modifica file ASS: {e}")
+        raise e
+
+def create_dual_ass_with_custom_height(segments, output_file_it, output_file_en, video_width=478, video_height=850, italian_height=120, english_height=60, font_size=16):
+    """Crea file ASS duali con altezza personalizzabile"""
+    print(f"🔧 DEBUG: create_dual_ass_with_custom_height - it_height: {italian_height}, en_height: {english_height}, font_size: {font_size}")
+    
+    # Crea file ASS italiano
+    create_customizable_ass_file(segments, output_file_it, "IT", italian_height, video_width, video_height, font_size)
+    
+    # Crea file ASS inglese
+    create_customizable_ass_file(segments, output_file_en, "EN", english_height, video_width, video_height, font_size)
+    
+    print("✅ File ASS duali creati con altezza personalizzabile")
 
 def process_video(input_video, music_file, openai_api_key, output_dir=".", custom_prompt=None, video_type=None, italian_height=120, english_height=60):
     """Funzione principale per elaborare il video"""
@@ -981,3 +1169,69 @@ def update_appliance_instructions(service, apartment_name, appliance_type, new_i
     except Exception as e:
         print(f"Errore nell'aggiornamento delle istruzioni: {e}")
         return False
+
+def test_subtitle_positioning_methods(input_video, segments, output_dir="."):
+    """Testa diversi metodi di posizionamento sottotitoli"""
+    print("🧪 TEST: Confronto metodi posizionamento sottotitoli")
+    
+    # Ottieni informazioni video
+    video_info = get_video_info(input_video)
+    video_width = video_info['width'] if video_info else 478
+    video_height = video_info['height'] if video_info else 850
+    
+    print(f"📐 Video dimensions: {video_width}x{video_height}")
+    
+    # Test 1: Metodo attuale (subtitles filter)
+    print("\n🔧 TEST 1: Metodo attuale (subtitles filter)")
+    try:
+        srt_file_it = os.path.join(output_dir, "test1_italian.srt")
+        srt_file_en = os.path.join(output_dir, "test1_english.srt")
+        output_video = os.path.join(output_dir, "test1_subtitles.mp4")
+        
+        create_srt_file(segments, srt_file_it, "IT")
+        create_srt_file(segments, srt_file_en, "EN")
+        
+        add_subtitles_to_video(input_video, srt_file_it, srt_file_en, output_video, 120, 60)
+        print("✅ Test 1 completato")
+    except Exception as e:
+        print(f"❌ Test 1 fallito: {e}")
+    
+    # Test 2: Nuovo metodo (ass filter)
+    print("\n🔧 TEST 2: Nuovo metodo (ass filter)")
+    try:
+        ass_file_it = os.path.join(output_dir, "test2_italian.ass")
+        ass_file_en = os.path.join(output_dir, "test2_english.ass")
+        output_video = os.path.join(output_dir, "test2_ass.mp4")
+        
+        create_fixed_position_ass_file(segments, ass_file_it, "IT", 120, video_width, video_height)
+        create_fixed_position_ass_file(segments, ass_file_en, "EN", 60, video_width, video_height)
+        
+        add_subtitles_with_fixed_position(input_video, ass_file_it, ass_file_en, output_video)
+        print("✅ Test 2 completato")
+    except Exception as e:
+        print(f"❌ Test 2 fallito: {e}")
+    
+    # Test 3: Metodo unificato (dual ass)
+    print("\n🔧 TEST 3: Metodo unificato (dual ass)")
+    try:
+        ass_file_it = os.path.join(output_dir, "test3_italian.ass")
+        ass_file_en = os.path.join(output_dir, "test3_english.ass")
+        output_video = os.path.join(output_dir, "test3_dual.mp4")
+        
+        create_dual_ass_files(segments, ass_file_it, ass_file_en, video_width, video_height)
+        
+        add_subtitles_with_fixed_position(input_video, ass_file_it, ass_file_en, output_video)
+        print("✅ Test 3 completato")
+    except Exception as e:
+        print(f"❌ Test 3 fallito: {e}")
+    
+    print("\n📊 RISULTATI TEST:")
+    print("Test 1: Metodo attuale (subtitles) - Può avere sovrapposizioni")
+    print("Test 2: Nuovo metodo (ass) - Posizione fissa, controllo completo")
+    print("Test 3: Metodo unificato (dual ass) - Ottimizzato per dual-language")
+    
+    return {
+        "test1": os.path.join(output_dir, "test1_subtitles.mp4"),
+        "test2": os.path.join(output_dir, "test2_ass.mp4"),
+        "test3": os.path.join(output_dir, "test3_dual.mp4")
+    }
