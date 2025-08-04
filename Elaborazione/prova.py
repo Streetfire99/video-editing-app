@@ -108,9 +108,9 @@ Example output:
     response = client.chat.completions.create(
         model="gpt-4",
         messages=[
-            {"role": "system", "content": final_prompt.format(raw_transcription=raw_transcription)},
-            {"role": "user", "content": raw_transcription}
-        ]
+            {"role": "user", "content": final_prompt.format(raw_transcription=raw_transcription)}
+        ],
+        temperature=0.1
     )
 
     # Clean the response content before parsing JSON
