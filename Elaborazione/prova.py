@@ -230,6 +230,10 @@ def split_text(text, max_length=25, max_lines=2):
 def distribute_subtitles(segments, texts):
     """Distribuisce i sottotitoli in modo uniforme"""
     print(f"🔧 DEBUG: distribute_subtitles - segments: {len(segments)}, texts: {len(texts)}")
+    print(f"🔧 DEBUG: texts type: {type(texts)}")
+    if texts:
+        print(f"🔧 DEBUG: first text type: {type(texts[0])}")
+        print(f"🔧 DEBUG: first text: {texts[0]}")
     
     # Controlla se la lista è vuota
     if not segments:
@@ -239,10 +243,17 @@ def distribute_subtitles(segments, texts):
         for i, text in enumerate(texts):
             start_time = i * 5.0  # 5 secondi per segmento
             end_time = (i + 1) * 5.0
+            
+            # Gestisce sia stringhe che dizionari
+            if isinstance(text, dict):
+                text_content = text.get('text', str(text))
+            else:
+                text_content = str(text)
+            
             distributed_segments.append({
                 'start': start_time,
                 'end': end_time,
-                'text': text['text']
+                'text': text_content
             })
         return distributed_segments
     
@@ -270,10 +281,16 @@ def distribute_subtitles(segments, texts):
         start_time = i * duration_per_subtitle
         end_time = (i + 1) * duration_per_subtitle
         
+        # Gestisce sia stringhe che dizionari
+        if isinstance(texts[i], dict):
+            text_content = texts[i].get('text', str(texts[i]))
+        else:
+            text_content = str(texts[i])
+        
         distributed_segments.append({
             'start': start_time,
             'end': end_time,
-            'text': texts[i]['text']
+            'text': text_content
         })
     
     print(f"🔧 DEBUG: Created {len(distributed_segments)} distributed segments")
