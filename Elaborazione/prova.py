@@ -139,12 +139,15 @@ Example output:
     print(f"🔧 DEBUG: optimize_transcription - optimized_segments: {len(optimized_segments)}")
     
     # Post-processing: assicurati che ogni testo sia adatto per i sottotitoli
-    for segment in optimized_segments:
+    print(f"🔧 DEBUG: Post-processing {len(optimized_segments)} segments")
+    for i, segment in enumerate(optimized_segments):
+        print(f"🔧 DEBUG: Processing segment {i}: {segment}")
         if 'text' in segment:
             # Usa process_subtitle_text per coerenza
             lines = process_subtitle_text(segment['text'])
             # Ricombina in un singolo testo (le righe saranno separate da \n nel file SRT)
             segment['text'] = lines[0] + (f"\n{lines[1]}" if lines[1] else "")
+            print(f"🔧 DEBUG: Processed segment {i} text: {segment['text']}")
 
     return optimized_segments
 
@@ -302,6 +305,8 @@ def distribute_subtitles(segments, texts):
         })
     
     print(f"🔧 DEBUG: Created {len(distributed_segments)} distributed segments")
+    print(f"🔧 DEBUG: First segment: {distributed_segments[0] if distributed_segments else 'None'}")
+    print(f"🔧 DEBUG: Last segment: {distributed_segments[-1] if distributed_segments else 'None'}")
     return distributed_segments
 
 def create_srt_file(segments, output_file, language="IT"):
@@ -1136,7 +1141,14 @@ def generate_subtitles_only(input_video, openai_api_key, output_dir=".", custom_
         
         # Ottimizza la trascrizione
         print("🔧 DEBUG: Optimizing transcription...")
-        optimized_segments = optimize_transcription(transcript.segments, client, custom_prompt, video_type)
+        try:
+            optimized_segments = optimize_transcription(transcript.segments, client, custom_prompt, video_type)
+            print(f"🔧 DEBUG: optimize_transcription completed successfully with {len(optimized_segments)} segments")
+        except Exception as e:
+            print(f"❌ DEBUG: Error in optimize_transcription: {e}")
+            import traceback
+            print(f"❌ DEBUG: Traceback: {traceback.format_exc()}")
+            raise
         
         # Traduci i sottotitoli in inglese
         print("🔧 DEBUG: Translating subtitles...")
