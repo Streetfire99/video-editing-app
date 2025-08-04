@@ -234,6 +234,9 @@ def distribute_subtitles(segments, texts):
     if texts:
         print(f"🔧 DEBUG: first text type: {type(texts[0])}")
         print(f"🔧 DEBUG: first text: {texts[0]}")
+        print(f"🔧 DEBUG: texts content: {texts}")
+    else:
+        print("🔧 DEBUG: texts is empty")
     
     # Controlla se la lista è vuota
     if not segments:
@@ -280,6 +283,11 @@ def distribute_subtitles(segments, texts):
     for i in range(num_subtitles):
         start_time = i * duration_per_subtitle
         end_time = (i + 1) * duration_per_subtitle
+        
+        # Controlla che l'indice sia valido
+        if i >= len(texts):
+            print(f"🔧 DEBUG: Index {i} out of range for texts (length: {len(texts)})")
+            break
         
         # Gestisce sia stringhe che dizionari
         if isinstance(texts[i], dict):
