@@ -134,7 +134,9 @@ Example output:
         raise ValueError("La risposta di OpenAI non è una lista di segmenti")
 
     # Distribuisci i testi ottimizzati sui segmenti originali mantenendo i timestamp
+    print(f"🔧 DEBUG: optimize_transcription - raw_transcription: {len(raw_transcription)}, optimized_texts: {len(optimized_texts)}")
     optimized_segments = distribute_subtitles(raw_transcription, optimized_texts)
+    print(f"🔧 DEBUG: optimize_transcription - optimized_segments: {len(optimized_segments)}")
     
     # Post-processing: assicurati che ogni testo sia adatto per i sottotitoli
     for segment in optimized_segments:
@@ -227,6 +229,8 @@ def split_text(text, max_length=25, max_lines=2):
 
 def distribute_subtitles(segments, texts):
     """Distribuisce i sottotitoli in modo uniforme"""
+    print(f"🔧 DEBUG: distribute_subtitles - segments: {len(segments)}, texts: {len(texts)}")
+    
     # Controlla se la lista è vuota
     if not segments:
         print("🔧 DEBUG: No segments found, creating default segments")
@@ -242,11 +246,21 @@ def distribute_subtitles(segments, texts):
             })
         return distributed_segments
     
+    # Controlla se texts è vuoto
+    if not texts:
+        print("🔧 DEBUG: No texts found, returning empty segments")
+        return []
+    
     # Gestisce sia oggetti Whisper che dizionari
-    if hasattr(segments[-1], 'end'):
-        total_duration = segments[-1].end
-    else:
-        total_duration = segments[-1]['end']
+    try:
+        if hasattr(segments[-1], 'end'):
+            total_duration = segments[-1].end
+        else:
+            total_duration = segments[-1]['end']
+    except (IndexError, KeyError) as e:
+        print(f"🔧 DEBUG: Error accessing segment end: {e}")
+        # Fallback: usa una durata di default
+        total_duration = 60.0  # 60 secondi di default
     
     num_subtitles = len(texts)
     duration_per_subtitle = total_duration / num_subtitles
@@ -262,6 +276,7 @@ def distribute_subtitles(segments, texts):
             'text': texts[i]['text']
         })
     
+    print(f"🔧 DEBUG: Created {len(distributed_segments)} distributed segments")
     return distributed_segments
 
 def create_srt_file(segments, output_file, language="IT"):
