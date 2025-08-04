@@ -290,6 +290,41 @@ def create_srt_file(segments, output_file, language="IT"):
             
             srt.write(f"{i}\n{start} --> {end}\n{prefix}{text}\n\n")
 
+def read_srt_file(srt_file):
+    """Legge un file SRT e restituisce una lista di (start_time, end_time, text)"""
+    subtitles = []
+    with open(srt_file, 'r', encoding='utf-8') as f:
+        content = f.read()
+    
+    # Parsing del file SRT
+    blocks = content.strip().split('\n\n')
+    for block in blocks:
+        lines = block.split('\n')
+        if len(lines) >= 3:
+            # Ignora il numero del sottotitolo (prima riga)
+            time_line = lines[1]
+            text = '\n'.join(lines[2:])
+            
+            # Parsing del timestamp
+            if ' --> ' in time_line:
+                start_str, end_str = time_line.split(' --> ')
+                start_time = parse_timestamp(start_str)
+                end_time = parse_timestamp(end_str)
+                
+                subtitles.append((start_time, end_time, text))
+    
+    return subtitles
+
+def parse_timestamp(timestamp_str):
+    """Converte un timestamp SRT in secondi"""
+    # Formato: HH:MM:SS,mmm
+    time_parts = timestamp_str.replace(',', '.').split(':')
+    hours = int(time_parts[0])
+    minutes = int(time_parts[1])
+    seconds = float(time_parts[2])
+    
+    return hours * 3600 + minutes * 60 + seconds
+
 def create_ass_file(segments, output_file, language="IT", margin_v=85, video_width=478, video_height=850):
     """Crea file ASS con posizione specifica"""
     with open(output_file, "w", encoding="utf-8") as ass:
@@ -544,11 +579,37 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
         else:
             print(f"🔧 DEBUG: Using default dimensions: {video_width}x{video_height}")
         
-        # Usa il filtro subtitles con font ancora più piccolo per evitare sovrapposizioni
+        # NUOVO APPROCCIO: Usa drawtext per controllo diretto del posizionamento
+        # Leggi i file SRT e crea i testi per drawtext
+        italian_texts = read_srt_file(subtitle_file_it)
+        english_texts = read_srt_file(subtitle_file_en)
+        
+        # Crea il filtro drawtext per ogni sottotitolo
+        drawtext_filters = []
+        
+        # Aggiungi sottotitoli italiani
+        for i, (start_time, end_time, text) in enumerate(italian_texts):
+            # Calcola la posizione Y per l'italiano
+            y_pos = video_height - italian_height
+            # Escape dei caratteri speciali per drawtext
+            text_escaped = text.replace("'", "\\'").replace('"', '\\"')
+            drawtext_filters.append(f"drawtext=text='{text_escaped}':fontsize=14:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=2:x=(w-text_w)/2:y={y_pos}:enable='between(t,{start_time},{end_time})'")
+        
+        # Aggiungi sottotitoli inglesi
+        for i, (start_time, end_time, text) in enumerate(english_texts):
+            # Calcola la posizione Y per l'inglese (sopra l'italiano)
+            y_pos = video_height - english_height
+            # Escape dei caratteri speciali per drawtext
+            text_escaped = text.replace("'", "\\'").replace('"', '\\"')
+            drawtext_filters.append(f"drawtext=text='{text_escaped}':fontsize=14:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=2:x=(w-text_w)/2:y={y_pos}:enable='between(t,{start_time},{end_time})'")
+        
+        # Combina tutti i filtri drawtext
+        vf_filter = ",".join(drawtext_filters)
+        
         stream = ffmpeg.output(
             stream,
             output_video,
-            vf=f"subtitles={subtitle_file_it}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height},MarginL=50,MarginR=50',subtitles={subtitle_file_en}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height},MarginL=50,MarginR=50'",
+            vf=vf_filter,
             vcodec='libx264',
             acodec='aac',
             preset='medium',
@@ -556,7 +617,7 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
             pix_fmt='yuv420p'
         )
         ffmpeg.run(stream, overwrite_output=True)
-        print("🔧 DEBUG: Both subtitles added successfully")
+        print("🔧 DEBUG: Drawtext subtitles added successfully")
 
 
             
