@@ -23,6 +23,8 @@ sys.path.append('Elaborazione')
 # Importa le funzioni da prova.py
 from Elaborazione.prova import (
     process_video, 
+    generate_subtitles_only,
+    finalize_video_processing,
     get_openai_client, 
     create_srt_file, 
     add_subtitles_to_video,
@@ -276,6 +278,10 @@ if 'segments' not in st.session_state:
     st.session_state.segments = []
 if 'current_video_path' not in st.session_state:
     st.session_state.current_video_path = None
+if 'subtitles_generated' not in st.session_state:
+    st.session_state.subtitles_generated = False
+if 'subtitles_data' not in st.session_state:
+    st.session_state.subtitles_data = None
 
 # Sezione principale
 st.header("📤 Carica Video")
@@ -339,63 +345,83 @@ st.success(f"📹 Titolo video: **{video_title}**")
 
 # Pulsante per elaborare (solo se video caricato e selezioni fatte)
 if uploaded_video is not None and selected_apartment and selected_video_type:
-    if st.button("🚀 Elabora Video", type="primary"):
-        if not openai_api_key:
-            st.error("❌ Inserisci la tua OpenAI API Key")
-            st.stop()
-        
-        # Crea directory temporanea per questa sessione
-        output_dir = create_session_temp_dir()
-        
-        # Valori di default per l'altezza dei sottotitoli
-        italian_height = 75
-        english_height = 50
-        
-        with st.spinner("🔄 Elaborazione video in corso..."):
-            try:
-                # Percorso del file musica
-                music_file = os.path.join("Elaborazione", "audio.mp3")
-                
-                # Elabora il video
-                result = process_video(
-                    input_video=video_path,
-                    music_file=music_file,  # File musica di sottofondo
-                    openai_api_key=openai_api_key,
-                    output_dir=output_dir,
-                    video_type=selected_video_type,
-                    italian_height=italian_height,
-                    english_height=english_height
-                )
-                
-                if result['success']:
-                    st.session_state.processed_video = result
-                    st.session_state.segments = result.get('segments', [])
-                    st.success("✅ Video elaborato con successo!")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("🎬 Genera Sottotitoli", type="primary"):
+            if not openai_api_key:
+                st.error("❌ Inserisci la tua OpenAI API Key")
+                st.stop()
+            
+            # Crea directory temporanea per questa sessione
+            output_dir = create_session_temp_dir()
+            
+            with st.spinner("🔄 Generazione sottotitoli in corso..."):
+                try:
+                    # Genera solo i sottotitoli
+                    result = generate_subtitles_only(
+                        input_video=video_path,
+                        openai_api_key=openai_api_key,
+                        output_dir=output_dir,
+                        video_type=selected_video_type
+                    )
                     
-                    # Mostra il video elaborato
-                    if os.path.exists(result['final_video']):
-                        st.video(result['final_video'])
-                        
-                        # Aggiungi pulsante di download
-                        with open(result['final_video'], "rb") as video_file:
-                            st.download_button(
-                                label="📥 Scarica Video Elaborato",
-                                data=video_file.read(),
-                                file_name=f"video_elaborato_{int(time.time())}.mp4",
-                                mime="video/mp4"
-                            )
+                    if result['success']:
+                        st.session_state.subtitles_data = result
+                        st.session_state.segments = result.get('segments', [])
+                        st.session_state.subtitles_generated = True
+                        st.success("✅ Sottotitoli generati con successo!")
+                        st.rerun()
                     else:
-                        st.error("❌ File video elaborato non trovato")
-                else:
-                    st.error(f"❌ Errore durante l'elaborazione: {result.get('error', 'Errore sconosciuto')}")
+                        st.error(f"❌ Errore durante la generazione: {result.get('error', 'Errore sconosciuto')}")
+                        
+                except Exception as e:
+                    st.error(f"❌ Errore durante la generazione: {str(e)}")
+                    cleanup_session_files()
+    
+    with col2:
+        if st.session_state.subtitles_generated and st.button("🚀 Completa Elaborazione", type="secondary"):
+            with st.spinner("🔄 Completamento elaborazione in corso..."):
+                try:
+                    # Valori di default per l'altezza dei sottotitoli
+                    italian_height = 75
+                    english_height = 50
                     
-            except Exception as e:
-                st.error(f"❌ Errore durante l'elaborazione: {str(e)}")
-                # Pulisci i file temporanei in caso di errore
-                cleanup_session_files()
+                    # Completa l'elaborazione
+                    result = finalize_video_processing(
+                        input_video=video_path,
+                        srt_it_file=st.session_state.subtitles_data['srt_it_file'],
+                        srt_en_file=st.session_state.subtitles_data['srt_en_file'],
+                        output_dir=output_dir,
+                        italian_height=italian_height,
+                        english_height=english_height
+                    )
+                    
+                    if result['success']:
+                        st.session_state.processed_video = result
+                        st.success("✅ Video elaborato con successo!")
+                        
+                        # Mostra il video elaborato
+                        if os.path.exists(result['final_video']):
+                            st.video(result['final_video'])
+                            
+                            # Aggiungi pulsante di download
+                            with open(result['final_video'], "rb") as video_file:
+                                st.download_button(
+                                    label="📥 Scarica Video Elaborato",
+                                    data=video_file.read(),
+                                    file_name=f"video_elaborato_{int(time.time())}.mp4",
+                                    mime="video/mp4"
+                                )
+                    else:
+                        st.error(f"❌ Errore durante l'elaborazione: {result.get('error', 'Errore sconosciuto')}")
+                        
+                except Exception as e:
+                    st.error(f"❌ Errore durante l'elaborazione: {str(e)}")
+                    cleanup_session_files()
 
-# Sezione per modificare i sottotitoli (solo se il video è stato elaborato)
-if st.session_state.processed_video and st.session_state.segments and st.session_state.processed_video.get("has_voice", True):
+# Sezione per modificare i sottotitoli (solo se i sottotitoli sono stati generati)
+if st.session_state.segments and (st.session_state.subtitles_generated or (st.session_state.processed_video and st.session_state.processed_video.get("has_voice", True))):
     st.markdown("---")
     st.header("✏️ Modifica Sottotitoli")
     st.info("Modifica i sottotitoli italiani e inglesi. I sottotitoli inglesi manterranno la stessa durata di quelli italiani.")
@@ -446,47 +472,80 @@ if st.session_state.processed_video and st.session_state.segments and st.session
         with col4:
             st.write(format_timestamp(segment['end']))
     
-    # Pulsante per rielaborare con i sottotitoli modificati
-    if st.button("🔄 Rielabora con Sottotitoli Modificati"):
-        with st.spinner("Rielaborazione in corso..."):
-            try:
-                # Crea i file SRT temporanei
-                temp_srt_it = tempfile.NamedTemporaryFile(mode='w', suffix='.srt', delete=False)
-                temp_srt_en = tempfile.NamedTemporaryFile(mode='w', suffix='.srt', delete=False)
-                
-                # Scrivi i sottotitoli modificati
-                create_srt_file(st.session_state.edited_segments, temp_srt_it.name, "IT")
-                create_srt_file(st.session_state.edited_segments, temp_srt_en.name, "EN")
-                
-                # Rielabora il video con i nuovi sottotitoli
-                result = add_subtitles_to_video(
-                    input_video=st.session_state.processed_video['video_with_music'],
-                    subtitle_file_it=temp_srt_it.name,
-                    subtitle_file_en=temp_srt_en.name,
-                    output_video=st.session_state.processed_video['final_video']
-                )
-                
-                # Pulisci i file temporanei
-                os.unlink(temp_srt_it.name)
-                os.unlink(temp_srt_en.name)
-                
-                st.success("✅ Video rielaborato con successo!")
-                
-                # Mostra il video rielaborato
-                if os.path.exists(st.session_state.processed_video['final_video']):
-                    st.video(st.session_state.processed_video['final_video'])
+    # Pulsanti per rielaborare con i sottotitoli modificati
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("🔄 Rielabora con Sottotitoli Modificati"):
+            with st.spinner("Rielaborazione in corso..."):
+                try:
+                    # Crea i file SRT temporanei
+                    temp_srt_it = tempfile.NamedTemporaryFile(mode='w', suffix='.srt', delete=False)
+                    temp_srt_en = tempfile.NamedTemporaryFile(mode='w', suffix='.srt', delete=False)
                     
-                    # Aggiungi pulsante di download
-                    with open(st.session_state.processed_video['final_video'], "rb") as video_file:
-                        st.download_button(
-                            label="📥 Scarica Video Elaborato",
-                            data=video_file.read(),
-                            file_name=f"video_elaborato_{int(time.time())}.mp4",
-                            mime="video/mp4"
+                    # Scrivi i sottotitoli modificati
+                    create_srt_file(st.session_state.edited_segments, temp_srt_it.name, "IT")
+                    create_srt_file(st.session_state.edited_segments, temp_srt_en.name, "EN")
+                    
+                    # Se il video è già stato elaborato, rielabora con i nuovi sottotitoli
+                    if st.session_state.processed_video:
+                        result = add_subtitles_to_video(
+                            input_video=st.session_state.processed_video['video_with_music'],
+                            subtitle_file_it=temp_srt_it.name,
+                            subtitle_file_en=temp_srt_en.name,
+                            output_video=st.session_state.processed_video['final_video']
                         )
-                
-            except Exception as e:
-                st.error(f"❌ Errore durante la rielaborazione: {str(e)}")
+                        
+                        st.success("✅ Video rielaborato con successo!")
+                        
+                        # Mostra il video rielaborato
+                        if os.path.exists(st.session_state.processed_video['final_video']):
+                            st.video(st.session_state.processed_video['final_video'])
+                            
+                            # Aggiungi pulsante di download
+                            with open(st.session_state.processed_video['final_video'], "rb") as video_file:
+                                st.download_button(
+                                    label="📥 Scarica Video Elaborato",
+                                    data=video_file.read(),
+                                    file_name=f"video_elaborato_{int(time.time())}.mp4",
+                                    mime="video/mp4"
+                                )
+                    else:
+                        # Aggiorna i file SRT per la prossima elaborazione
+                        st.session_state.subtitles_data['srt_it_file'] = temp_srt_it.name
+                        st.session_state.subtitles_data['srt_en_file'] = temp_srt_en.name
+                        st.success("✅ Sottotitoli aggiornati! Ora puoi completare l'elaborazione.")
+                    
+                    # Pulisci i file temporanei
+                    os.unlink(temp_srt_it.name)
+                    os.unlink(temp_srt_en.name)
+                    
+                except Exception as e:
+                    st.error(f"❌ Errore durante la rielaborazione: {str(e)}")
+    
+    with col2:
+        if st.button("🔄 Rigenera Sottotitoli"):
+            with st.spinner("Rigenerazione sottotitoli in corso..."):
+                try:
+                    # Rigenera i sottotitoli
+                    result = generate_subtitles_only(
+                        input_video=video_path,
+                        openai_api_key=openai_api_key,
+                        output_dir=output_dir,
+                        video_type=selected_video_type
+                    )
+                    
+                    if result['success']:
+                        st.session_state.subtitles_data = result
+                        st.session_state.segments = result.get('segments', [])
+                        st.session_state.edited_segments = st.session_state.segments.copy()
+                        st.success("✅ Sottotitoli rigenerati con successo!")
+                        st.rerun()
+                    else:
+                        st.error(f"❌ Errore durante la rigenerazione: {result.get('error', 'Errore sconosciuto')}")
+                        
+                except Exception as e:
+                    st.error(f"❌ Errore durante la rigenerazione: {str(e)}")
 
 # Sezione per personalizzare l'altezza dei sottotitoli
 if st.session_state.processed_video and st.session_state.segments and st.session_state.processed_video.get("has_voice", True):

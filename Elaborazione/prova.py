@@ -1040,6 +1040,110 @@ def process_video(input_video, music_file, openai_api_key, output_dir=".", custo
             "error": str(e)
         }
 
+def generate_subtitles_only(input_video, openai_api_key, output_dir=".", custom_prompt=None, video_type=None):
+    """Genera solo i sottotitoli senza elaborare il video finale"""
+    print(f"🔧 DEBUG: generate_subtitles_only - input: {input_video}, output_dir: {output_dir}")
+    
+    try:
+        # Inizializza il client OpenAI
+        client = get_openai_client(openai_api_key)
+        
+        # Crea directory di output se non esiste
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Estrai l'audio dal video
+        print("🔧 DEBUG: Extracting audio...")
+        audio_file = os.path.join(output_dir, "temp_audio.wav")
+        extract_audio_from_video(input_video, audio_file)
+        
+        # Trascrivi l'audio
+        print("🔧 DEBUG: Transcribing audio...")
+        transcript = transcribe_audio(audio_file, client)
+        
+        # Verifica se c'è audio nel video
+        if not transcript.segments:
+            print("🔧 DEBUG: No audio segments found")
+            return {
+                'success': False,
+                'error': 'Nessun audio rilevato nel video',
+                'has_voice': False
+            }
+        
+        # Ottimizza la trascrizione
+        print("🔧 DEBUG: Optimizing transcription...")
+        optimized_segments = optimize_transcription(transcript.segments, client, custom_prompt, video_type)
+        
+        # Traduci i sottotitoli in inglese
+        print("🔧 DEBUG: Translating subtitles...")
+        srt_en_file = os.path.join(output_dir, "subtitles_en.srt")
+        translate_subtitles(optimized_segments, client, srt_en_file, video_type)
+        
+        # Crea file SRT italiano
+        print("🔧 DEBUG: Creating Italian SRT file...")
+        srt_it_file = os.path.join(output_dir, "subtitles_it.srt")
+        create_srt_file(optimized_segments, srt_it_file, "IT")
+        
+        # Pulisci il file audio temporaneo
+        if os.path.exists(audio_file):
+            os.remove(audio_file)
+        
+        return {
+            'success': True,
+            'segments': optimized_segments,
+            'srt_it_file': srt_it_file,
+            'srt_en_file': srt_en_file,
+            'has_voice': True,
+            'input_video': input_video
+        }
+        
+    except Exception as e:
+        print(f"❌ DEBUG: Error in generate_subtitles_only - {e}")
+        return {
+            'success': False,
+            'error': str(e),
+            'has_voice': False
+        }
+
+def finalize_video_processing(input_video, srt_it_file, srt_en_file, output_dir, italian_height=120, english_height=60):
+    """Completa l'elaborazione del video usando i sottotitoli già generati"""
+    print(f"🔧 DEBUG: finalize_video_processing - input: {input_video}, it_srt: {srt_it_file}, en_srt: {srt_en_file}")
+    
+    try:
+        # Percorso del file musica
+        music_file = os.path.join("Elaborazione", "audio.mp3")
+        
+        # Aggiungi musica di sottofondo
+        print("🔧 DEBUG: Adding background music...")
+        video_with_music = os.path.join(output_dir, "video_with_music.mp4")
+        add_background_music(input_video, music_file, video_with_music)
+        
+        # Aggiungi sottotitoli
+        print("🔧 DEBUG: Adding subtitles...")
+        final_video = os.path.join(output_dir, "final_video.mp4")
+        add_subtitles_to_video(
+            input_video=video_with_music,
+            subtitle_file_it=srt_it_file,
+            subtitle_file_en=srt_en_file,
+            output_video=final_video,
+            italian_height=italian_height,
+            english_height=english_height
+        )
+        
+        return {
+            'success': True,
+            'video_with_music': video_with_music,
+            'final_video': final_video,
+            'has_voice': True
+        }
+        
+    except Exception as e:
+        print(f"❌ DEBUG: Error in finalize_video_processing - {e}")
+        return {
+            'success': False,
+            'error': str(e),
+            'has_voice': False
+        }
+
 def upload_to_youtube(video_path, title, description, tags, credentials_path="service_account_key.json"):
     """Carica il video su YouTube e restituisce il link"""
     try:
