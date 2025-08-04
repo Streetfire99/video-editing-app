@@ -242,7 +242,7 @@ def distribute_subtitles(segments, texts):
     return distributed_segments
 
 def create_srt_file(segments, output_file, language="IT"):
-    """Crea file SRT - identica al test che funzionava"""
+    """Crea file SRT con controllo diretto del testo"""
     with open(output_file, "w", encoding="utf-8") as srt:
         for i, segment in enumerate(segments, start=1):
             start = format_timestamp(segment['start'])
@@ -256,7 +256,38 @@ def create_srt_file(segments, output_file, language="IT"):
                 text = segment.get('text_en', segment['text'])  # Fallback al testo italiano se non c'è inglese
                 prefix = "[EN] "
             
-            # Usa il testo direttamente senza split_text (come nel test)
+            # CONTROLLO DIRETTO DEL TESTO - Forza massimo 2 righe
+            max_chars_per_line = 20  # Ridotto per sicurezza
+            
+            if len(text) > max_chars_per_line:
+                # Dividi in modo intelligente
+                words = text.split()
+                lines = []
+                current_line = ""
+                
+                for word in words:
+                    test_line = current_line + (" " + word) if current_line else word
+                    if len(test_line) <= max_chars_per_line:
+                        current_line = test_line
+                    else:
+                        if current_line:
+                            lines.append(current_line)
+                        current_line = word
+                
+                if current_line:
+                    lines.append(current_line)
+                
+                # Assicurati di avere massimo 2 righe
+                if len(lines) > 2:
+                    # Combina le righe in eccesso
+                    lines = [lines[0], " ".join(lines[1:])]
+                    # Tronca se ancora troppo lungo
+                    if len(lines[1]) > max_chars_per_line:
+                        lines[1] = lines[1][:max_chars_per_line-3] + "..."
+                
+                # Unisci le righe con \n
+                text = "\\N".join(lines)
+            
             srt.write(f"{i}\n{start} --> {end}\n{prefix}{text}\n\n")
 
 def create_ass_file(segments, output_file, language="IT", margin_v=85, video_width=478, video_height=850):
@@ -513,11 +544,11 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
         else:
             print(f"🔧 DEBUG: Using default dimensions: {video_width}x{video_height}")
         
-        # Usa il filtro subtitles con margini ampi per evitare wrapping
+        # Usa il filtro subtitles con configurazione semplice e diretta
         stream = ffmpeg.output(
             stream,
             output_video,
-            vf=f"subtitles={subtitle_file_it}:force_style='FontSize=18,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height},MarginL=200,MarginR=200,WrapStyle=0',subtitles={subtitle_file_en}:force_style='FontSize=18,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height},MarginL=200,MarginR=200,WrapStyle=0'",
+            vf=f"subtitles={subtitle_file_it}:force_style='FontSize=16,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height},MarginL=50,MarginR=50',subtitles={subtitle_file_en}:force_style='FontSize=16,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height},MarginL=50,MarginR=50'",
             vcodec='libx264',
             acodec='aac',
             preset='medium',
@@ -548,7 +579,7 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
             stream = ffmpeg.output(
                 stream,
                 output_video,
-                vf=f"subtitles={subtitle_file_it}:force_style='FontSize=18,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height},MarginL=200,MarginR=200,WrapStyle=0',subtitles={subtitle_file_en}:force_style='FontSize=18,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height},MarginL=200,MarginR=200,WrapStyle=0'",
+                vf=f"subtitles={subtitle_file_it}:force_style='FontSize=16,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height},MarginL=50,MarginR=50',subtitles={subtitle_file_en}:force_style='FontSize=16,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height},MarginL=50,MarginR=50'",
                 vcodec='libx264',
                 acodec='aac',
                 preset='medium',
