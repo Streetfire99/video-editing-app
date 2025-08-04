@@ -133,15 +133,18 @@ Example output:
     if not isinstance(optimized_texts, list):
         raise ValueError("La risposta di OpenAI non è una lista di segmenti")
 
-            # Post-processing: assicurati che ogni testo sia adatto per i sottotitoli
-        for segment in optimized_texts:
-            if 'text' in segment:
-                # Usa process_subtitle_text per coerenza
-                lines = process_subtitle_text(segment['text'])
-                # Ricombina in un singolo testo (le righe saranno separate da \n nel file SRT)
-                segment['text'] = lines[0] + (f"\n{lines[1]}" if lines[1] else "")
+    # Distribuisci i testi ottimizzati sui segmenti originali mantenendo i timestamp
+    optimized_segments = distribute_subtitles(raw_transcription, optimized_texts)
+    
+    # Post-processing: assicurati che ogni testo sia adatto per i sottotitoli
+    for segment in optimized_segments:
+        if 'text' in segment:
+            # Usa process_subtitle_text per coerenza
+            lines = process_subtitle_text(segment['text'])
+            # Ricombina in un singolo testo (le righe saranno separate da \n nel file SRT)
+            segment['text'] = lines[0] + (f"\n{lines[1]}" if lines[1] else "")
 
-    return optimized_texts
+    return optimized_segments
 
 def format_timestamp(seconds):
     """Formatta i timestamp per SRT"""
@@ -224,7 +227,12 @@ def split_text(text, max_length=25, max_lines=2):
 
 def distribute_subtitles(segments, texts):
     """Distribuisce i sottotitoli in modo uniforme"""
-    total_duration = segments[-1].end
+    # Gestisce sia oggetti Whisper che dizionari
+    if hasattr(segments[-1], 'end'):
+        total_duration = segments[-1].end
+    else:
+        total_duration = segments[-1]['end']
+    
     num_subtitles = len(texts)
     duration_per_subtitle = total_duration / num_subtitles
     
