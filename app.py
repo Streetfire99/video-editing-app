@@ -30,6 +30,10 @@ from Elaborazione.prova import (
     split_text
 )
 
+# Importa le funzioni per YouTube e Drive
+from youtube_upload import upload_to_youtube, check_youtube_setup, get_youtube_status
+from drive_manager import upload_video_to_drive, add_tracking_entry
+
 # Importa le funzioni per YouTube
 from youtube_upload import upload_to_youtube, check_youtube_setup, get_youtube_status
 
@@ -371,6 +375,15 @@ if uploaded_video is not None and selected_apartment and selected_video_type:
                     # Mostra il video elaborato
                     if os.path.exists(result['final_video']):
                         st.video(result['final_video'])
+                        
+                        # Aggiungi pulsante di download
+                        with open(result['final_video'], "rb") as video_file:
+                            st.download_button(
+                                label="📥 Scarica Video Elaborato",
+                                data=video_file.read(),
+                                file_name=f"video_elaborato_{int(time.time())}.mp4",
+                                mime="video/mp4"
+                            )
                     else:
                         st.error("❌ File video elaborato non trovato")
                 else:
@@ -458,7 +471,19 @@ if st.session_state.processed_video and st.session_state.segments and st.session
                 os.unlink(temp_srt_en.name)
                 
                 st.success("✅ Video rielaborato con successo!")
-                st.rerun()
+                
+                # Mostra il video rielaborato
+                if os.path.exists(st.session_state.processed_video['final_video']):
+                    st.video(st.session_state.processed_video['final_video'])
+                    
+                    # Aggiungi pulsante di download
+                    with open(st.session_state.processed_video['final_video'], "rb") as video_file:
+                        st.download_button(
+                            label="📥 Scarica Video Elaborato",
+                            data=video_file.read(),
+                            file_name=f"video_elaborato_{int(time.time())}.mp4",
+                            mime="video/mp4"
+                        )
                 
             except Exception as e:
                 st.error(f"❌ Errore durante la rielaborazione: {str(e)}")
@@ -514,7 +539,19 @@ if st.session_state.processed_video and st.session_state.segments and st.session
                 os.unlink(temp_srt_en.name)
                 
                 st.success("✅ Video rielaborato con nuove altezze!")
-                st.rerun()
+                
+                # Mostra il video rielaborato
+                if os.path.exists(st.session_state.processed_video['final_video']):
+                    st.video(st.session_state.processed_video['final_video'])
+                    
+                    # Aggiungi pulsante di download
+                    with open(st.session_state.processed_video['final_video'], "rb") as video_file:
+                        st.download_button(
+                            label="📥 Scarica Video Elaborato",
+                            data=video_file.read(),
+                            file_name=f"video_elaborato_{int(time.time())}.mp4",
+                            mime="video/mp4"
+                        )
                 
             except Exception as e:
                 st.error(f"❌ Errore durante la rielaborazione: {str(e)}")
