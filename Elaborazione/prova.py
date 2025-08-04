@@ -227,6 +227,21 @@ def split_text(text, max_length=25, max_lines=2):
 
 def distribute_subtitles(segments, texts):
     """Distribuisce i sottotitoli in modo uniforme"""
+    # Controlla se la lista è vuota
+    if not segments:
+        print("🔧 DEBUG: No segments found, creating default segments")
+        # Crea segmenti di default se non ce ne sono
+        distributed_segments = []
+        for i, text in enumerate(texts):
+            start_time = i * 5.0  # 5 secondi per segmento
+            end_time = (i + 1) * 5.0
+            distributed_segments.append({
+                'start': start_time,
+                'end': end_time,
+                'text': text['text']
+            })
+        return distributed_segments
+    
     # Gestisce sia oggetti Whisper che dizionari
     if hasattr(segments[-1], 'end'):
         total_duration = segments[-1].end
@@ -1076,6 +1091,8 @@ def generate_subtitles_only(input_video, openai_api_key, output_dir=".", custom_
                 'error': 'Nessun audio rilevato nel video',
                 'has_voice': False
             }
+        
+        print(f"🔧 DEBUG: Found {len(transcript.segments)} audio segments")
         
         # Ottimizza la trascrizione
         print("🔧 DEBUG: Optimizing transcription...")
