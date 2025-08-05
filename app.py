@@ -383,9 +383,9 @@ if uploaded_video is not None and selected_apartment and selected_video_type:
         if st.session_state.subtitles_generated and st.button("🚀 Completa Elaborazione", type="secondary"):
             with st.spinner("🔄 Completamento elaborazione in corso..."):
                 try:
-                    # Valori di default per l'altezza dei sottotitoli
-                    italian_height = 75
-                    english_height = 50
+                    # Valori di default per l'altezza dei sottotitoli (stessi del file locale)
+                    italian_height = 120
+                    english_height = 60
                     
                     # Completa l'elaborazione
                     result = finalize_video_processing(
@@ -547,73 +547,7 @@ if st.session_state.segments and (st.session_state.subtitles_generated or (st.se
                 except Exception as e:
                     st.error(f"❌ Errore durante la rigenerazione: {str(e)}")
 
-# Sezione per personalizzare l'altezza dei sottotitoli
-if st.session_state.processed_video and st.session_state.segments and st.session_state.processed_video.get("has_voice", True):
-    st.markdown("---")
-    st.header("🎛️ Personalizza Altezza Sottotitoli")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        italian_height = st.slider(
-            "🇮🇹 Altezza Sottotitoli Italiani",
-            min_value=10,
-            max_value=150,
-            value=120,
-            help="Posizione verticale dei sottotitoli italiani (10=alto, 150=basso)"
-        )
-    
-    with col2:
-        english_height = st.slider(
-            "🇬🇧 Altezza Sottotitoli Inglesi",
-            min_value=10,
-            max_value=150,
-            value=60,
-            help="Posizione verticale dei sottotitoli inglesi (10=alto, 150=basso)"
-        )
-    
-    if st.button("🔄 Rielabora con Nuove Altezze"):
-        with st.spinner("Rielaborazione con nuove altezze..."):
-            try:
-                segments_to_use = st.session_state.get('edited_segments', st.session_state.segments)
-                
-                # Metodo semplice con file SRT
-                temp_srt_it = tempfile.NamedTemporaryFile(mode='w', suffix='.srt', delete=False)
-                temp_srt_en = tempfile.NamedTemporaryFile(mode='w', suffix='.srt', delete=False)
-                
-                create_srt_file(segments_to_use, temp_srt_it.name, "IT")
-                create_srt_file(segments_to_use, temp_srt_en.name, "EN")
-                
-                result = add_subtitles_to_video(
-                    input_video=st.session_state.processed_video['video_with_music'],
-                    subtitle_file_it=temp_srt_it.name,
-                    subtitle_file_en=temp_srt_en.name,
-                    output_video=st.session_state.processed_video['final_video'],
-                    italian_height=italian_height,
-                    english_height=english_height
-                )
-                
-                # Pulisci i file temporanei
-                os.unlink(temp_srt_it.name)
-                os.unlink(temp_srt_en.name)
-                
-                st.success("✅ Video rielaborato con nuove altezze!")
-                
-                # Mostra il video rielaborato
-                if os.path.exists(st.session_state.processed_video['final_video']):
-                    st.video(st.session_state.processed_video['final_video'])
-                    
-                    # Aggiungi pulsante di download
-                    with open(st.session_state.processed_video['final_video'], "rb") as video_file:
-                        st.download_button(
-                            label="📥 Scarica Video Elaborato",
-                            data=video_file.read(),
-                            file_name=f"video_elaborato_{int(time.time())}.mp4",
-                            mime="video/mp4"
-                        )
-                
-            except Exception as e:
-                st.error(f"❌ Errore durante la rielaborazione: {str(e)}")
+# Sezione per personalizzare l'altezza dei sottotitoli - RIMOSSA PER PROBLEMI FFMPEG
 
 
 
