@@ -138,16 +138,24 @@ Example output:
     optimized_segments = distribute_subtitles(raw_transcription, optimized_texts)
     print(f"🔧 DEBUG: optimize_transcription - optimized_segments: {len(optimized_segments)}")
     
-    # Post-processing: assicurati che ogni testo sia adatto per i sottotitoli
+        # Post-processing: assicurati che ogni testo sia adatto per i sottotitoli
     print(f"🔧 DEBUG: Post-processing {len(optimized_segments)} segments")
     for i, segment in enumerate(optimized_segments):
         print(f"🔧 DEBUG: Processing segment {i}: {segment}")
-        if 'text' in segment:
-            # Usa process_subtitle_text per coerenza
-            lines = process_subtitle_text(segment['text'])
-            # Ricombina in un singolo testo (le righe saranno separate da \n nel file SRT)
-            segment['text'] = lines[0] + (f"\n{lines[1]}" if lines[1] else "")
-            print(f"🔧 DEBUG: Processed segment {i} text: {segment['text']}")
+        try:
+            if 'text' in segment:
+                # Usa process_subtitle_text per coerenza
+                lines = process_subtitle_text(segment['text'])
+                # Ricombina in un singolo testo (le righe saranno separate da \n nel file SRT)
+                segment['text'] = lines[0] + (f"\n{lines[1]}" if lines[1] else "")
+                print(f"🔧 DEBUG: Processed segment {i} text: {segment['text']}")
+            else:
+                print(f"🔧 DEBUG: Segment {i} has no 'text' key: {segment}")
+        except Exception as e:
+            print(f"❌ DEBUG: Error processing segment {i}: {e}")
+            import traceback
+            print(f"❌ DEBUG: Traceback: {traceback.format_exc()}")
+            raise
 
     return optimized_segments
 
@@ -159,11 +167,15 @@ def format_timestamp(seconds):
 
 def process_subtitle_text(text):
     """Processa il testo per i sottotitoli - funzione unificata"""
+    print(f"🔧 DEBUG: process_subtitle_text called with text: '{text}'")
+    
     if not text:
+        print("🔧 DEBUG: Empty text, returning empty lines")
         return ["", ""]
     
     # Pulisci il testo aggressivamente da caratteri problematici
     text = text.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ').strip()
+    print(f"🔧 DEBUG: Cleaned text: '{text}'")
     
     # Rimuovi spazi multipli
     import re
@@ -175,9 +187,12 @@ def process_subtitle_text(text):
     # Se il testo è troppo lungo, troncalo
     if len(text) > 40:  # 2 righe x 20 caratteri
         text = text[:37] + "..."
+        print(f"🔧 DEBUG: Truncated text: '{text}'")
     
     # Usa split_text per garantire sempre 2 righe
-    return split_text(text, max_length=25, max_lines=2)
+    result = split_text(text, max_length=25, max_lines=2)
+    print(f"🔧 DEBUG: split_text result: {result}")
+    return result
 
 def split_text(text, max_length=25, max_lines=2):
     """Divide il testo per i sottotitoli - versione che funzionava bene"""
