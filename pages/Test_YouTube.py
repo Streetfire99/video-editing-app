@@ -35,33 +35,72 @@ if accounts_status:
 # Sezione 2: Autenticazione
 st.header("🔐 Autenticazione")
 
-from youtube_manager import get_next_available_account
+from youtube_manager import get_next_available_account, YOUTUBE_ACCOUNTS
 next_account = get_next_available_account()
 
-if next_account:
-    st.warning(f"🔐 **Account da autenticare:** {next_account}")
+# Controlla se ci sono account autenticati
+authenticated_accounts = []
+for account in YOUTUBE_ACCOUNTS:
+    from youtube_manager import is_account_authenticated
+    if is_account_authenticated(account):
+        authenticated_accounts.append(account)
+
+if authenticated_accounts:
+    st.success(f"✅ Account autenticati: {len(authenticated_accounts)}/{len(YOUTUBE_ACCOUNTS)}")
+    for account in authenticated_accounts:
+        st.success(f"✅ {account}")
+else:
+    st.warning("❌ Nessun account autenticato")
     
-    # Inizializza session state per l'autenticazione
-    if 'youtube_auth_account' not in st.session_state:
-        st.session_state.youtube_auth_account = None
-    if 'youtube_auth_url' not in st.session_state:
-        st.session_state.youtube_auth_url = None
-    
-    if st.button(f"🔐 Genera URL Autenticazione {next_account}"):
-        success, message = authenticate_youtube_account(next_account)
-        if not success:
-            # Mostra l'URL di autenticazione
-            st.session_state.youtube_auth_account = next_account
-            st.session_state.youtube_auth_url = message
+    if next_account:
+        st.warning(f"🔐 **Account da autenticare:** {next_account}")
+        
+        # Inizializza session state per l'autenticazione
+        if 'youtube_auth_account' not in st.session_state:
+            st.session_state.youtube_auth_account = None
+        if 'youtube_auth_url' not in st.session_state:
+            st.session_state.youtube_auth_url = None
+        
+        if st.button(f"🔐 Genera URL Autenticazione {next_account}"):
+            success, message = authenticate_youtube_account(next_account)
+            if not success:
+                # Mostra l'URL di autenticazione
+                st.session_state.youtube_auth_account = next_account
+                st.session_state.youtube_auth_url = message
+                st.info("🔐 **URL di autenticazione generato**")
+                st.code(message, language=None)
+                
+                # Campo per inserire il codice di autorizzazione
+                auth_code = st.text_input("Inserisci il codice di autorizzazione:", key="youtube_auth_code")
+                
+                if st.button("✅ Completa Autenticazione"):
+                    if auth_code:
+                        success, message = authenticate_youtube_account(next_account, auth_code)
+                        if success:
+                            st.success(message)
+                            # Pulisci session state
+                            del st.session_state.youtube_auth_account
+                            del st.session_state.youtube_auth_url
+                            st.rerun()
+                        else:
+                            st.error(message)
+                    else:
+                        st.error("❌ Inserisci il codice di autorizzazione")
+            else:
+                st.success(message)
+                st.rerun()
+        
+        # Se abbiamo già un URL di autenticazione, mostralo
+        elif st.session_state.youtube_auth_url:
             st.info("🔐 **URL di autenticazione generato**")
-            st.code(message, language=None)
+            st.code(st.session_state.youtube_auth_url, language=None)
             
             # Campo per inserire il codice di autorizzazione
             auth_code = st.text_input("Inserisci il codice di autorizzazione:", key="youtube_auth_code")
             
             if st.button("✅ Completa Autenticazione"):
                 if auth_code:
-                    success, message = authenticate_youtube_account(next_account, auth_code)
+                    success, message = authenticate_youtube_account(st.session_state.youtube_auth_account, auth_code)
                     if success:
                         st.success(message)
                         # Pulisci session state
@@ -72,33 +111,8 @@ if next_account:
                         st.error(message)
                 else:
                     st.error("❌ Inserisci il codice di autorizzazione")
-        else:
-            st.success(message)
-            st.rerun()
-    
-    # Se abbiamo già un URL di autenticazione, mostralo
-    elif st.session_state.youtube_auth_url:
-        st.info("🔐 **URL di autenticazione generato**")
-        st.code(st.session_state.youtube_auth_url, language=None)
-        
-        # Campo per inserire il codice di autorizzazione
-        auth_code = st.text_input("Inserisci il codice di autorizzazione:", key="youtube_auth_code")
-        
-        if st.button("✅ Completa Autenticazione"):
-            if auth_code:
-                success, message = authenticate_youtube_account(st.session_state.youtube_auth_account, auth_code)
-                if success:
-                    st.success(message)
-                    # Pulisci session state
-                    del st.session_state.youtube_auth_account
-                    del st.session_state.youtube_auth_url
-                    st.rerun()
-                else:
-                    st.error(message)
-            else:
-                st.error("❌ Inserisci il codice di autorizzazione")
-else:
-    st.success("✅ Tutti gli account sono autenticati!")
+    else:
+        st.error("❌ Nessun account disponibile per l'autenticazione")
 
 # Sezione 3: Upload Test
 st.header("🚀 Test Upload")
