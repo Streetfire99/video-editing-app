@@ -345,6 +345,9 @@ st.success(f"📹 Titolo video: **{video_title}**")
 
 # Pulsante per elaborare (solo se video caricato e selezioni fatte)
 if uploaded_video is not None and selected_apartment and selected_video_type:
+    # Crea directory temporanea per questa sessione
+    output_dir = create_session_temp_dir()
+    
     col1, col2 = st.columns(2)
     
     with col1:
@@ -352,9 +355,6 @@ if uploaded_video is not None and selected_apartment and selected_video_type:
             if not openai_api_key:
                 st.error("❌ Inserisci la tua OpenAI API Key")
                 st.stop()
-            
-            # Crea directory temporanea per questa sessione
-            output_dir = create_session_temp_dir()
             
             with st.spinner("🔄 Generazione sottotitoli in corso..."):
                 try:
