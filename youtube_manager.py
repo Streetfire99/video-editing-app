@@ -115,14 +115,14 @@ def authenticate_account(account):
                 SCOPES
             )
             
-            # In Streamlit, creiamo un URL di autenticazione
+            # Su Streamlit Cloud, usiamo sempre il metodo manuale
+            # run_local_server non funziona perché non c'è un browser disponibile
             auth_url, _ = flow.authorization_url(prompt='consent')
             
             print(f"🔧 DEBUG: Generated auth URL for {account}")
             print(f"🔧 DEBUG: Auth URL: {auth_url}")
             
-            # Per ora, restituiamo False perché l'utente deve completare l'autenticazione manualmente
-            # In futuro, possiamo implementare un sistema per gestire il callback
+            # L'utente deve visitare l'URL e completare l'autenticazione manualmente
             print(f"⚠️ DEBUG: Manual authentication required - user must visit URL and provide code")
             
             return False
