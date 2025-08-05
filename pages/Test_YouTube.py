@@ -1,3 +1,4 @@
+# Cache busting - v2
 import streamlit as st
 import os
 import tempfile
@@ -171,7 +172,7 @@ if uploaded_file:
 # Sezione 4: Debug Info
 st.header("🔧 Debug Info")
 
-if st.button("📊 Mostra Info Debug", key="debug_button"):
+if st.button("📊 Mostra Info Debug", key="debug_button_unique"):
     st.subheader("📋 Configurazione YouTube")
     
     # Client secrets
