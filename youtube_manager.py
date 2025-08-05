@@ -343,7 +343,7 @@ def get_youtube_status():
         print(f"❌ Errore nel recupero dello stato YouTube: {e}")
         return None
 
-def authenticate_youtube_account(account):
+def authenticate_youtube_account(account, auth_code=None):
     """Autentica un account YouTube specifico"""
     try:
         print(f"🔧 DEBUG: authenticate_youtube_account - Starting for {account}")
@@ -364,12 +364,26 @@ def authenticate_youtube_account(account):
                 SCOPES
             )
             
-            # Genera l'URL di autenticazione
-            auth_url, _ = flow.authorization_url(prompt='consent')
-            
-            print(f"🔧 DEBUG: Generated auth URL: {auth_url}")
-            
-            return False, f"🔐 Per autenticare {account}, visita questo URL:\n\n{auth_url}\n\nDopo l'autenticazione, copia il codice e inseriscilo qui."
+            if auth_code:
+                # Se abbiamo il codice di autorizzazione, completiamo l'autenticazione
+                print(f"🔧 DEBUG: Completing authentication with auth code")
+                flow.fetch_token(code=auth_code)
+                credentials = flow.credentials
+                
+                # Salva il token
+                token_path = get_token_path(account)
+                with open(token_path, 'wb') as token:
+                    pickle.dump(credentials, token)
+                
+                print(f"✅ DEBUG: Account {account} authenticated successfully")
+                return True, f"✅ Account {account} autenticato con successo"
+            else:
+                # Genera l'URL di autenticazione
+                auth_url, _ = flow.authorization_url(prompt='consent')
+                
+                print(f"🔧 DEBUG: Generated auth URL: {auth_url}")
+                
+                return False, f"🔐 Per autenticare {account}, visita questo URL:\n\n{auth_url}\n\nDopo l'autenticazione, copia il codice e inseriscilo qui."
             
         finally:
             # Pulisci il file temporaneo

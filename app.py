@@ -642,13 +642,62 @@ with st.form("youtube_upload_form"):
                 st.warning("🔐 **Autenticazione YouTube richiesta**")
                 st.info(f"Per caricare video su YouTube, devi autenticare l'account: **{next_account}**")
                 
-                if st.button(f"🔐 Autentica {next_account}"):
+                # Inizializza session state per l'autenticazione
+                if 'youtube_auth_account' not in st.session_state:
+                    st.session_state.youtube_auth_account = None
+                if 'youtube_auth_url' not in st.session_state:
+                    st.session_state.youtube_auth_url = None
+                
+                if st.button(f"🔐 Genera URL Autenticazione {next_account}"):
                     success, message = authenticate_youtube_account(next_account)
-                    if success:
+                    if not success:
+                        # Mostra l'URL di autenticazione
+                        st.session_state.youtube_auth_account = next_account
+                        st.session_state.youtube_auth_url = message
+                        st.info("🔐 **URL di autenticazione generato**")
+                        st.code(message, language=None)
+                        
+                        # Campo per inserire il codice di autorizzazione
+                        auth_code = st.text_input("Inserisci il codice di autorizzazione:", key="youtube_auth_code")
+                        
+                        if st.button("✅ Completa Autenticazione"):
+                            if auth_code:
+                                success, message = authenticate_youtube_account(next_account, auth_code)
+                                if success:
+                                    st.success(message)
+                                    # Pulisci session state
+                                    del st.session_state.youtube_auth_account
+                                    del st.session_state.youtube_auth_url
+                                    st.rerun()
+                                else:
+                                    st.error(message)
+                            else:
+                                st.error("❌ Inserisci il codice di autorizzazione")
+                    else:
                         st.success(message)
                         st.rerun()
-                    else:
-                        st.error(message)
+                
+                # Se abbiamo già un URL di autenticazione, mostralo
+                elif st.session_state.youtube_auth_url:
+                    st.info("🔐 **URL di autenticazione generato**")
+                    st.code(st.session_state.youtube_auth_url, language=None)
+                    
+                    # Campo per inserire il codice di autorizzazione
+                    auth_code = st.text_input("Inserisci il codice di autorizzazione:", key="youtube_auth_code")
+                    
+                    if st.button("✅ Completa Autenticazione"):
+                        if auth_code:
+                            success, message = authenticate_youtube_account(st.session_state.youtube_auth_account, auth_code)
+                            if success:
+                                st.success(message)
+                                # Pulisci session state
+                                del st.session_state.youtube_auth_account
+                                del st.session_state.youtube_auth_url
+                                st.rerun()
+                            else:
+                                st.error(message)
+                        else:
+                            st.error("❌ Inserisci il codice di autorizzazione")
 
 # Sezione per l'upload su Google Drive
 st.subheader("☁️ Carica su Google Drive")
