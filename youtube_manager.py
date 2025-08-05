@@ -121,7 +121,7 @@ def authenticate_account(account):
                 prompt='consent',
                 access_type='offline',
                 include_granted_scopes='true',
-                redirect_uri='urn:ietf:wg:oauth:2.0:oob'  # Per flusso manuale
+                redirect_uri='urn:ietf:wg:oauth:2.0:oob'
             )
             
             print(f"🔧 DEBUG: Generated auth URL for {account}")
@@ -388,7 +388,7 @@ def authenticate_youtube_account(account, auth_code=None):
                     prompt='consent',
                     access_type='offline',
                     include_granted_scopes='true',
-                    redirect_uri='urn:ietf:wg:oauth:2.0:oob'  # Per flusso manuale
+                    redirect_uri='urn:ietf:wg:oauth:2.0:oob'
                 )
                 
                 print(f"🔧 DEBUG: Generated auth URL: {auth_url}")
