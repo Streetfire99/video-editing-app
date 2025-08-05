@@ -171,51 +171,7 @@ if uploaded_file:
 # Sezione 4: Debug Info
 st.header("🔧 Debug Info")
 
-if st.button("📊 Mostra Info Debug"):
-    st.subheader("📋 Configurazione YouTube")
-    
-    # Client secrets
-    try:
-        from youtube_manager import get_client_secrets
-        client_secrets = get_client_secrets()
-        if client_secrets:
-            st.success("✅ Client secrets trovati")
-            st.json(client_secrets)
-        else:
-            st.error("❌ Client secrets non trovati")
-    except Exception as e:
-        st.error(f"❌ Errore nel recupero client secrets: {e}")
-    
-    # Token files
-    st.subheader("📁 File Token")
-    token_dir = "youtube_tokens"
-    if os.path.exists(token_dir):
-        token_files = os.listdir(token_dir)
-        if token_files:
-            st.success(f"✅ Trovati {len(token_files)} file token:")
-            for token_file in token_files:
-                st.write(f"- {token_file}")
-        else:
-            st.warning("⚠️ Directory token vuota")
-    else:
-        st.warning("⚠️ Directory token non trovata")
-    
-    # Session state
-    st.subheader("💾 Session State")
-    youtube_session_keys = [k for k in st.session_state.keys() if 'youtube' in k.lower()]
-    if youtube_session_keys:
-        for key in youtube_session_keys:
-            st.write(f"- {key}: {st.session_state[key]}")
-    else:
-        st.info("ℹ️ Nessuna chiave YouTube in session state")
-
-st.markdown("---")
-st.info("ℹ️ **Nota:** Questa pagina è temporanea e verrà eliminata dopo i test.")
-
-# Sezione 4: Debug Info
-st.header("🔧 Debug Info")
-
-if st.button("📊 Mostra Info Debug"):
+if st.button("📊 Mostra Info Debug", key="debug_button"):
     st.subheader("📋 Configurazione YouTube")
     
     # Client secrets
