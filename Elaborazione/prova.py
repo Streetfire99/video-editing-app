@@ -68,7 +68,7 @@ def transcribe_audio(audio_file, client):
         )
     return transcript
 
-def optimize_transcription(raw_transcription, client, custom_prompt=None, video_type=None):
+def optimize_transcription(raw_transcription, client, custom_prompt=None, video_type=None, original_segments=None):
     """Ottimizza la trascrizione con descrizione visiva"""
     
     # Prompt base per la tipologia di video
@@ -137,7 +137,14 @@ Example output:
 
     # Distribuisci i testi ottimizzati sui segmenti originali mantenendo i timestamp
     print(f"🔧 DEBUG: optimize_transcription - raw_transcription: {len(raw_transcription)}, optimized_texts: {len(optimized_texts)}")
-    optimized_segments = distribute_subtitles(raw_transcription, optimized_texts)
+    
+    if original_segments:
+        # Usa i segmenti originali per distribuire i testi ottimizzati
+        optimized_segments = distribute_subtitles(original_segments, optimized_texts)
+    else:
+        # Fallback: usa direttamente i testi ottimizzati
+        optimized_segments = optimized_texts
+    
     print(f"🔧 DEBUG: optimize_transcription - optimized_segments: {len(optimized_segments)}")
     
         # Post-processing: assicurati che ogni testo sia adatto per i sottotitoli
@@ -1034,13 +1041,8 @@ def process_video(input_video, music_file, openai_api_key, output_dir=".", custo
         else:
             # 3. Ottimizza la trascrizione
             print("🔧 DEBUG: Step 3 - Optimizing transcription...")
-            optimized_texts = optimize_transcription(raw_transcription, client, custom_prompt, video_type)
-            print("🔧 DEBUG: Step 3 completed - Transcription optimized")
-            
-            # 4. Distribuisci i sottotitoli
-            print("🔧 DEBUG: Step 4 - Distributing subtitles...")
-            distributed_segments = distribute_subtitles(transcript.segments, optimized_texts)
-            print("🔧 DEBUG: Step 4 completed - Subtitles distributed")
+            distributed_segments = optimize_transcription(raw_transcription, client, custom_prompt, video_type, transcript.segments)
+            print("🔧 DEBUG: Step 3 completed - Transcription optimized and distributed")
             
             # 5. Crea file SRT italiani
             print("🔧 DEBUG: Step 5 - Creating Italian SRT file...")
@@ -1161,7 +1163,11 @@ def generate_subtitles_only(input_video, openai_api_key, output_dir=".", custom_
         # Ottimizza la trascrizione
         print("🔧 DEBUG: Optimizing transcription...")
         try:
-            optimized_segments = optimize_transcription(transcript.segments, client, custom_prompt, video_type)
+            # Estrai il testo grezzo dai segmenti
+            raw_transcription = "\n".join([seg.text for seg in transcript.segments])
+            print(f"🔧 DEBUG: Raw transcription extracted: {len(raw_transcription)} characters")
+            
+            optimized_segments = optimize_transcription(raw_transcription, client, custom_prompt, video_type, transcript.segments)
             print(f"🔧 DEBUG: optimize_transcription completed successfully with {len(optimized_segments)} segments")
         except IndexError as e:
             print(f"❌ DEBUG: IndexError in optimize_transcription: {e}")
