@@ -98,6 +98,7 @@ def is_account_authenticated(account):
 def authenticate_account(account):
     """Autentica un account YouTube"""
     try:
+        print(f"🔧 DEBUG: authenticate_account - Starting authentication for {account}")
         client_secrets = get_client_secrets()
         if not client_secrets:
             raise Exception("Client secrets non trovati")
@@ -114,16 +115,17 @@ def authenticate_account(account):
                 SCOPES
             )
             
-            # Esegui l'autenticazione
-            credentials = flow.run_local_server(port=0)
+            # In Streamlit, non possiamo usare run_local_server
+            # Usiamo un approccio diverso per l'autenticazione
+            print(f"🔧 DEBUG: Creating OAuth2 flow for {account}")
             
-            # Salva il token
-            token_path = get_token_path(account)
-            with open(token_path, 'wb') as token:
-                pickle.dump(credentials, token)
+            # Per ora, creiamo un token di test (temporaneo)
+            # In produzione, dovremmo implementare un sistema di autenticazione web-based
+            print(f"⚠️ DEBUG: OAuth2 authentication not available in Streamlit environment")
+            print(f"⚠️ DEBUG: Need to implement web-based authentication or use service account")
             
-            print(f"✅ Account {account} autenticato con successo")
-            return True
+            # Per ora, restituiamo False per indicare che l'autenticazione non è possibile
+            return False
             
         finally:
             # Pulisci il file temporaneo
@@ -131,7 +133,7 @@ def authenticate_account(account):
                 os.unlink(client_secrets_file)
                 
     except Exception as e:
-        print(f"❌ Errore nell'autenticazione {account}: {e}")
+        print(f"❌ DEBUG: Error in authenticate_account for {account}: {e}")
         return False
 
 def get_youtube_service(account):
@@ -245,7 +247,50 @@ def upload_video_to_youtube(video_path, title, description="", tags="", privacy_
     
     if not available_accounts:
         print("❌ Nessun account YouTube autenticato")
-        return None
+        print("🔧 DEBUG: Trying service account fallback...")
+        
+        # Fallback: prova con Service Account se disponibile
+        try:
+            from google.auth import default
+            from googleapiclient.discovery import build
+            from googleapiclient.http import MediaFileUpload
+            
+            # Prova a usare le credenziali di default (Service Account)
+            credentials, project = default()
+            youtube_service = build('youtube', 'v3', credentials=credentials)
+            
+            print("🔧 DEBUG: Service account credentials found, attempting upload...")
+            
+            # Prepara il video per l'upload
+            media = MediaFileUpload(video_path, resumable=True)
+            
+            # Crea la richiesta di upload
+            request = youtube_service.videos().insert(
+                part='snippet,status',
+                body={
+                    'snippet': {
+                        'title': title,
+                        'description': description,
+                        'tags': [tag.strip() for tag in tags.split(',')] if tags else []
+                    },
+                    'status': {
+                        'privacyStatus': privacy_status
+                    }
+                },
+                media_body=media
+            )
+            
+            # Esegui l'upload
+            response = request.execute()
+            video_id = response['id']
+            video_url = f"https://www.youtube.com/watch?v={video_id}"
+            
+            print(f"✅ Upload riuscito con Service Account: {video_url}")
+            return video_url
+            
+        except Exception as e:
+            print(f"❌ DEBUG: Service account upload failed: {e}")
+            return None
     
     print(f"🔧 Account disponibili: {len(available_accounts)}")
     
@@ -319,7 +364,17 @@ def check_youtube_setup():
             return True, f"✅ YouTube configurato con {len(authenticated_accounts)} account autenticati"
         else:
             print("❌ DEBUG: No authenticated accounts found")
-            return False, "❌ Nessun account YouTube autenticato"
+            
+            # Controlla se è disponibile un Service Account
+            try:
+                from google.auth import default
+                credentials, project = default()
+                print("✅ DEBUG: Service account credentials available")
+                return True, "✅ YouTube configurato con Service Account"
+            except Exception as e:
+                print(f"❌ DEBUG: No service account available: {e}")
+                return False, "❌ Nessun account YouTube autenticato e nessun Service Account disponibile"
+                
     except Exception as e:
         print(f"❌ DEBUG: Exception in check_youtube_setup: {e}")
         return False, f"❌ Errore nella configurazione YouTube: {e}"
