@@ -147,7 +147,7 @@ Example output:
     
     print(f"🔧 DEBUG: optimize_transcription - optimized_segments: {len(optimized_segments)}")
     
-        # Post-processing: assicurati che ogni testo sia adatto per i sottotitoli
+    # Post-processing: assicurati che ogni testo sia adatto per i sottotitoli
     print(f"🔧 DEBUG: Post-processing {len(optimized_segments)} segments")
     for i, segment in enumerate(optimized_segments):
         print(f"🔧 DEBUG: Processing segment {i}: {segment}")
@@ -253,7 +253,7 @@ def split_text(text, max_length=30, max_lines=2):
             lines = [first_line, second_line]
         else:
             lines = [first_line, remaining_text]
-    
+        
     # Assicurati di avere sempre 2 righe
     while len(lines) < max_lines:
         lines.append("")
@@ -692,7 +692,7 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
         )
         ffmpeg.run(stream_it, overwrite_output=True)
         print("🔧 DEBUG: Italian subtitles added successfully")
-        
+
         # Poi aggiungi i sottotitoli inglesi al video con sottotitoli italiani
         stream_final = ffmpeg.input('temp_it.mp4')
         stream_final = ffmpeg.output(
