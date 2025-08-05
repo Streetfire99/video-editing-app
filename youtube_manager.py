@@ -4,7 +4,7 @@ import tempfile
 import time
 import json
 import streamlit as st
-from google_auth_oauthlib.flow import InstalledAppFlow
+from google_auth_oauthlib.flow import InstalledAppFlow, Flow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
@@ -109,10 +109,11 @@ def authenticate_account(account):
             client_secrets_file = f.name
         
         try:
-            # Crea il flusso OAuth2
-            flow = InstalledAppFlow.from_client_secrets_file(
+            # Crea il flusso OAuth2 per web application
+            flow = Flow.from_client_secrets_file(
                 client_secrets_file, 
-                SCOPES
+                scopes=SCOPES,
+                redirect_uri='urn:ietf:wg:oauth:2.0:oob'
             )
             
             # Su Streamlit Cloud, usiamo sempre il metodo manuale
@@ -362,10 +363,11 @@ def authenticate_youtube_account(account, auth_code=None):
             client_secrets_file = f.name
         
         try:
-            # Crea il flusso OAuth2
-            flow = InstalledAppFlow.from_client_secrets_file(
+            # Crea il flusso OAuth2 per web application
+            flow = Flow.from_client_secrets_file(
                 client_secrets_file, 
-                SCOPES
+                scopes=SCOPES,
+                redirect_uri='urn:ietf:wg:oauth:2.0:oob'
             )
             
             if auth_code:
