@@ -117,7 +117,12 @@ def authenticate_account(account):
             
             # Su Streamlit Cloud, usiamo sempre il metodo manuale
             # run_local_server non funziona perché non c'è un browser disponibile
-            auth_url, _ = flow.authorization_url(prompt='consent')
+            auth_url, _ = flow.authorization_url(
+                prompt='consent',
+                access_type='offline',
+                include_granted_scopes='true',
+                redirect_uri='urn:ietf:wg:oauth:2.0:oob'  # Per flusso manuale
+            )
             
             print(f"🔧 DEBUG: Generated auth URL for {account}")
             print(f"🔧 DEBUG: Auth URL: {auth_url}")
@@ -379,7 +384,12 @@ def authenticate_youtube_account(account, auth_code=None):
                 return True, f"✅ Account {account} autenticato con successo"
             else:
                 # Genera l'URL di autenticazione
-                auth_url, _ = flow.authorization_url(prompt='consent')
+                auth_url, _ = flow.authorization_url(
+                    prompt='consent',
+                    access_type='offline',
+                    include_granted_scopes='true',
+                    redirect_uri='urn:ietf:wg:oauth:2.0:oob'  # Per flusso manuale
+                )
                 
                 print(f"🔧 DEBUG: Generated auth URL: {auth_url}")
                 
