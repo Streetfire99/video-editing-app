@@ -3,6 +3,9 @@ config.json
 client_secrets.json
 token.pickle
 service_account_key.json
+youtube_token.pickle
+drive_token.pickle
+service_account:key.json
 
 # File temporanei
 *.tmp
