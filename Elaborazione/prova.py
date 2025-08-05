@@ -662,45 +662,40 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
         else:
             print(f"🔧 DEBUG: Using default dimensions: {video_width}x{video_height}")
         
-        # NUOVO APPROCCIO: Usa drawtext per controllo diretto del posizionamento
-        # Leggi i file SRT e crea i testi per drawtext
-        italian_texts = read_srt_file(subtitle_file_it)
-        english_texts = read_srt_file(subtitle_file_en)
-        
-        # Crea il filtro drawtext per ogni sottotitolo
-        drawtext_filters = []
-        
-        # Aggiungi sottotitoli italiani
-        for i, (start_time, end_time, text) in enumerate(italian_texts):
-            # Calcola la posizione Y per l'italiano
-            y_pos = video_height - italian_height
-            # Escape dei caratteri speciali per drawtext
-            text_escaped = text.replace("'", "\\'").replace('"', '\\"')
-            drawtext_filters.append(f"drawtext=text='{text_escaped}':fontsize=14:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=2:x=(w-text_w)/2:y={y_pos}:enable='between(t,{start_time},{end_time})'")
-        
-        # Aggiungi sottotitoli inglesi
-        for i, (start_time, end_time, text) in enumerate(english_texts):
-            # Calcola la posizione Y per l'inglese (sopra l'italiano)
-            y_pos = video_height - english_height
-            # Escape dei caratteri speciali per drawtext
-            text_escaped = text.replace("'", "\\'").replace('"', '\\"')
-            drawtext_filters.append(f"drawtext=text='{text_escaped}':fontsize=14:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=2:x=(w-text_w)/2:y={y_pos}:enable='between(t,{start_time},{end_time})'")
-        
-        # Combina tutti i filtri drawtext
-        vf_filter = ",".join(drawtext_filters)
-        
-        stream = ffmpeg.output(
+        # METODO SEMPLICE: Usa il filtro subtitles che è più stabile
+        # Aggiungi prima i sottotitoli italiani
+        stream_it = ffmpeg.output(
             stream,
-            output_video,
-            vf=vf_filter,
+            'temp_it.mp4',
+            vf=f"subtitles={subtitle_file_it}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height},MarginL=50,MarginR=50'",
             vcodec='libx264',
             acodec='aac',
             preset='medium',
             crf=18,
             pix_fmt='yuv420p'
         )
-        ffmpeg.run(stream, overwrite_output=True)
-        print("🔧 DEBUG: Drawtext subtitles added successfully")
+        ffmpeg.run(stream_it, overwrite_output=True)
+        print("🔧 DEBUG: Italian subtitles added successfully")
+        
+        # Poi aggiungi i sottotitoli inglesi al video con sottotitoli italiani
+        stream_final = ffmpeg.input('temp_it.mp4')
+        stream_final = ffmpeg.output(
+            stream_final,
+            output_video,
+            vf=f"subtitles={subtitle_file_en}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height},MarginL=50,MarginR=50'",
+            vcodec='libx264',
+            acodec='aac',
+            preset='medium',
+            crf=18,
+            pix_fmt='yuv420p'
+        )
+        ffmpeg.run(stream_final, overwrite_output=True)
+        
+        # Pulisci il file temporaneo
+        if os.path.exists('temp_it.mp4'):
+            os.remove('temp_it.mp4')
+        
+        print("🔧 DEBUG: Both subtitles added successfully")
 
 
             
@@ -1159,6 +1154,11 @@ def generate_subtitles_only(input_video, openai_api_key, output_dir=".", custom_
         try:
             optimized_segments = optimize_transcription(transcript.segments, client, custom_prompt, video_type)
             print(f"🔧 DEBUG: optimize_transcription completed successfully with {len(optimized_segments)} segments")
+        except IndexError as e:
+            print(f"❌ DEBUG: IndexError in optimize_transcription: {e}")
+            import traceback
+            print(f"❌ DEBUG: IndexError traceback: {traceback.format_exc()}")
+            raise
         except Exception as e:
             print(f"❌ DEBUG: Error in optimize_transcription: {e}")
             import traceback
