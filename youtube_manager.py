@@ -28,21 +28,29 @@ os.makedirs(TOKEN_DIR, exist_ok=True)
 def get_client_secrets():
     """Ottiene le credenziali OAuth2 da Streamlit secrets o file locale"""
     try:
+        print("🔧 DEBUG: get_client_secrets - Starting")
+        
         # Prova prima da Streamlit secrets
         if st.secrets.get("YOUTUBE_CLIENT_SECRETS"):
+            print("✅ DEBUG: Found YOUTUBE_CLIENT_SECRETS in st.secrets")
             client_secrets = st.secrets.get("YOUTUBE_CLIENT_SECRETS")
             if isinstance(client_secrets, str):
+                print("🔧 DEBUG: Client secrets is string, parsing JSON")
                 return json.loads(client_secrets)
+            print("🔧 DEBUG: Client secrets is already dict")
             return client_secrets
         else:
+            print("❌ DEBUG: YOUTUBE_CLIENT_SECRETS not found in st.secrets")
             # Fallback su file locale
             if os.path.exists("client_secrets.json"):
+                print("✅ DEBUG: Found client_secrets.json locally")
                 with open("client_secrets.json", "r") as f:
                     return json.load(f)
             else:
+                print("❌ DEBUG: No client_secrets.json found locally")
                 return None
     except Exception as e:
-        print(f"❌ Errore nel recupero client secrets: {e}")
+        print(f"❌ DEBUG: Error in get_client_secrets: {e}")
         return None
 
 def get_token_path(account):
@@ -67,16 +75,24 @@ def is_token_expired(credentials):
 def is_account_authenticated(account):
     """Controlla se un account è autenticato"""
     try:
+        print(f"🔧 DEBUG: is_account_authenticated - Checking {account}")
         token_path = get_token_path(account)
+        print(f"🔧 DEBUG: Token path: {token_path}")
+        
         if not os.path.exists(token_path):
+            print(f"❌ DEBUG: Token file not found for {account}")
             return False
         
+        print(f"✅ DEBUG: Token file found for {account}")
         with open(token_path, 'rb') as token:
             credentials = pickle.load(token)
         
-        return not is_token_expired(credentials)
+        is_expired = is_token_expired(credentials)
+        print(f"🔧 DEBUG: Token expired: {is_expired}")
+        
+        return not is_expired
     except Exception as e:
-        print(f"❌ Errore nel controllo autenticazione {account}: {e}")
+        print(f"❌ DEBUG: Error in is_account_authenticated for {account}: {e}")
         return False
 
 def authenticate_account(account):
@@ -280,14 +296,32 @@ def upload_video_to_youtube(video_path, title, description="", tags="", privacy_
 def check_youtube_setup():
     """Controlla se YouTube è configurato correttamente"""
     try:
+        print("🔧 DEBUG: check_youtube_setup - Starting check")
+        
+        # Controlla se i client secrets sono disponibili
+        client_secrets = get_client_secrets()
+        if not client_secrets:
+            print("❌ DEBUG: No client secrets found")
+            return False, "❌ Client secrets non trovati"
+        
+        print("✅ DEBUG: Client secrets found")
+        
         # Controlla se ci sono account autenticati
-        authenticated_accounts = [acc for acc in YOUTUBE_ACCOUNTS if is_account_authenticated(acc)]
+        authenticated_accounts = []
+        for acc in YOUTUBE_ACCOUNTS:
+            is_auth = is_account_authenticated(acc)
+            print(f"🔧 DEBUG: Account {acc}: {'✅ Autenticato' if is_auth else '❌ Non autenticato'}")
+            if is_auth:
+                authenticated_accounts.append(acc)
         
         if authenticated_accounts:
+            print(f"✅ DEBUG: Found {len(authenticated_accounts)} authenticated accounts")
             return True, f"✅ YouTube configurato con {len(authenticated_accounts)} account autenticati"
         else:
+            print("❌ DEBUG: No authenticated accounts found")
             return False, "❌ Nessun account YouTube autenticato"
     except Exception as e:
+        print(f"❌ DEBUG: Exception in check_youtube_setup: {e}")
         return False, f"❌ Errore nella configurazione YouTube: {e}"
 
 def get_youtube_status():
