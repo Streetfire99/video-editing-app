@@ -81,8 +81,10 @@ Your task is to optimize the following raw transcription of an instructional vid
 2. Write short, complete sentences that describe exactly what is shown in the video.
 3. Each sentence should be self-contained and not reference previous or next actions.
 4. Avoid long explanations or multiple actions in one sentence.
-5. Keep each line under 20 characters to prevent overlap.
+5. Keep each line under 30 characters to prevent overlap.
 6. Each subtitle should be exactly 2 lines maximum.
+7. NEVER truncate sentences with ellipsis (...).
+8. Write complete, self-contained sentences.
 7. DO NOT add any prefix to the text - just write the Italian text as is.
 8. DO NOT add periods, exclamation marks, or question marks at the end of sentences.
 9. Provide the output as a JSON array of segments, where each segment has:
@@ -184,65 +186,72 @@ def process_subtitle_text(text):
     # Rimuovi punti, esclamazioni e domande finali
     text = text.rstrip('.!?')
     
-    # Se il testo è troppo lungo, troncalo
-    if len(text) > 40:  # 2 righe x 20 caratteri
-        text = text[:37] + "..."
-        print(f"🔧 DEBUG: Truncated text: '{text}'")
+    # Se il testo è troppo lungo, non troncarlo ma gestirlo in split_text
+    if len(text) > 60:  # Aumentato il limite per evitare troncamenti
+        print(f"🔧 DEBUG: Long text detected: '{text}' (length: {len(text)})")
+        # Non troncare, lascia che split_text gestisca la divisione
     
     # Usa split_text per garantire sempre 2 righe
     result = split_text(text, max_length=25, max_lines=2)
     print(f"🔧 DEBUG: split_text result: {result}")
     return result
 
-def split_text(text, max_length=25, max_lines=2):
-    """Divide il testo per i sottotitoli - versione che funzionava bene"""
-    # First, try to split on natural sentence boundaries
-    import re
-    sentences = re.split(r'([.!?])\s+', text)
-    # Recombine the punctuation with the sentences
-    sentences = [''.join(i) for i in zip(sentences[::2], sentences[1::2] + [''])]
+def split_text(text, max_length=30, max_lines=2):
+    """Divide il testo per i sottotitoli - versione migliorata senza troncamenti"""
+    print(f"🔧 DEBUG: split_text input: '{text}' (length: {len(text)})")
     
+    # Se il testo è già abbastanza corto, restituiscilo direttamente
+    if len(text) <= max_length:
+        return [text, ""]
+    
+    # Dividi il testo in parole
+    words = text.split()
     lines = []
-    current_line = []
-    current_length = 0
+    current_line = ""
     
-    for sentence in sentences:
-        words = sentence.split()
-        for word in words:
-            if current_length + len(word) + 1 <= max_length:
-                current_line.append(word)
-                current_length += len(word) + 1
-            else:
-                if current_line:
-                    lines.append(' '.join(current_line))
-                current_line = [word]
-                current_length = len(word) + 1
+    for word in words:
+        # Prova ad aggiungere la parola alla riga corrente
+        test_line = current_line + (" " + word) if current_line else word
+        
+        if len(test_line) <= max_length:
+            current_line = test_line
+        else:
+            # Se la riga corrente non è vuota, salvala e inizia una nuova
+            if current_line:
+                lines.append(current_line)
+            current_line = word
     
+    # Aggiungi l'ultima riga se non è vuota
     if current_line:
-        lines.append(' '.join(current_line))
+        lines.append(current_line)
     
-    # If we have more than 2 lines, try to combine them intelligently
+    # Assicurati di avere massimo 2 righe
     if len(lines) > max_lines:
-        # Try to combine lines while respecting sentence boundaries
-        combined = []
-        current = []
-        current_length = 0
+        # Combina le righe in eccesso nella seconda riga
+        first_line = lines[0]
+        remaining_text = " ".join(lines[1:])
         
-        for line in lines:
-            if current_length + len(line) + 1 <= max_length:
-                current.append(line)
-                current_length += len(line) + 1
-            else:
-                if current:
-                    combined.append(' '.join(current))
-                current = [line]
-                current_length = len(line) + 1
-        
-        if current:
-            combined.append(' '.join(current))
-        
-        lines = combined[:max_lines]
+        # Se la seconda riga è ancora troppo lunga, dividila ulteriormente
+        if len(remaining_text) > max_length:
+            # Trova un punto di divisione naturale
+            words_remaining = remaining_text.split()
+            second_line = ""
+            for word in words_remaining:
+                test_line = second_line + (" " + word) if second_line else word
+                if len(test_line) <= max_length:
+                    second_line = test_line
+                else:
+                    break
+            
+            lines = [first_line, second_line]
+        else:
+            lines = [first_line, remaining_text]
     
+    # Assicurati di avere sempre 2 righe
+    while len(lines) < max_lines:
+        lines.append("")
+    
+    print(f"🔧 DEBUG: split_text result: {lines}")
     return lines[:max_lines]
 
 def distribute_subtitles(segments, texts):
