@@ -121,7 +121,7 @@ def authenticate_account(account):
             auth_url, _ = flow.authorization_url(
                 prompt='consent',
                 access_type='offline',
-                include_granted_scopes='true'
+                include_granted_scopes='false'  # Non includere scope extra
             )
             
             print(f"🔧 DEBUG: Generated auth URL for {account}")
@@ -388,7 +388,7 @@ def authenticate_youtube_account(account, auth_code=None):
                 auth_url, _ = flow.authorization_url(
                     prompt='consent',
                     access_type='offline',
-                    include_granted_scopes='true'
+                    include_granted_scopes='false'  # Non includere scope extra
                 )
                 
                 print(f"🔧 DEBUG: Generated auth URL: {auth_url}")
