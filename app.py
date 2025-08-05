@@ -33,11 +33,11 @@ from Elaborazione.prova import (
 )
 
 # Importa le funzioni per YouTube e Drive
-from youtube_upload import upload_to_youtube, check_youtube_setup, get_youtube_status
+from youtube_manager import upload_to_youtube, check_youtube_setup, get_youtube_status
 from drive_manager import upload_video_to_drive, add_tracking_entry
 
 # Importa le funzioni per YouTube
-from youtube_upload import upload_to_youtube, check_youtube_setup, get_youtube_status
+from youtube_manager import upload_to_youtube, check_youtube_setup, get_youtube_status
 
 # Importa le funzioni per la gestione dei dati
 from data_manager import (
@@ -594,27 +594,7 @@ with st.form("youtube_upload_form"):
         print(f"🔧 DEBUG: Video title: {youtube_title}")
         print(f"🔧 DEBUG: Privacy status: {privacy_status}")
         
-        # Controlla se c'è un codice di autenticazione in attesa
-        from youtube_account_manager import get_next_account_to_authenticate, authenticate_with_code_modern
-        pending_account = None
-        pending_code = None
-        
-        for account in ["xeniamilano.info@gmail.com", "videoxenia1@gmail.com", "videoxenia2@gmail.com", "videoxenia3@gmail.com", "videoxenia4@gmail.com"]:
-            if f"pending_auth_code_{account}" in st.session_state:
-                pending_account = account
-                pending_code = st.session_state[f"pending_auth_code_{account}"]
-                break
-        
-        if pending_code and pending_account:
-            print(f"🔧 DEBUG: Processing authentication for {pending_account}")
-            if authenticate_with_code_modern(pending_account, pending_code):
-                st.success(f"✅ {pending_account} autenticato con successo!")
-                # Pulisci i dati di autenticazione
-                del st.session_state[f"pending_auth_code_{pending_account}"]
-                del st.session_state[f"pending_auth_account_{pending_account}"]
-                st.rerun()
-            else:
-                st.error("❌ Errore nell'autenticazione. Riprova.")
+        # Controlla se c'è un codice di autenticazione in attesa (logica rimossa - ora usa youtube_manager)
         
         if youtube_status[0]:
             print("🔧 DEBUG: YouTube status is OK, starting upload")
@@ -656,11 +636,19 @@ with st.form("youtube_upload_form"):
             st.error("❌ YouTube non configurato correttamente")
             
             # Mostra banner di autenticazione se necessario
-            from youtube_account_manager import get_next_account_to_authenticate, show_modern_authentication_banner
-            next_account = get_next_account_to_authenticate()
+            from youtube_manager import get_next_available_account, authenticate_youtube_account
+            next_account = get_next_available_account()
             if next_account:
                 st.warning("🔐 **Autenticazione YouTube richiesta**")
-                show_modern_authentication_banner(next_account)
+                st.info(f"Per caricare video su YouTube, devi autenticare l'account: **{next_account}**")
+                
+                if st.button(f"🔐 Autentica {next_account}"):
+                    success, message = authenticate_youtube_account(next_account)
+                    if success:
+                        st.success(message)
+                        st.rerun()
+                    else:
+                        st.error(message)
 
 # Sezione per l'upload su Google Drive
 st.subheader("☁️ Carica su Google Drive")

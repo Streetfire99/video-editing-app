@@ -1245,66 +1245,8 @@ def finalize_video_processing(input_video, srt_it_file, srt_en_file, output_dir,
             'has_voice': False
         }
 
-def upload_to_youtube(video_path, title, description, tags, credentials_path="service_account_key.json"):
-    """Carica il video su YouTube e restituisce il link"""
-    try:
-        from googleapiclient.discovery import build
-        from googleapiclient.http import MediaFileUpload
-        from google.auth import default
-        
-        # Carica le credenziali
-        if os.path.exists(credentials_path):
-            os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credentials_path
-            credentials, project = default()
-        else:
-            raise Exception("File credentials non trovato")
-        
-        # Crea il servizio YouTube
-        youtube = build('youtube', 'v3', credentials=credentials)
-        
-        # Prepara i metadati del video
-        body = {
-            'snippet': {
-                'title': title,
-                'description': description,
-                'tags': [tag.strip() for tag in tags.split(',')],
-                'categoryId': '27'  # Education
-            },
-            'status': {
-                'privacyStatus': 'private'  # Inizia come privato
-            }
-        }
-        
-        # Carica il video
-        media = MediaFileUpload(video_path, chunksize=-1, resumable=True)
-        
-        # Esegui l'upload
-        request = youtube.videos().insert(
-            part=','.join(body.keys()),
-            body=body,
-            media_body=media
-        )
-        
-        response = None
-        while response is None:
-            status, response = request.next_chunk()
-            if status:
-                print(f"Uploaded {int(status.progress() * 100)}%")
-        
-        video_id = response['id']
-        video_url = f"https://www.youtube.com/watch?v={video_id}"
-        
-        return {
-            "success": True,
-            "video_url": video_url,
-            "video_id": video_id
-        }
-        
-    except Exception as e:
-        return {
-            "success": False,
-            "error": str(e)
-        }
+# Funzione upload_to_youtube rimossa - ora usa youtube_manager.py
+# Per compatibilità, importa da youtube_manager
 
 SCOPES = [
     'https://www.googleapis.com/auth/youtube',
