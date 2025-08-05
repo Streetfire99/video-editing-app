@@ -107,37 +107,7 @@ if st.session_state.get('auth_account'):
                 del st.session_state.auth_account
                 st.rerun()
 
-# Sezione 3: Test Account
-st.header("🧪 Test Account")
-
-# Test di connettività per account autenticati
-authenticated_accounts = [acc for acc in account_status if acc['authenticated']]
-
-if authenticated_accounts:
-    st.subheader("🔍 Test Connettività")
-    
-    for acc in authenticated_accounts:
-        col1, col2, col3 = st.columns([3, 2, 2])
-        
-        with col1:
-            st.write(f"**{acc['account']}**")
-        
-        with col2:
-            st.info("Pronto per test")
-        
-        with col3:
-            if st.button(f"🧪 Test {acc['account']}", key=f"test_{acc['account']}"):
-                from youtube_manager import test_account
-                success, message = test_account(acc['account'])
-                if success:
-                    st.success("✅ Connessione OK")
-                else:
-                    st.error("❌ Errore connessione")
-                    st.error(message)
-else:
-    st.warning("⚠️ Nessun account autenticato per il test")
-
-# Sezione 4: Gestione Token
+# Sezione 3: Gestione Token
 st.header("🗑️ Gestione Token")
 
 st.info("Elimina i token per reautenticare gli account")
