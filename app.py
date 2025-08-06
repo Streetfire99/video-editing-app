@@ -373,11 +373,8 @@ uploaded_videos = st.file_uploader(
     accept_multiple_files=True
 )
 
-# Mostra video caricati
+# Salva i video caricati nel session state
 if uploaded_videos:
-    st.subheader("📋 Video Caricati")
-    
-    # Salva i video e aggiorna session state
     for uploaded_video in uploaded_videos:
         # Salva il video temporaneamente
         video_path = create_session_temp_file(f"video_{uploaded_video.name}", ".mp4")
@@ -400,17 +397,7 @@ if uploaded_videos:
                 'youtube_link': None
             })
     
-    # Mostra lista video
-    for i, video in enumerate(st.session_state.bulk_processing['videos']):
-        col1, col2, col3 = st.columns([3, 1, 1])
-        with col1:
-            st.write(f"**{video['name']}** ({video['file'].size / (1024*1024):.1f} MB)")
-        with col2:
-            st.write(f"🎬 Video")
-        with col3:
-            if st.button("🗑️", key=f"remove_{i}"):
-                st.session_state.bulk_processing['videos'].pop(i)
-                st.rerun()
+    st.success(f"✅ Caricati {len(uploaded_videos)} video!")
 
 # Sezione configurazione globale
 if st.session_state.bulk_processing['videos']:
@@ -425,30 +412,58 @@ if st.session_state.bulk_processing['videos']:
         key="global_apartment"
     )
     
-    # Selezione tipologia video globale
-    selected_video_type = st.selectbox(
-        "🎥 Tipologia Video (valida per tutti i video)",
-        options=[""] + video_types,
-        help="Scegli la tipologia di video che stai creando",
-        key="global_video_type"
-    )
-    
     # Aggiorna configurazione globale
-    if selected_apartment and selected_video_type:
+    if selected_apartment:
         st.session_state.bulk_processing['global_config']['apartment'] = selected_apartment
-        st.session_state.bulk_processing['global_config']['video_type'] = selected_video_type
         
-        # Aggiorna tutti i video con la configurazione globale
+        # Aggiorna tutti i video con l'appartamento globale
         for video in st.session_state.bulk_processing['videos']:
             video['apartment'] = selected_apartment
-            video['video_type'] = selected_video_type
         
-        st.success(f"✅ Configurazione applicata: **{selected_apartment} - {selected_video_type}**")
+        st.success(f"✅ Appartamento applicato: **{selected_apartment}**")
         
-        # Pulsante per generare sottotitoli e manuali
-        if st.button("🎬 Genera Sottotitoli e Manuali per Tutti i Video", type="primary"):
-            st.session_state.bulk_processing['current_phase'] = 'generate'
-            st.rerun()
+        # Mostra configurazione individuale per ogni video
+        st.subheader("🎥 Configurazione Individuale Video")
+        st.info("Seleziona la tipologia per ogni video individualmente")
+        
+        # Mostra lista video con selezione tipologia
+        for i, video in enumerate(st.session_state.bulk_processing['videos']):
+            with st.container():
+                col1, col2, col3 = st.columns([2, 2, 1])
+                
+                with col1:
+                    st.write(f"**{video['name']}** ({video['file'].size / (1024*1024):.1f} MB)")
+                
+                with col2:
+                    # Selezione tipologia per questo video specifico
+                    video_type = st.selectbox(
+                        f"Tipologia per {video['name']}",
+                        options=[""] + video_types,
+                        key=f"video_type_{i}",
+                        help=f"Scegli la tipologia per {video['name']}"
+                    )
+                    
+                    if video_type:
+                        video['video_type'] = video_type
+                        st.success(f"✅ {video_type}")
+                
+                with col3:
+                    if st.button("🗑️", key=f"remove_{i}"):
+                        st.session_state.bulk_processing['videos'].pop(i)
+                        st.rerun()
+        
+        # Verifica che tutti i video abbiano una tipologia
+        all_videos_configured = all(video.get('video_type') for video in st.session_state.bulk_processing['videos'])
+        
+        if all_videos_configured:
+            st.success("✅ Tutti i video sono configurati!")
+            
+            # Pulsante per generare sottotitoli e manuali
+            if st.button("🎬 Genera Sottotitoli e Manuali per Tutti i Video", type="primary"):
+                st.session_state.bulk_processing['current_phase'] = 'generate'
+                st.rerun()
+        else:
+            st.warning("⚠️ Seleziona una tipologia per tutti i video prima di procedere")
 
 # ============================================================================
 # GESTIONE FASI BULK PROCESSING
