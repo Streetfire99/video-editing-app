@@ -524,6 +524,10 @@ if current_phase == 'generate':
                 video['subtitles_data'] = result
                 video['output_dir'] = output_dir
                 
+                # Debug info
+                st.write(f"🔧 DEBUG: Sottotitoli IT salvati: {len(video['subtitles']['it'])}")
+                st.write(f"🔧 DEBUG: Sottotitoli EN salvati: {len(video['subtitles']['en'])}")
+                
                 # Genera manuali usando la trascrizione
                 try:
                     # Estrai il testo dalla trascrizione per creare i manuali
@@ -570,6 +574,39 @@ if current_phase == 'generate':
     
     status_text.text("✅ Generazione completata!")
     
+    # Mostra risultati della generazione
+    st.subheader("📋 Risultati Generazione")
+    
+    for i, video in enumerate(st.session_state.bulk_processing['videos']):
+        with st.expander(f"🎬 {video['name']} - {video.get('video_type', 'N/A')}"):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.write("**Sottotitoli Italiani:**")
+                if video['subtitles']['it']:
+                    for j, segment in enumerate(video['subtitles']['it'][:5]):  # Mostra primi 5
+                        st.write(f"{j+1}. {segment.get('text', '')}")
+                    if len(video['subtitles']['it']) > 5:
+                        st.write(f"... e altri {len(video['subtitles']['it']) - 5} segmenti")
+                else:
+                    st.write("❌ Nessun sottotitolo generato")
+            
+            with col2:
+                st.write("**Sottotitoli Inglesi:**")
+                if video['subtitles']['en']:
+                    for j, segment in enumerate(video['subtitles']['en'][:5]):  # Mostra primi 5
+                        st.write(f"{j+1}. {segment.get('text', '')}")
+                    if len(video['subtitles']['en']) > 5:
+                        st.write(f"... e altri {len(video['subtitles']['en']) - 5} segmenti")
+                else:
+                    st.write("❌ Nessun sottotitolo generato")
+            
+            st.write("**Manuale Italiano:**")
+            st.text_area("", value=video['manuals']['it'], height=100, disabled=True, key=f"manual_it_display_{i}")
+            
+            st.write("**Manuale Inglese:**")
+            st.text_area("", value=video['manuals']['en'], height=100, disabled=True, key=f"manual_en_display_{i}")
+    
     # Pulsante per passare alla fase di modifica
     if st.button("✏️ Modifica Sottotitoli e Manuali", type="primary"):
         st.session_state.bulk_processing['current_phase'] = 'modify'
@@ -590,14 +627,30 @@ elif current_phase == 'modify':
                 
                 # Modifica sottotitoli
                 st.write("**Sottotitoli Italiani:**")
-                for j, segment in enumerate(video['subtitles']['it']):
-                    edited_text = st.text_area(
-                        f"IT {j+1}",
-                        value=segment.get('text', ''),
-                        key=f"it_{i}_{j}",
-                        height=60
-                    )
-                    video['subtitles']['it'][j]['text'] = edited_text
+                if video['subtitles']['it']:
+                    for j, segment in enumerate(video['subtitles']['it']):
+                        edited_text = st.text_area(
+                            f"IT {j+1}",
+                            value=segment.get('text', ''),
+                            key=f"it_{i}_{j}",
+                            height=60
+                        )
+                        video['subtitles']['it'][j]['text'] = edited_text
+                else:
+                    st.warning("❌ Nessun sottotitolo italiano disponibile per la modifica")
+                
+                st.write("**Sottotitoli Inglesi:**")
+                if video['subtitles']['en']:
+                    for j, segment in enumerate(video['subtitles']['en']):
+                        edited_text = st.text_area(
+                            f"EN {j+1}",
+                            value=segment.get('text', ''),
+                            key=f"en_{i}_{j}",
+                            height=60
+                        )
+                        video['subtitles']['en'][j]['text'] = edited_text
+                else:
+                    st.warning("❌ Nessun sottotitolo inglese disponibile per la modifica")
                 
                 # Modifica manuali
                 col1, col2 = st.columns(2)
