@@ -50,6 +50,8 @@ from data_manager import (
 # Importa le funzioni per Google Drive
 from drive_manager import upload_video_to_drive, add_tracking_entry
 
+
+
 def create_session_temp_file(prefix, suffix):
     """Crea un file temporaneo unico per questa sessione"""
     session_id = st.session_state.session_id
@@ -753,15 +755,31 @@ elif current_phase == 'process':
         status_text.text(f"🔄 Elaborando {video['name']}... ({i+1}/{total_videos})")
         
         try:
+            # Crea file SRT temporanei con i sottotitoli modificati
+            temp_srt_it = tempfile.NamedTemporaryFile(mode='w', suffix='.srt', delete=False, encoding='utf-8')
+            temp_srt_en = tempfile.NamedTemporaryFile(mode='w', suffix='.srt', delete=False, encoding='utf-8')
+            
+            # Scrivi i sottotitoli italiani modificati
+            create_srt_file(video['subtitles']['it'], temp_srt_it.name, "IT")
+            
+            # Scrivi i sottotitoli inglesi modificati
+            create_srt_file(video['subtitles']['en'], temp_srt_en.name, "EN")
+            
             # Elabora video con sottotitoli modificati
             result = finalize_video_processing(
                 input_video=video['path'],
-                srt_it_file=video['subtitles_data']['srt_it_file'],
-                srt_en_file=video['subtitles_data']['srt_en_file'],
+                srt_it_file=temp_srt_it.name,
+                srt_en_file=temp_srt_en.name,
                 output_dir=video['output_dir'],
                 italian_height=120,
                 english_height=60
             )
+            
+            # Pulisci i file temporanei
+            temp_srt_it.close()
+            temp_srt_en.close()
+            os.unlink(temp_srt_it.name)
+            os.unlink(temp_srt_en.name)
             
             if result['success']:
                 video['processed_video'] = result
