@@ -170,16 +170,16 @@ IMPORTANTE:
 - NON creare istruzioni generiche come "accedi al sito" o "seguire le istruzioni"
 - Analizza il contenuto della trascrizione e crea istruzioni concrete
 - Se la trascrizione è troppo breve, deduci il contenuto dal nome del video
-- Massimo 5 punti in formato elenco numerato (1., 2., 3., ecc.)
-- Frasi brevi e concrete
+- Massimo 3-4 punti in formato elenco numerato (1., 2., 3., 4.)
+- Ogni frase deve essere di circa 9-10 parole
+- Frasi brevi, concrete e dirette
 - NON mettere punti alla fine delle istruzioni
 
 Esempio di istruzioni specifiche (non generiche):
-1. Verifica che la caldaia sia spenta prima di iniziare
-2. Controlla il livello dell'acqua nel serbatoio
-3. Regola la temperatura al valore desiderato
-4. Monitora la pressione durante il funzionamento
-5. Chiudi la valvola principale quando hai finito
+1. Individua il boiler sotto la lavatrice nella stanza principale
+2. Assicurati che il boiler sia sempre acceso e collegato alla presa
+3. Controlla che il boiler mostri una luce blu durante il funzionamento
+4. Se l'acqua finisce attendi che il boiler ricarichi per 20-30 minuti
 
 Istruzioni specifiche per questo video:
 """
@@ -191,20 +191,20 @@ Istruzioni italiane:
 {transcription}
 
 IMPORTANTE:
-- Mantieni il formato elenco numerato 1., 2., 3., ecc.
+- Mantieni il formato elenco numerato 1., 2., 3., 4.
 - NON mettere punti alla fine delle istruzioni
 - Traduci fedelmente mantenendo la stessa struttura
 - NON aggiungere "English Translation:" o altri prefissi
 - Restituisci SOLO la traduzione numerata
 - Crea frasi COMPLETE e COERENTI, non spezzate
-- Ogni punto deve essere una frase completa e comprensibile
+- Ogni frase deve essere di circa 9-10 parole
+- Massimo 3-4 punti
 
 Esempio di traduzione corretta:
 1. Locate the boiler under the washing machine in the main room
 2. Ensure the boiler is always turned on and connected to the socket
-3. Check that the boiler displays a blue light, indicating it is working
-4. If the boiler is off, check the electrical panel making sure all sockets are turned on
-5. If the water runs out, wait for the boiler to recharge for 20-30 minutes
+3. Check that the boiler displays a blue light during operation
+4. If the water runs out wait for the boiler to recharge for 20-30 minutes
 
 Traduzione in inglese:"""
         
@@ -542,14 +542,17 @@ if current_phase == 'generate':
                 
                 # Aggiungi prefissi ai segmenti inglesi
                 for segment in segments_en:
-                    if isinstance(segment, dict) and 'text' in segment and not segment['text'].startswith('[EN]'):
-                        segment['text'] = f"[EN] {segment['text']}"
+                    if isinstance(segment, dict) and 'text' in segment:
+                        # Rimuovi eventuali prefissi esistenti e aggiungi quello corretto
+                        text = segment['text'].replace('[EN] ', '').replace('[IT] ', '')
+                        segment['text'] = f"[EN] {text}"
                     elif isinstance(segment, tuple) and len(segment) > 2:
                         # Se è una tuple, converti in dizionario con prefisso
+                        text = segment[2].replace('[EN] ', '').replace('[IT] ', '')
                         segments_en[segments_en.index(segment)] = {
                             'start': segment[0],
                             'end': segment[1],
-                            'text': f"[EN] {segment[2]}"
+                            'text': f"[EN] {text}"
                         }
                 
                 video['subtitles'] = {
