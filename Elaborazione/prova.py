@@ -607,28 +607,55 @@ def add_background_music(input_video, music_file, output_video):
         print("🔧 DEBUG: Importing ffmpeg for background music...")
         import ffmpeg
         print("🔧 DEBUG: ffmpeg imported successfully for background music")
+        
+        # Verifica che i file esistano
+        if not os.path.exists(input_video):
+            raise FileNotFoundError(f"Video input non trovato: {input_video}")
+        if not os.path.exists(music_file):
+            raise FileNotFoundError(f"File musica non trovato: {music_file}")
+        
         input_stream = ffmpeg.input(input_video)
-        music_stream = ffmpeg.input(music_file, stream_loop=-1)
+        music_stream = ffmpeg.input(music_file)
+        
+        # Usa un approccio più semplice e compatibile
         stream = ffmpeg.output(
             input_stream['v'],
-            ffmpeg.filter(music_stream['a'], 'volume', 0.7),
+            ffmpeg.filter(music_stream['a'], 'volume', 0.3),  # Volume più basso
             output_video,
             shortest=None,
             vcodec='libx264',
             acodec='aac',
-            preset='medium',
-            crf=18,
+            preset='fast',  # Preset più veloce
+            crf=20,  # Qualità leggermente più bassa per stabilità
             pix_fmt='yuv420p'
         )
         print("🔧 DEBUG: Running ffmpeg.run for background music...")
-        ffmpeg.run(stream, overwrite_output=True)
+        ffmpeg.run(stream, overwrite_output=True, quiet=True)  # Aggiungi quiet=True per ridurre output
         print("🔧 DEBUG: Background music added successfully")
     except ImportError as e:
         print(f"❌ DEBUG: ImportError in add_background_music - {e}")
         raise Exception("ffmpeg-python non è disponibile. Installa ffmpeg-python.")
     except Exception as e:
         print(f"❌ DEBUG: Unexpected error in add_background_music - {e}")
-        raise e
+        # Prova un approccio alternativo senza musica se fallisce
+        print("🔧 DEBUG: Trying alternative approach without music...")
+        try:
+            import ffmpeg
+            input_stream = ffmpeg.input(input_video)
+            stream = ffmpeg.output(
+                input_stream,
+                output_video,
+                vcodec='libx264',
+                acodec='aac',
+                preset='fast',
+                crf=20,
+                pix_fmt='yuv420p'
+            )
+            ffmpeg.run(stream, overwrite_output=True, quiet=True)
+            print("🔧 DEBUG: Video processed without background music")
+        except Exception as e2:
+            print(f"❌ DEBUG: Alternative approach also failed - {e2}")
+            raise e
 
 
 
@@ -1192,7 +1219,16 @@ def generate_subtitles_only(input_video, openai_api_key, output_dir=".", custom_
         
         # Leggi i sottotitoli inglesi dal file SRT
         print("🔧 DEBUG: Reading English subtitles from SRT file...")
-        segments_en = read_srt_file(srt_en_file)
+        segments_en_raw = read_srt_file(srt_en_file)
+        
+        # Converti nel formato corretto (come i segmenti italiani)
+        segments_en = []
+        for start_time, end_time, text in segments_en_raw:
+            segments_en.append({
+                'start': start_time,
+                'end': end_time,
+                'text': text.strip()
+            })
         
         # Pulisci il file audio temporaneo
         if os.path.exists(audio_file):

@@ -807,8 +807,10 @@ elif current_phase == 'process':
             if result['success']:
                 video['processed_video'] = result
                 st.success(f"✅ {video['name']} - Video elaborato!")
+                st.write(f"🔧 DEBUG: Video salvato con success: {result.get('final_video', 'N/A')}")
             else:
                 st.error(f"❌ {video['name']} - Errore: {result.get('error', 'Errore sconosciuto')}")
+                st.write(f"🔧 DEBUG: Risultato fallito: {result}")
                 
         except Exception as e:
             st.error(f"❌ {video['name']} - Errore: {str(e)}")
@@ -827,6 +829,9 @@ elif current_phase == 'results':
     st.markdown("---")
     st.header("📊 Risultati Elaborazione")
     
+    # Debug: mostra informazioni sui video
+    st.info(f"🔧 DEBUG: Numero video in sessione: {len(st.session_state.bulk_processing['videos'])}")
+    
     # Crea tab per ogni video elaborato
     if st.session_state.bulk_processing['videos']:
         tab_names = [f"🎬 {video['name']}" for video in st.session_state.bulk_processing['videos']]
@@ -836,16 +841,25 @@ elif current_phase == 'results':
             with tab:
                 st.subheader(f"Risultati: {video['name']}")
                 
-                if video['processed_video']:
+                # Debug: mostra informazioni sul video
+                st.write(f"🔧 DEBUG: Video ha processed_video: {video.get('processed_video') is not None}")
+                if video.get('processed_video'):
+                    st.write(f"🔧 DEBUG: processed_video keys: {list(video['processed_video'].keys())}")
+                    if 'final_video' in video['processed_video']:
+                        st.write(f"🔧 DEBUG: final_video path: {video['processed_video']['final_video']}")
+                        st.write(f"🔧 DEBUG: final_video exists: {os.path.exists(video['processed_video']['final_video'])}")
+                
+                if video.get('processed_video') and video['processed_video'].get('success'):
                     # Mostra video elaborato
-                    if os.path.exists(video['processed_video']['final_video']):
-                        st.video(video['processed_video']['final_video'])
+                    final_video_path = video['processed_video'].get('final_video')
+                    if final_video_path and os.path.exists(final_video_path):
+                        st.video(final_video_path)
                         
                         # Pulsanti individuali
                         col1, col2, col3 = st.columns(3)
                         
                         with col1:
-                            with open(video['processed_video']['final_video'], "rb") as video_file:
+                            with open(final_video_path, "rb") as video_file:
                                 st.download_button(
                                     label="📥 Scarica Video",
                                     data=video_file.read(),
@@ -862,24 +876,30 @@ elif current_phase == 'results':
                             if st.button("📺 Upload YouTube", key=f"youtube_{i}"):
                                 # Upload su YouTube
                                 pass
+                    else:
+                        st.error(f"❌ Video elaborato non trovato: {final_video_path}")
+                else:
+                    st.error(f"❌ Video non elaborato correttamente per {video['name']}")
+                    if video.get('processed_video'):
+                        st.write(f"Errore: {video['processed_video'].get('error', 'Errore sconosciuto')}")
+                
+                # Manuali
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.write("**Manuale Italiano:**")
+                    st.text_area("", value=video['manuals']['it'], height=150, disabled=True)
                     
-                    # Manuali
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.write("**Manuale Italiano:**")
-                        st.text_area("", value=video['manuals']['it'], height=150, disabled=True)
-                        
-                        if st.button("📥 Scarica Manuale IT", key=f"download_it_{i}"):
-                            # Download manuale IT
-                            pass
+                    if st.button("📥 Scarica Manuale IT", key=f"download_it_{i}"):
+                        # Download manuale IT
+                        pass
+                
+                with col2:
+                    st.write("**Manuale Inglese:**")
+                    st.text_area("", value=video['manuals']['en'], height=150, disabled=True)
                     
-                    with col2:
-                        st.write("**Manuale Inglese:**")
-                        st.text_area("", value=video['manuals']['en'], height=150, disabled=True)
-                        
-                        if st.button("📥 Scarica Manuale EN", key=f"download_en_{i}"):
-                            # Download manuale EN
-                            pass
+                    if st.button("📥 Scarica Manuale EN", key=f"download_en_{i}"):
+                        # Download manuale EN
+                        pass
         
         # Pulsanti bulk
         st.markdown("---")
@@ -899,112 +919,6 @@ elif current_phase == 'results':
             if st.button("📺 Upload Tutti su YouTube", type="primary"):
                 # Upload di tutti i video su YouTube
                 pass
-
-    
-    with col1:
-        st.subheader("🇮🇹 Italiano")
-        edited_italian_text = st.text_area(
-            "Testo italiano",
-            value=italian_text,
-            key="transcript_italian_box",
-            height=400
-        )
-    
-    with col2:
-        st.subheader("🇬🇧 Inglese")
-        edited_english_text = st.text_area(
-            "Testo inglese",
-            value=english_text,
-            key="transcript_english_box",
-            height=400
-        )
-    
-    # Pulsanti per salvare i transcript
-    if st.button("💾 Salva Entrambi i Transcript"):
-        try:
-            # Salva su Google Drive
-            from drive_manager import get_drive_service, create_folder_if_not_exists
-            
-            service = get_drive_service()
-            
-            # ID della cartella principale
-            main_folder_id = "1w9P2oiRfFgsOOj82V7xOruhjnl-APCCi"
-            
-            # Crea la cartella dell'appartamento se non esiste
-            apartment_folder_id = create_folder_if_not_exists(service, main_folder_id, selected_apartment)
-            if not apartment_folder_id:
-                st.error("❌ Errore nella creazione della cartella appartamento")
-                st.stop()
-            
-            # Crea la cartella del tipo video se non esiste
-            video_type_folder_id = create_folder_if_not_exists(service, apartment_folder_id, selected_video_type)
-            if not video_type_folder_id:
-                st.error("❌ Errore nella creazione della cartella tipo video")
-                st.stop()
-            
-            # Carica il file su Drive
-            from googleapiclient.http import MediaIoBaseUpload
-            import io
-            
-            # Salva transcript italiano
-            filename_it = f"Istruzioni_{selected_video_type}_{selected_apartment}_ita.txt"
-            file_metadata_it = {
-                'name': filename_it,
-                'parents': [video_type_folder_id]
-            }
-            
-            file_content_it = io.BytesIO(edited_italian_text.encode('utf-8'))
-            media_it = MediaIoBaseUpload(file_content_it, mimetype='text/plain', resumable=True)
-            
-            file_it = service.files().create(
-                body=file_metadata_it,
-                media_body=media_it,
-                fields='id,webViewLink'
-            ).execute()
-            
-            # Rendi il file pubblico
-            service.permissions().create(
-                fileId=file_it['id'],
-                body={'type': 'anyone', 'role': 'reader'},
-                fields='id'
-            ).execute()
-            
-            file_link_it = file_it['webViewLink']
-            
-            # Salva transcript inglese
-            filename_en = f"Istruzioni_{selected_video_type}_{selected_apartment}_en.txt"
-            file_metadata_en = {
-                'name': filename_en,
-                'parents': [video_type_folder_id]
-            }
-            
-            file_content_en = io.BytesIO(edited_english_text.encode('utf-8'))
-            media_en = MediaIoBaseUpload(file_content_en, mimetype='text/plain', resumable=True)
-            
-            file_en = service.files().create(
-                body=file_metadata_en,
-                media_body=media_en,
-                fields='id,webViewLink'
-            ).execute()
-            
-            # Rendi il file pubblico
-            service.permissions().create(
-                fileId=file_en['id'],
-                body={'type': 'anyone', 'role': 'reader'},
-                fields='id'
-            ).execute()
-            
-            file_link_en = file_en['webViewLink']
-            
-            st.success(f"✅ Entrambi i transcript salvati su Drive!")
-            st.info(f"🇮🇹 Italiano: {filename_it}")
-            st.info(f"🇬🇧 Inglese: {filename_en}")
-            
-            st.session_state.italian_transcript_path = file_link_it
-            st.session_state.english_transcript_path = file_link_en
-            
-        except Exception as e:
-            st.error(f"❌ Errore nel salvataggio dei transcript: {str(e)}")
 
 # Footer
 st.markdown("---")
