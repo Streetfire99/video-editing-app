@@ -48,7 +48,7 @@ from data_manager import (
 )
 
 # Importa le funzioni per Google Drive
-from drive_manager import upload_video_to_drive, upload_manual_to_drive, add_tracking_entry
+from drive_manager import upload_video_to_drive, add_tracking_entry
 
 def create_session_temp_file(prefix, suffix):
     """Crea un file temporaneo unico per questa sessione"""
