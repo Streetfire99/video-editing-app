@@ -196,6 +196,15 @@ IMPORTANTE:
 - Traduci fedelmente mantenendo la stessa struttura
 - NON aggiungere "English Translation:" o altri prefissi
 - Restituisci SOLO la traduzione numerata
+- Crea frasi COMPLETE e COERENTI, non spezzate
+- Ogni punto deve essere una frase completa e comprensibile
+
+Esempio di traduzione corretta:
+1. Locate the boiler under the washing machine in the main room
+2. Ensure the boiler is always turned on and connected to the socket
+3. Check that the boiler displays a blue light, indicating it is working
+4. If the boiler is off, check the electrical panel making sure all sockets are turned on
+5. If the water runs out, wait for the boiler to recharge for 20-30 minutes
 
 Traduzione in inglese:"""
         
@@ -522,10 +531,30 @@ if current_phase == 'generate':
             )
             
             if result['success']:
-                # Salva sottotitoli nel video
+                # Salva sottotitoli nel video con prefissi
+                segments_it = result.get('segments', [])
+                segments_en = result.get('segments_en', [])
+                
+                # Aggiungi prefissi ai segmenti italiani
+                for segment in segments_it:
+                    if 'text' in segment and not segment['text'].startswith('[IT]'):
+                        segment['text'] = f"[IT] {segment['text']}"
+                
+                # Aggiungi prefissi ai segmenti inglesi
+                for segment in segments_en:
+                    if isinstance(segment, dict) and 'text' in segment and not segment['text'].startswith('[EN]'):
+                        segment['text'] = f"[EN] {segment['text']}"
+                    elif isinstance(segment, tuple) and len(segment) > 2:
+                        # Se è una tuple, converti in dizionario con prefisso
+                        segments_en[segments_en.index(segment)] = {
+                            'start': segment[0],
+                            'end': segment[1],
+                            'text': f"[EN] {segment[2]}"
+                        }
+                
                 video['subtitles'] = {
-                    'it': result.get('segments', []),
-                    'en': result.get('segments_en', [])
+                    'it': segments_it,
+                    'en': segments_en
                 }
                 video['subtitles_data'] = result
                 video['output_dir'] = output_dir
