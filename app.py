@@ -376,7 +376,7 @@ if 'bulk_processing' not in st.session_state:
             'apartment': None,
             'video_type': None
         },
-        'current_phase': 'upload'  # upload, generate, modify, process, results
+        'current_phase': 'upload'  # upload, generate, process, results
     }
 
 # Sezione principale - Upload multiplo
@@ -503,6 +503,17 @@ with st.expander("➕ Aggiungi Nuova Tipologia"):
 # Gestione fasi del bulk processing
 current_phase = st.session_state.bulk_processing['current_phase']
 
+# Controlla se i video hanno già i sottotitoli generati
+videos_have_subtitles = all(
+    video.get('subtitles', {}).get('it') and video.get('subtitles', {}).get('en')
+    for video in st.session_state.bulk_processing['videos']
+)
+
+# Se siamo nella fase 'process' ma i video non hanno sottotitoli, genera prima i sottotitoli
+if current_phase == 'process' and not videos_have_subtitles:
+    st.info("🔄 Generando sottotitoli prima dell'elaborazione video...")
+    current_phase = 'generate'
+
 if current_phase == 'generate':
     st.markdown("---")
     st.header("🎬 Generazione Sottotitoli e Manuali")
@@ -617,8 +628,9 @@ if current_phase == 'generate':
     # Debug: mostra la fase corrente
     st.info(f"🔧 DEBUG: Fase corrente: {current_phase}")
     
-    # Mostra risultati della generazione
-    st.subheader("📋 Risultati Generazione")
+    # Mostra risultati della generazione con possibilità di modifica
+    st.subheader("✏️ Elaborazione Sottotitoli e Manuali")
+    st.info("📝 Modifica i sottotitoli e manuali generati prima di procedere con l'elaborazione video")
     
     for i, video in enumerate(st.session_state.bulk_processing['videos']):
         with st.expander(f"🎬 {video['name']} - {video.get('video_type', 'N/A')}"):
@@ -627,82 +639,19 @@ if current_phase == 'generate':
             with col1:
                 st.write("**Sottotitoli Italiani:**")
                 if video['subtitles']['it']:
-                    for j, segment in enumerate(video['subtitles']['it'][:5]):  # Mostra primi 5
-                        st.write(f"{j+1}. {segment.get('text', '')}")
-                    if len(video['subtitles']['it']) > 5:
-                        st.write(f"... e altri {len(video['subtitles']['it']) - 5} segmenti")
-                else:
-                    st.write("❌ Nessun sottotitolo generato")
-            
-                with col2:
-                    st.write("**Sottotitoli Inglesi:**")
-                    if video['subtitles']['en']:
-                        for j, segment in enumerate(video['subtitles']['en'][:5]):  # Mostra primi 5
-                            # Gestisci sia il formato dizionario che tuple
-                            if isinstance(segment, dict):
-                                text = segment.get('text', '')
-                            else:
-                                # Se è una tuple (start_time, end_time, text)
-                                text = segment[2] if len(segment) > 2 else ''
-                            st.write(f"{j+1}. {text}")
-                        if len(video['subtitles']['en']) > 5:
-                            st.write(f"... e altri {len(video['subtitles']['en']) - 5} segmenti")
-                    else:
-                        st.write("❌ Nessun sottotitolo generato")
-            
-            st.write("**Manuale Italiano:**")
-            st.text_area("Manuale IT", value=video['manuals']['it'], height=100, disabled=True, key=f"manual_it_display_{i}", label_visibility="collapsed")
-            
-            st.write("**Manuale Inglese:**")
-            st.text_area("Manuale EN", value=video['manuals']['en'], height=100, disabled=True, key=f"manual_en_display_{i}", label_visibility="collapsed")
-    
-    # Pulsanti per il prossimo passo
-    st.markdown("---")
-    st.subheader("🎯 Prossimo Passo")
-    st.info("📝 Scegli come procedere con i sottotitoli e manuali generati:")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        if st.button("✏️ Modifica Sottotitoli e Manuali", type="primary", use_container_width=True):
-            st.session_state.bulk_processing['current_phase'] = 'modify'
-            st.rerun()
-    
-    with col2:
-        if st.button("🚀 Elabora Video Direttamente", type="secondary", use_container_width=True):
-            st.session_state.bulk_processing['current_phase'] = 'process'
-            st.rerun()
-
-elif current_phase == 'modify':
-    st.markdown("---")
-    st.header("✏️ Modifica Sottotitoli e Manuali")
-    
-    # Debug: mostra la fase corrente
-    st.info(f"🔧 DEBUG: Fase corrente: {current_phase}")
-    
-    # Crea tab per ogni video
-    if st.session_state.bulk_processing['videos']:
-        tab_names = [f"🎬 {video['name']}" for video in st.session_state.bulk_processing['videos']]
-        tabs = st.tabs(tab_names)
-        
-        for i, (video, tab) in enumerate(zip(st.session_state.bulk_processing['videos'], tabs)):
-            with tab:
-                st.subheader(f"Modifica: {video['name']}")
-                
-                # Modifica sottotitoli
-                st.write("**Sottotitoli Italiani:**")
-                if video['subtitles']['it']:
                     for j, segment in enumerate(video['subtitles']['it']):
                         edited_text = st.text_area(
                             f"IT {j+1}",
                             value=segment.get('text', ''),
                             key=f"it_{i}_{j}",
-                            height=60
+                            height=60,
+                            label_visibility="collapsed"
                         )
                         video['subtitles']['it'][j]['text'] = edited_text
                 else:
-                    st.warning("❌ Nessun sottotitolo italiano disponibile per la modifica")
-                
+                    st.write("❌ Nessun sottotitolo generato")
+            
+            with col2:
                 st.write("**Sottotitoli Inglesi:**")
                 if video['subtitles']['en']:
                     for j, segment in enumerate(video['subtitles']['en']):
@@ -717,7 +666,8 @@ elif current_phase == 'modify':
                             f"EN {j+1}",
                             value=current_text,
                             key=f"en_{i}_{j}",
-                            height=60
+                            height=60,
+                            label_visibility="collapsed"
                         )
                         
                         # Aggiorna il segmento nel formato corretto
@@ -731,38 +681,42 @@ elif current_phase == 'modify':
                                 'text': edited_text
                             }
                 else:
-                    st.warning("❌ Nessun sottotitolo inglese disponibile per la modifica")
-                
-                # Modifica manuali
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.write("**Manuale Italiano:**")
-                    video['manuals']['it'] = st.text_area(
-                        "Manuale IT",
-                        value=video['manuals']['it'],
-                        key=f"manual_it_{i}",
-                        height=200
-                    )
-                
-                with col2:
-                    st.write("**Manuale Inglese:**")
-                    video['manuals']['en'] = st.text_area(
-                        "Manuale EN",
-                        value=video['manuals']['en'],
-                        key=f"manual_en_{i}",
-                        height=200
-                    )
-        
-        # Pulsante per elaborare tutti i video
-        st.markdown("---")
-        st.subheader("🚀 Elaborazione Video")
-        st.write("Dopo aver modificato i sottotitoli e manuali, clicca qui per elaborare tutti i video:")
-        
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            if st.button("🚀 Elabora Tutti i Video", type="primary", use_container_width=True):
-                st.session_state.bulk_processing['current_phase'] = 'process'
-                st.rerun()
+                    st.write("❌ Nessun sottotitolo generato")
+            
+            # Manuali
+            col1, col2 = st.columns(2)
+            with col1:
+                st.write("**Manuale Italiano:**")
+                video['manuals']['it'] = st.text_area(
+                    "Manuale IT",
+                    value=video['manuals']['it'],
+                    key=f"manual_it_{i}",
+                    height=150,
+                    label_visibility="collapsed"
+                )
+            
+            with col2:
+                st.write("**Manuale Inglese:**")
+                video['manuals']['en'] = st.text_area(
+                    "Manuale EN",
+                    value=video['manuals']['en'],
+                    key=f"manual_en_{i}",
+                    height=150,
+                    label_visibility="collapsed"
+                )
+    
+    # Pulsante unico per elaborare i video
+    st.markdown("---")
+    st.subheader("🚀 Elaborazione Video")
+    st.info("📝 Dopo aver modificato i sottotitoli e manuali, clicca qui per elaborare tutti i video:")
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button("🚀 Elabora Video", type="primary", use_container_width=True):
+            st.session_state.bulk_processing['current_phase'] = 'process'
+            st.rerun()
+
+
 
 elif current_phase == 'process':
     st.markdown("---")

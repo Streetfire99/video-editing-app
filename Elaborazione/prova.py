@@ -148,22 +148,17 @@ Example output:
     print(f"🔧 DEBUG: optimize_transcription - optimized_segments: {len(optimized_segments)}")
     
     # Post-processing: assicurati che ogni testo sia adatto per i sottotitoli
-    print(f"🔧 DEBUG: Post-processing {len(optimized_segments)} segments")
     for i, segment in enumerate(optimized_segments):
-        print(f"🔧 DEBUG: Processing segment {i}: {segment}")
         try:
             if 'text' in segment:
                 # Usa process_subtitle_text per coerenza
                 lines = process_subtitle_text(segment['text'])
                 # Ricombina in un singolo testo (le righe saranno separate da \n nel file SRT)
                 segment['text'] = lines[0] + (f"\n{lines[1]}" if lines[1] else "")
-                print(f"🔧 DEBUG: Processed segment {i} text: {segment['text']}")
             else:
-                print(f"🔧 DEBUG: Segment {i} has no 'text' key: {segment}")
+                print(f"❌ DEBUG: Segment {i} has no 'text' key: {segment}")
         except Exception as e:
             print(f"❌ DEBUG: Error processing segment {i}: {e}")
-            import traceback
-            print(f"❌ DEBUG: Traceback: {traceback.format_exc()}")
             raise
 
     return optimized_segments
@@ -176,15 +171,11 @@ def format_timestamp(seconds):
 
 def process_subtitle_text(text):
     """Processa il testo per i sottotitoli - funzione unificata"""
-    print(f"🔧 DEBUG: process_subtitle_text called with text: '{text}'")
-    
     if not text:
-        print("🔧 DEBUG: Empty text, returning empty lines")
         return ["", ""]
     
     # Pulisci il testo aggressivamente da caratteri problematici
     text = text.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ').strip()
-    print(f"🔧 DEBUG: Cleaned text: '{text}'")
     
     # Rimuovi spazi multipli
     import re
@@ -193,20 +184,12 @@ def process_subtitle_text(text):
     # Rimuovi punti, esclamazioni e domande finali
     text = text.rstrip('.!?')
     
-    # Se il testo è troppo lungo, non troncarlo ma gestirlo in split_text
-    if len(text) > 60:  # Aumentato il limite per evitare troncamenti
-        print(f"🔧 DEBUG: Long text detected: '{text}' (length: {len(text)})")
-        # Non troncare, lascia che split_text gestisca la divisione
-    
     # Usa split_text per garantire sempre 2 righe
     result = split_text(text, max_length=25, max_lines=2)
-    print(f"🔧 DEBUG: split_text result: {result}")
     return result
 
 def split_text(text, max_length=30, max_lines=2):
     """Divide il testo per i sottotitoli - versione migliorata senza troncamenti"""
-    print(f"🔧 DEBUG: split_text input: '{text}' (length: {len(text)})")
-    
     # Se il testo è già abbastanza corto, restituiscilo direttamente
     if len(text) <= max_length:
         return [text, ""]
@@ -258,19 +241,10 @@ def split_text(text, max_length=30, max_lines=2):
     while len(lines) < max_lines:
         lines.append("")
     
-    print(f"🔧 DEBUG: split_text result: {lines}")
     return lines[:max_lines]
 
 def distribute_subtitles(segments, texts):
     """Distribuisce i sottotitoli in modo uniforme"""
-    print(f"🔧 DEBUG: distribute_subtitles - segments: {len(segments)}, texts: {len(texts)}")
-    print(f"🔧 DEBUG: texts type: {type(texts)}")
-    if texts:
-        print(f"🔧 DEBUG: first text type: {type(texts[0])}")
-        print(f"🔧 DEBUG: first text: {texts[0]}")
-        print(f"🔧 DEBUG: texts content: {texts}")
-    else:
-        print("🔧 DEBUG: texts is empty")
     
     # Controlla se la lista è vuota
     if not segments:
@@ -601,12 +575,9 @@ Translate the following Italian text to English, ensuring:
 
 def add_background_music(input_video, music_file, output_video):
     """Aggiunge musica di sottofondo"""
-    print(f"🔧 DEBUG: add_background_music - input: {input_video}, music: {music_file}, output: {output_video}")
     # Usa solo ffmpeg-python
     try:
-        print("🔧 DEBUG: Importing ffmpeg for background music...")
         import ffmpeg
-        print("🔧 DEBUG: ffmpeg imported successfully for background music")
         
         # Verifica che i file esistano
         if not os.path.exists(input_video):
@@ -629,16 +600,11 @@ def add_background_music(input_video, music_file, output_video):
             crf=20,  # Qualità leggermente più bassa per stabilità
             pix_fmt='yuv420p'
         )
-        print("🔧 DEBUG: Running ffmpeg.run for background music...")
-        ffmpeg.run(stream, overwrite_output=True, quiet=True)  # Aggiungi quiet=True per ridurre output
-        print("🔧 DEBUG: Background music added successfully")
+        ffmpeg.run(stream, overwrite_output=True, quiet=True)
     except ImportError as e:
-        print(f"❌ DEBUG: ImportError in add_background_music - {e}")
         raise Exception("ffmpeg-python non è disponibile. Installa ffmpeg-python.")
     except Exception as e:
-        print(f"❌ DEBUG: Unexpected error in add_background_music - {e}")
         # Prova un approccio alternativo senza musica se fallisce
-        print("🔧 DEBUG: Trying alternative approach without music...")
         try:
             import ffmpeg
             input_stream = ffmpeg.input(input_video)
@@ -652,58 +618,39 @@ def add_background_music(input_video, music_file, output_video):
                 pix_fmt='yuv420p'
             )
             ffmpeg.run(stream, overwrite_output=True, quiet=True)
-            print("🔧 DEBUG: Video processed without background music")
         except Exception as e2:
-            print(f"❌ DEBUG: Alternative approach also failed - {e2}")
             raise e
 
 
 
 def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, output_video, italian_height=120, english_height=60):
     """Aggiunge sottotitoli duali al video"""
-    print(f"🔧 DEBUG: add_subtitles_to_video - input: {input_video}, it_subs: {subtitle_file_it}, en_subs: {subtitle_file_en}, output: {output_video}, it_height: {italian_height}, en_height: {english_height}")
     
     # Verifica che i file SRT esistano
     if not os.path.exists(subtitle_file_it):
-        print(f"❌ DEBUG: Italian SRT file NOT found: {subtitle_file_it}")
         raise FileNotFoundError(f"File SRT italiano non trovato: {subtitle_file_it}")
-    else:
-        print(f"✅ DEBUG: Italian SRT file exists: {os.path.getsize(subtitle_file_it)} bytes")
     
     if not os.path.exists(subtitle_file_en):
-        print(f"❌ DEBUG: English SRT file NOT found: {subtitle_file_en}")
         raise FileNotFoundError(f"File SRT inglese non trovato: {subtitle_file_en}")
-    else:
-        print(f"✅ DEBUG: English SRT file exists: {os.path.getsize(subtitle_file_en)} bytes")
     
     try:
-        print("🔧 DEBUG: Importing ffmpeg for subtitles...")
         import ffmpeg
-        print("🔧 DEBUG: ffmpeg imported successfully for subtitles")
         
         # Ottieni informazioni sul video per gestire meglio i codec
         video_info = get_video_info(input_video)
-        print(f"🔧 DEBUG: Video codec detected: {video_info['video_codec'] if video_info else 'unknown'}")
-        
-        # Aggiungi entrambi i sottotitoli in un unico passaggio
-        print("🔧 DEBUG: Adding both subtitles in single pass...")
         
         # Rimuovi il file di output se esiste già
         if os.path.exists(output_video):
             os.remove(output_video)
-            print("🔧 DEBUG: Removed existing output file")
         
         stream = ffmpeg.input(input_video)
         
-        # Ottieni le dimensioni del video per debug
+        # Ottieni le dimensioni del video
         video_width = 478
         video_height = 850
         if video_info and 'width' in video_info and 'height' in video_info:
             video_width = video_info['width']
             video_height = video_info['height']
-            print(f"🔧 DEBUG: Video dimensions: {video_width}x{video_height}")
-        else:
-            print(f"🔧 DEBUG: Using default dimensions: {video_width}x{video_height}")
         
         # METODO SEMPLICE: Usa il filtro subtitles che è più stabile
         # Aggiungi prima i sottotitoli italiani
@@ -717,8 +664,7 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
             crf=18,
             pix_fmt='yuv420p'
         )
-        ffmpeg.run(stream_it, overwrite_output=True)
-        print("🔧 DEBUG: Italian subtitles added successfully")
+        ffmpeg.run(stream_it, overwrite_output=True, quiet=True)
 
         # Poi aggiungi i sottotitoli inglesi al video con sottotitoli italiani
         stream_final = ffmpeg.input('temp_it.mp4')
@@ -732,29 +678,24 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
             crf=18,
             pix_fmt='yuv420p'
         )
-        ffmpeg.run(stream_final, overwrite_output=True)
+        ffmpeg.run(stream_final, overwrite_output=True, quiet=True)
         
         # Pulisci il file temporaneo
         if os.path.exists('temp_it.mp4'):
             os.remove('temp_it.mp4')
-        
-        print("🔧 DEBUG: Both subtitles added successfully")
 
 
             
     except ImportError as e:
-        print(f"❌ DEBUG: ImportError in add_subtitles_to_video - {e}")
         raise Exception("ffmpeg-python non è disponibile. Installa ffmpeg-python.")
     except Exception as e:
-        print(f"❌ DEBUG: Unexpected error in add_subtitles_to_video - {e}")
         # Fallback per video problematici
-        print("🔧 DEBUG: Trying fallback method for problematic video...")
         try:
             import ffmpeg
             # Metodo alternativo: prima converti il video, poi aggiungi i sottotitoli
             stream = ffmpeg.input(input_video)
             stream = ffmpeg.output(stream, "temp_converted.mp4", vcodec='libx264', acodec='aac', preset='fast', crf=25)
-            ffmpeg.run(stream, overwrite_output=True)
+            ffmpeg.run(stream, overwrite_output=True, quiet=True)
     
             # Ora aggiungi i sottotitoli al video convertito
             stream = ffmpeg.input("temp_converted.mp4")
@@ -768,14 +709,12 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
                 crf=18,
                 pix_fmt='yuv420p'
             )
-            ffmpeg.run(stream, overwrite_output=True)
+            ffmpeg.run(stream, overwrite_output=True, quiet=True)
             
             # Rimuovi i file temporanei
             if os.path.exists("temp_converted.mp4"):
                 os.remove("temp_converted.mp4")
-            print("🔧 DEBUG: Fallback method completed successfully")
         except Exception as fallback_error:
-            print(f"❌ DEBUG: Fallback method also failed - {fallback_error}")
             raise e  # Rilancia l'errore originale
 
 def create_fixed_position_ass_file(segments, output_file, language="IT", margin_v=85, video_width=478, video_height=850):
