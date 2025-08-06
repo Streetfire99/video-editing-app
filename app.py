@@ -194,6 +194,8 @@ IMPORTANTE:
 - Mantieni il formato elenco numerato 1., 2., 3., ecc.
 - NON mettere punti alla fine delle istruzioni
 - Traduci fedelmente mantenendo la stessa struttura
+- NON aggiungere "English Translation:" o altri prefissi
+- Restituisci SOLO la traduzione numerata
 
 Traduzione in inglese:"""
         
@@ -216,6 +218,10 @@ Traduzione in inglese:"""
                 instructions = instructions.split("IMPORTANT:")[0].strip()
             if "Traduzione in inglese:" in instructions:
                 instructions = instructions.split("Traduzione in inglese:")[1].strip()
+            if "English Translation:" in instructions:
+                instructions = instructions.split("English Translation:")[1].strip()
+            # Rimuovi eventuali prefissi rimasti
+            instructions = instructions.replace("English Translation:", "").strip()
         
         return instructions
     except Exception as e:

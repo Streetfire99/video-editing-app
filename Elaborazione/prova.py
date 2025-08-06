@@ -1190,6 +1190,10 @@ def generate_subtitles_only(input_video, openai_api_key, output_dir=".", custom_
         srt_it_file = os.path.join(output_dir, "subtitles_it.srt")
         create_srt_file(optimized_segments, srt_it_file, "IT")
         
+        # Leggi i sottotitoli inglesi dal file SRT
+        print("🔧 DEBUG: Reading English subtitles from SRT file...")
+        segments_en = read_srt_file(srt_en_file)
+        
         # Pulisci il file audio temporaneo
         if os.path.exists(audio_file):
             os.remove(audio_file)
@@ -1197,6 +1201,7 @@ def generate_subtitles_only(input_video, openai_api_key, output_dir=".", custom_
         return {
             'success': True,
             'segments': optimized_segments,
+            'segments_en': segments_en,
             'srt_it_file': srt_it_file,
             'srt_en_file': srt_en_file,
             'has_voice': True,
