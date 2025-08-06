@@ -318,7 +318,7 @@ def create_srt_file(segments, output_file, language="IT"):
                 prefix = "[EN] "
             
             # CONTROLLO DIRETTO DEL TESTO - Forza massimo 2 righe
-            max_chars_per_line = 20  # Ridotto per sicurezza
+            max_chars_per_line = 40  # Aumentato per evitare tagli eccessivi
             
             if len(text) > max_chars_per_line:
                 # Dividi in modo intelligente

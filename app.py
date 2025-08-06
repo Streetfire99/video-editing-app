@@ -556,25 +556,8 @@ if current_phase == 'generate':
                 segments_it = result.get('segments', [])
                 segments_en = result.get('segments_en', [])
                 
-                # Aggiungi prefissi ai segmenti italiani
-                for segment in segments_it:
-                    if 'text' in segment and not segment['text'].startswith('[IT]'):
-                        segment['text'] = f"[IT] {segment['text']}"
-                
-                # Aggiungi prefissi ai segmenti inglesi
-                for segment in segments_en:
-                    if isinstance(segment, dict) and 'text' in segment:
-                        # Rimuovi eventuali prefissi esistenti e aggiungi quello corretto
-                        text = segment['text'].replace('[EN] ', '').replace('[IT] ', '')
-                        segment['text'] = f"[EN] {text}"
-                    elif isinstance(segment, tuple) and len(segment) > 2:
-                        # Se è una tuple, converti in dizionario con prefisso
-                        text = segment[2].replace('[EN] ', '').replace('[IT] ', '')
-                        segments_en[segments_en.index(segment)] = {
-                            'start': segment[0],
-                            'end': segment[1],
-                            'text': f"[EN] {text}"
-                        }
+                # Usa i sottotitoli generati così come sono (senza aggiungere prefissi)
+                # I prefissi verranno aggiunti automaticamente da create_srt_file
                 
                 video['subtitles'] = {
                     'it': segments_it,
@@ -635,17 +618,6 @@ if current_phase == 'generate':
     
     # Debug: mostra la fase corrente
     st.info(f"🔧 DEBUG: Fase corrente: {current_phase}")
-    
-    # Se tutti i video hanno sottotitoli, passa automaticamente alla fase 'process'
-    all_videos_have_subtitles = all(
-        video.get('subtitles', {}).get('it') and video.get('subtitles', {}).get('en')
-        for video in st.session_state.bulk_processing['videos']
-    )
-    
-    if all_videos_have_subtitles:
-        st.success("✅ Tutti i video hanno sottotitoli! Passaggio automatico alla fase di elaborazione...")
-        st.session_state.bulk_processing['current_phase'] = 'process'
-        st.rerun()
     
     # Mostra risultati della generazione con possibilità di modifica
     st.subheader("✏️ Elaborazione Sottotitoli e Manuali")
@@ -765,10 +737,35 @@ elif current_phase == 'process':
             temp_srt_en = tempfile.NamedTemporaryFile(mode='w', suffix='.srt', delete=False, encoding='utf-8')
             
             # Scrivi i sottotitoli italiani modificati
-            create_srt_file(video['subtitles']['it'], temp_srt_it.name, "IT")
+            # Assicurati che i segmenti abbiano il formato corretto
+            segments_it_formatted = []
+            for segment in video['subtitles']['it']:
+                if isinstance(segment, dict) and 'start' in segment and 'end' in segment and 'text' in segment:
+                    segments_it_formatted.append(segment)
+                else:
+                    st.error(f"❌ Formato segmento IT non valido: {segment}")
+                    continue
+            
+            create_srt_file(segments_it_formatted, temp_srt_it.name, "IT")
             
             # Scrivi i sottotitoli inglesi modificati
-            create_srt_file(video['subtitles']['en'], temp_srt_en.name, "EN")
+            # Assicurati che i segmenti abbiano il formato corretto
+            segments_en_formatted = []
+            for segment in video['subtitles']['en']:
+                if isinstance(segment, dict) and 'start' in segment and 'end' in segment and 'text' in segment:
+                    segments_en_formatted.append(segment)
+                elif isinstance(segment, tuple) and len(segment) >= 3:
+                    # Converti tuple in dizionario
+                    segments_en_formatted.append({
+                        'start': segment[0],
+                        'end': segment[1],
+                        'text': segment[2]
+                    })
+                else:
+                    st.error(f"❌ Formato segmento EN non valido: {segment}")
+                    continue
+            
+            create_srt_file(segments_en_formatted, temp_srt_en.name, "EN")
             
             # Elabora video con sottotitoli modificati
             result = finalize_video_processing(
