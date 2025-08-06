@@ -39,22 +39,15 @@ def get_openai_client(api_key):
 
 def extract_audio_from_video(input_video, audio_file):
     """Estrae l'audio dal video"""
-    print(f"🔧 DEBUG: extract_audio_from_video - input: {input_video}, output: {audio_file}")
     # Usa solo ffmpeg-python
     try:
-        print("🔧 DEBUG: Importing ffmpeg...")
         import ffmpeg
-        print("🔧 DEBUG: ffmpeg imported successfully")
         stream = ffmpeg.input(input_video)
         stream = ffmpeg.output(stream, audio_file, vn=None, ac=1, ar=16000, acodec='pcm_s16le')
-        print("🔧 DEBUG: Running ffmpeg.run...")
-        ffmpeg.run(stream, overwrite_output=True)
-        print("🔧 DEBUG: ffmpeg.run completed successfully")
+        ffmpeg.run(stream, overwrite_output=True, quiet=True)
     except ImportError as e:
-        print(f"❌ DEBUG: ImportError - {e}")
         raise Exception("ffmpeg-python non è disponibile. Installa ffmpeg-python.")
     except Exception as e:
-        print(f"❌ DEBUG: Unexpected error in extract_audio_from_video - {e}")
         raise e
     return audio_file
 
@@ -136,16 +129,12 @@ Example output:
         raise ValueError("La risposta di OpenAI non è una lista di segmenti")
 
     # Distribuisci i testi ottimizzati sui segmenti originali mantenendo i timestamp
-    print(f"🔧 DEBUG: optimize_transcription - raw_transcription: {len(raw_transcription)}, optimized_texts: {len(optimized_texts)}")
-    
     if original_segments:
         # Usa i segmenti originali per distribuire i testi ottimizzati
         optimized_segments = distribute_subtitles(original_segments, optimized_texts)
     else:
         # Fallback: usa direttamente i testi ottimizzati
         optimized_segments = optimized_texts
-    
-    print(f"🔧 DEBUG: optimize_transcription - optimized_segments: {len(optimized_segments)}")
     
     # Post-processing: assicurati che ogni testo sia adatto per i sottotitoli
     for i, segment in enumerate(optimized_segments):
@@ -158,7 +147,6 @@ Example output:
             else:
                 print(f"❌ DEBUG: Segment {i} has no 'text' key: {segment}")
         except Exception as e:
-            print(f"❌ DEBUG: Error processing segment {i}: {e}")
             raise
 
     return optimized_segments
@@ -643,77 +631,40 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
         if os.path.exists(output_video):
             os.remove(output_video)
         
+        # METODO SEMPLIFICATO: Aggiungi entrambi i sottotitoli in un unico passaggio
         stream = ffmpeg.input(input_video)
-        
-        # Ottieni le dimensioni del video
-        video_width = 478
-        video_height = 850
-        if video_info and 'width' in video_info and 'height' in video_info:
-            video_width = video_info['width']
-            video_height = video_info['height']
-        
-        # METODO SEMPLICE: Usa il filtro subtitles che è più stabile
-        # Aggiungi prima i sottotitoli italiani
-        stream_it = ffmpeg.output(
+        stream = ffmpeg.output(
             stream,
-            'temp_it.mp4',
-            vf=f"subtitles={subtitle_file_it}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height},MarginL=50,MarginR=50'",
-            vcodec='libx264',
-            acodec='aac',
-            preset='medium',
-            crf=18,
-            pix_fmt='yuv420p'
-        )
-        ffmpeg.run(stream_it, overwrite_output=True, quiet=True)
-
-        # Poi aggiungi i sottotitoli inglesi al video con sottotitoli italiani
-        stream_final = ffmpeg.input('temp_it.mp4')
-        stream_final = ffmpeg.output(
-            stream_final,
             output_video,
-            vf=f"subtitles={subtitle_file_en}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height},MarginL=50,MarginR=50'",
+            vf=f"subtitles={subtitle_file_it}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height},MarginL=50,MarginR=50',subtitles={subtitle_file_en}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height},MarginL=50,MarginR=50'",
             vcodec='libx264',
             acodec='aac',
-            preset='medium',
-            crf=18,
+            preset='fast',  # Usa preset veloce per maggiore stabilità
+            crf=20,  # Qualità leggermente più bassa per stabilità
             pix_fmt='yuv420p'
         )
-        ffmpeg.run(stream_final, overwrite_output=True, quiet=True)
         
-        # Pulisci il file temporaneo
-        if os.path.exists('temp_it.mp4'):
-            os.remove('temp_it.mp4')
+        ffmpeg.run(stream, overwrite_output=True, quiet=True)
 
 
             
     except ImportError as e:
         raise Exception("ffmpeg-python non è disponibile. Installa ffmpeg-python.")
     except Exception as e:
-        # Fallback per video problematici
+        # Se il metodo principale fallisce, prova senza sottotitoli
         try:
             import ffmpeg
-            # Metodo alternativo: prima converti il video, poi aggiungi i sottotitoli
             stream = ffmpeg.input(input_video)
-            stream = ffmpeg.output(stream, "temp_converted.mp4", vcodec='libx264', acodec='aac', preset='fast', crf=25)
-            ffmpeg.run(stream, overwrite_output=True, quiet=True)
-    
-            # Ora aggiungi i sottotitoli al video convertito
-            stream = ffmpeg.input("temp_converted.mp4")
             stream = ffmpeg.output(
                 stream,
                 output_video,
-                vf=f"subtitles={subtitle_file_it}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height},MarginL=50,MarginR=50',subtitles={subtitle_file_en}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height},MarginL=50,MarginR=50'",
                 vcodec='libx264',
                 acodec='aac',
-                preset='medium',
-                crf=18,
+                preset='fast',
+                crf=20,
                 pix_fmt='yuv420p'
             )
             ffmpeg.run(stream, overwrite_output=True, quiet=True)
-            
-            # Rimuovi i file temporanei
-            if os.path.exists("temp_converted.mp4"):
-                os.remove("temp_converted.mp4")
         except Exception as fallback_error:
             raise e  # Rilancia l'errore originale
 
@@ -1097,8 +1048,6 @@ def process_video(input_video, music_file, openai_api_key, output_dir=".", custo
 
 def generate_subtitles_only(input_video, openai_api_key, output_dir=".", custom_prompt=None, video_type=None):
     """Genera solo i sottotitoli senza elaborare il video finale"""
-    print(f"🔧 DEBUG: generate_subtitles_only - input: {input_video}, output_dir: {output_dir}")
-    
     try:
         # Inizializza il client OpenAI
         client = get_openai_client(openai_api_key)
@@ -1107,57 +1056,38 @@ def generate_subtitles_only(input_video, openai_api_key, output_dir=".", custom_
         os.makedirs(output_dir, exist_ok=True)
         
         # Estrai l'audio dal video
-        print("🔧 DEBUG: Extracting audio...")
         audio_file = os.path.join(output_dir, "temp_audio.wav")
         extract_audio_from_video(input_video, audio_file)
         
         # Trascrivi l'audio
-        print("🔧 DEBUG: Transcribing audio...")
         transcript = transcribe_audio(audio_file, client)
         
         # Verifica se c'è audio nel video
         if not transcript.segments:
-            print("🔧 DEBUG: No audio segments found")
             return {
                 'success': False,
                 'error': 'Nessun audio rilevato nel video',
                 'has_voice': False
             }
         
-        print(f"🔧 DEBUG: Found {len(transcript.segments)} audio segments")
-        
         # Ottimizza la trascrizione
-        print("🔧 DEBUG: Optimizing transcription...")
         try:
             # Estrai il testo grezzo dai segmenti
             raw_transcription = "\n".join([seg.text for seg in transcript.segments])
-            print(f"🔧 DEBUG: Raw transcription extracted: {len(raw_transcription)} characters")
             
             optimized_segments = optimize_transcription(raw_transcription, client, custom_prompt, video_type, transcript.segments)
-            print(f"🔧 DEBUG: optimize_transcription completed successfully with {len(optimized_segments)} segments")
-        except IndexError as e:
-            print(f"❌ DEBUG: IndexError in optimize_transcription: {e}")
-            import traceback
-            print(f"❌ DEBUG: IndexError traceback: {traceback.format_exc()}")
-            raise
         except Exception as e:
-            print(f"❌ DEBUG: Error in optimize_transcription: {e}")
-            import traceback
-            print(f"❌ DEBUG: Traceback: {traceback.format_exc()}")
             raise
         
         # Traduci i sottotitoli in inglese
-        print("🔧 DEBUG: Translating subtitles...")
         srt_en_file = os.path.join(output_dir, "subtitles_en.srt")
         translate_subtitles(optimized_segments, client, srt_en_file, video_type)
         
         # Crea file SRT italiano
-        print("🔧 DEBUG: Creating Italian SRT file...")
         srt_it_file = os.path.join(output_dir, "subtitles_it.srt")
         create_srt_file(optimized_segments, srt_it_file, "IT")
         
         # Leggi i sottotitoli inglesi dal file SRT
-        print("🔧 DEBUG: Reading English subtitles from SRT file...")
         segments_en_raw = read_srt_file(srt_en_file)
         
         # Converti nel formato corretto (come i segmenti italiani)
@@ -1184,7 +1114,6 @@ def generate_subtitles_only(input_video, openai_api_key, output_dir=".", custom_
         }
         
     except Exception as e:
-        print(f"❌ DEBUG: Error in generate_subtitles_only - {e}")
         return {
             'success': False,
             'error': str(e),
@@ -1193,19 +1122,15 @@ def generate_subtitles_only(input_video, openai_api_key, output_dir=".", custom_
 
 def finalize_video_processing(input_video, srt_it_file, srt_en_file, output_dir, italian_height=120, english_height=60):
     """Completa l'elaborazione del video usando i sottotitoli già generati"""
-    print(f"🔧 DEBUG: finalize_video_processing - input: {input_video}, it_srt: {srt_it_file}, en_srt: {srt_en_file}")
-    
     try:
         # Percorso del file musica
         music_file = os.path.join("Elaborazione", "audio.mp3")
-        
+
         # Aggiungi musica di sottofondo
-        print("🔧 DEBUG: Adding background music...")
         video_with_music = os.path.join(output_dir, "video_with_music.mp4")
         add_background_music(input_video, music_file, video_with_music)
-        
+
         # Aggiungi sottotitoli
-        print("🔧 DEBUG: Adding subtitles...")
         final_video = os.path.join(output_dir, "final_video.mp4")
         add_subtitles_to_video(
             input_video=video_with_music,
@@ -1215,16 +1140,15 @@ def finalize_video_processing(input_video, srt_it_file, srt_en_file, output_dir,
             italian_height=italian_height,
             english_height=english_height
         )
-        
+
         return {
             'success': True,
             'video_with_music': video_with_music,
             'final_video': final_video,
             'has_voice': True
         }
-        
+
     except Exception as e:
-        print(f"❌ DEBUG: Error in finalize_video_processing - {e}")
         return {
             'success': False,
             'error': str(e),

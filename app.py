@@ -503,15 +503,17 @@ with st.expander("➕ Aggiungi Nuova Tipologia"):
 # Gestione fasi del bulk processing
 current_phase = st.session_state.bulk_processing['current_phase']
 
-# Controlla se i video hanno già i sottotitoli generati
-videos_have_subtitles = all(
-    video.get('subtitles', {}).get('it') and video.get('subtitles', {}).get('en')
-    for video in st.session_state.bulk_processing['videos']
-)
+# Controlla quali video hanno già i sottotitoli generati
+videos_needing_subtitles = []
+for video in st.session_state.bulk_processing['videos']:
+    has_it_subtitles = video.get('subtitles', {}).get('it')
+    has_en_subtitles = video.get('subtitles', {}).get('en')
+    if not (has_it_subtitles and has_en_subtitles):
+        videos_needing_subtitles.append(video)
 
-# Se siamo nella fase 'process' ma i video non hanno sottotitoli, genera prima i sottotitoli
-if current_phase == 'process' and not videos_have_subtitles:
-    st.info("🔄 Generando sottotitoli prima dell'elaborazione video...")
+# Se siamo nella fase 'process' ma alcuni video non hanno sottotitoli, genera solo quelli mancanti
+if current_phase == 'process' and videos_needing_subtitles:
+    st.info(f"🔄 Generando sottotitoli per {len(videos_needing_subtitles)} video mancanti...")
     current_phase = 'generate'
 
 if current_phase == 'generate':
@@ -526,9 +528,11 @@ if current_phase == 'generate':
     progress_bar = st.progress(0)
     status_text = st.empty()
     
-    total_videos = len(st.session_state.bulk_processing['videos'])
+    # Processa solo i video che hanno bisogno di sottotitoli
+    videos_to_process = videos_needing_subtitles if videos_needing_subtitles else st.session_state.bulk_processing['videos']
+    total_videos = len(videos_to_process)
     
-    for i, video in enumerate(st.session_state.bulk_processing['videos']):
+    for i, video in enumerate(videos_to_process):
         status_text.text(f"🔄 Generando sottotitoli per {video['name']}... ({i+1}/{total_videos})")
         
         try:
