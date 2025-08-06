@@ -597,15 +597,21 @@ if current_phase == 'generate':
                 else:
                     st.write("❌ Nessun sottotitolo generato")
             
-            with col2:
-                st.write("**Sottotitoli Inglesi:**")
-                if video['subtitles']['en']:
-                    for j, segment in enumerate(video['subtitles']['en'][:5]):  # Mostra primi 5
-                        st.write(f"{j+1}. {segment.get('text', '')}")
-                    if len(video['subtitles']['en']) > 5:
-                        st.write(f"... e altri {len(video['subtitles']['en']) - 5} segmenti")
-                else:
-                    st.write("❌ Nessun sottotitolo generato")
+                with col2:
+                    st.write("**Sottotitoli Inglesi:**")
+                    if video['subtitles']['en']:
+                        for j, segment in enumerate(video['subtitles']['en'][:5]):  # Mostra primi 5
+                            # Gestisci sia il formato dizionario che tuple
+                            if isinstance(segment, dict):
+                                text = segment.get('text', '')
+                            else:
+                                # Se è una tuple (start_time, end_time, text)
+                                text = segment[2] if len(segment) > 2 else ''
+                            st.write(f"{j+1}. {text}")
+                        if len(video['subtitles']['en']) > 5:
+                            st.write(f"... e altri {len(video['subtitles']['en']) - 5} segmenti")
+                    else:
+                        st.write("❌ Nessun sottotitolo generato")
             
             st.write("**Manuale Italiano:**")
             st.text_area("", value=video['manuals']['it'], height=100, disabled=True, key=f"manual_it_display_{i}")
@@ -648,13 +654,30 @@ elif current_phase == 'modify':
                 st.write("**Sottotitoli Inglesi:**")
                 if video['subtitles']['en']:
                     for j, segment in enumerate(video['subtitles']['en']):
+                        # Gestisci sia il formato dizionario che tuple
+                        if isinstance(segment, dict):
+                            current_text = segment.get('text', '')
+                        else:
+                            # Se è una tuple (start_time, end_time, text)
+                            current_text = segment[2] if len(segment) > 2 else ''
+                        
                         edited_text = st.text_area(
                             f"EN {j+1}",
-                            value=segment.get('text', ''),
+                            value=current_text,
                             key=f"en_{i}_{j}",
                             height=60
                         )
-                        video['subtitles']['en'][j]['text'] = edited_text
+                        
+                        # Aggiorna il segmento nel formato corretto
+                        if isinstance(segment, dict):
+                            video['subtitles']['en'][j]['text'] = edited_text
+                        else:
+                            # Se era una tuple, converti in dizionario
+                            video['subtitles']['en'][j] = {
+                                'start': segment[0],
+                                'end': segment[1],
+                                'text': edited_text
+                            }
                 else:
                     st.warning("❌ Nessun sottotitolo inglese disponibile per la modifica")
                 
