@@ -377,10 +377,9 @@ if 'bulk_processing' not in st.session_state:
     st.session_state.bulk_processing = {
         'videos': [],
         'global_config': {
-            'apartment': None,
-            'video_type': None
+            'apartment': None
         },
-        'current_phase': 'upload'  # upload, generate, process, results
+        'current_phase': 'upload'  # upload, generate_edit, process, results
     }
 
 # Sezione principale - Upload multiplo
@@ -481,7 +480,7 @@ if st.session_state.bulk_processing['videos']:
             
             # Pulsante per generare sottotitoli e manuali
             if st.button("🎬 Genera Sottotitoli e Manuali per Tutti i Video", type="primary"):
-                st.session_state.bulk_processing['current_phase'] = 'generate'
+                st.session_state.bulk_processing['current_phase'] = 'generate_edit'
                 st.rerun()
         else:
             st.warning("⚠️ Seleziona una tipologia per tutti i video prima di procedere")
@@ -507,121 +506,105 @@ with st.expander("➕ Aggiungi Nuova Tipologia"):
 # Gestione fasi del bulk processing
 current_phase = st.session_state.bulk_processing['current_phase']
 
-# Controlla quali video hanno già i sottotitoli generati
-videos_needing_subtitles = []
-for video in st.session_state.bulk_processing['videos']:
-    has_it_subtitles = video.get('subtitles', {}).get('it')
-    has_en_subtitles = video.get('subtitles', {}).get('en')
-    if not (has_it_subtitles and has_en_subtitles):
-        videos_needing_subtitles.append(video)
-
-# Se siamo nella fase 'process' ma alcuni video non hanno sottotitoli, genera solo quelli mancanti
-if current_phase == 'process' and videos_needing_subtitles:
-    st.info(f"🔄 Generando sottotitoli per {len(videos_needing_subtitles)} video mancanti...")
-    current_phase = 'generate'
-
-if current_phase == 'generate':
+if current_phase == 'generate_edit':
     st.markdown("---")
-    st.header("🎬 Generazione Sottotitoli e Manuali")
+    st.header("🎬 Generazione e Modifica Sottotitoli")
     
     if not openai_api_key:
         st.error("❌ Inserisci la tua OpenAI API Key")
         st.stop()
     
-    # Progress bar per la generazione
-    progress_bar = st.progress(0)
-    status_text = st.empty()
+    # Controlla se i sottotitoli sono già stati generati
+    videos_with_subtitles = []
+    videos_needing_generation = []
     
-    # Processa solo i video che hanno bisogno di sottotitoli
-    videos_to_process = videos_needing_subtitles if videos_needing_subtitles else st.session_state.bulk_processing['videos']
-    total_videos = len(videos_to_process)
+    for video in st.session_state.bulk_processing['videos']:
+        has_subtitles = video.get('subtitles', {}).get('it') and video.get('subtitles', {}).get('en')
+        if has_subtitles:
+            videos_with_subtitles.append(video)
+        else:
+            videos_needing_generation.append(video)
     
-    for i, video in enumerate(videos_to_process):
-        status_text.text(f"🔄 Generando sottotitoli per {video['name']}... ({i+1}/{total_videos})")
+    # Genera sottotitoli per i video che ne hanno bisogno
+    if videos_needing_generation:
+        st.subheader("🔄 Generazione Sottotitoli")
         
-        try:
-            # Crea directory temporanea per questo video
-            output_dir = create_session_temp_dir()
-            
-            # Genera sottotitoli
-            result = generate_subtitles_only(
-                input_video=video['path'],
-                openai_api_key=openai_api_key,
-                output_dir=output_dir,
-                video_type=video['video_type']
-            )
-            
-            if result['success']:
-                # Salva sottotitoli nel video con prefissi
-                segments_it = result.get('segments', [])
-                segments_en = result.get('segments_en', [])
-                
-                # Usa i sottotitoli generati così come sono (senza aggiungere prefissi)
-                # I prefissi verranno aggiunti automaticamente da create_srt_file
-                
-                video['subtitles'] = {
-                    'it': segments_it,
-                    'en': segments_en
-                }
-                video['subtitles_data'] = result
-                video['output_dir'] = output_dir
-                
-                # Debug info
-                st.write(f"🔧 DEBUG: Sottotitoli IT salvati: {len(video['subtitles']['it'])}")
-                st.write(f"🔧 DEBUG: Sottotitoli EN salvati: {len(video['subtitles']['en'])}")
-                
-                # Genera manuali usando la trascrizione
-                try:
-                    # Estrai il testo dalla trascrizione per creare i manuali
-                    transcription_text = ""
-                    for segment in result.get('segments', []):
-                        transcription_text += segment.get('text', '') + " "
-                    
-                    # Genera manuale italiano
-                    manual_it = create_instructions_from_transcription(
-                        transcription_text, 
-                        video['name'], 
-                        "italiano",
-                        openai_api_key
-                    )
-                    
-                    # Genera manuale inglese
-                    manual_en = create_instructions_from_transcription(
-                        transcription_text, 
-                        video['name'], 
-                        "inglese",
-                        openai_api_key
-                    )
-                    
-                    video['manuals'] = {
-                        'it': manual_it or f"Manuale italiano per {video['name']}",
-                        'en': manual_en or f"English manual for {video['name']}"
-                    }
-                except Exception as e:
-                    st.error(f"❌ Errore generazione manuali per {video['name']}: {str(e)}")
-                    video['manuals'] = {
-                        'it': f"Manuale italiano per {video['name']}",
-                        'en': f"English manual for {video['name']}"
-                    }
-                
-                st.success(f"✅ {video['name']} - Sottotitoli e manuali generati!")
-            else:
-                st.error(f"❌ {video['name']} - Errore: {result.get('error', 'Errore sconosciuto')}")
-                
-        except Exception as e:
-            st.error(f"❌ {video['name']} - Errore: {str(e)}")
+        # Progress bar per la generazione
+        progress_bar = st.progress(0)
+        status_text = st.empty()
         
-        # Aggiorna progress bar
-        progress_bar.progress((i + 1) / total_videos)
+        for i, video in enumerate(videos_needing_generation):
+            status_text.text(f"🔄 Generando sottotitoli per {video['name']}... ({i+1}/{len(videos_needing_generation)})")
+            
+            try:
+                # Crea directory temporanea per questo video
+                output_dir = create_session_temp_dir()
+                
+                # Genera sottotitoli
+                result = generate_subtitles_only(
+                    input_video=video['path'],
+                    openai_api_key=openai_api_key,
+                    output_dir=output_dir,
+                    video_type=video['video_type']
+                )
+                
+                if result['success']:
+                    segments_it = result.get('segments', [])
+                    segments_en = result.get('segments_en', [])
+                    
+                    video['subtitles'] = {
+                        'it': segments_it,
+                        'en': segments_en
+                    }
+                    video['subtitles_data'] = result
+                    video['output_dir'] = output_dir
+                    
+                    # Genera manuali
+                    try:
+                        transcription_text = ""
+                        for segment in result.get('segments', []):
+                            transcription_text += segment.get('text', '') + " "
+                        
+                        manual_it = create_instructions_from_transcription(
+                            transcription_text, 
+                            video['name'], 
+                            "italiano",
+                            openai_api_key
+                        )
+                        
+                        manual_en = create_instructions_from_transcription(
+                            transcription_text, 
+                            video['name'], 
+                            "inglese",
+                            openai_api_key
+                        )
+                        
+                        video['manuals'] = {
+                            'it': manual_it or f"Manuale italiano per {video['name']}",
+                            'en': manual_en or f"English manual for {video['name']}"
+                        }
+                    except Exception as e:
+                        st.error(f"❌ Errore generazione manuali per {video['name']}: {str(e)}")
+                        video['manuals'] = {
+                            'it': f"Manuale italiano per {video['name']}",
+                            'en': f"English manual for {video['name']}"
+                        }
+                    
+                    st.success(f"✅ {video['name']} - Sottotitoli e manuali generati!")
+                else:
+                    st.error(f"❌ {video['name']} - Errore: {result.get('error', 'Errore sconosciuto')}")
+                    
+            except Exception as e:
+                st.error(f"❌ {video['name']} - Errore: {str(e)}")
+            
+            # Aggiorna progress bar
+            progress_bar.progress((i + 1) / len(videos_needing_generation))
+        
+        status_text.text("✅ Generazione completata!")
     
-    status_text.text("✅ Generazione completata!")
-    
-    # Debug: mostra la fase corrente
-    st.info(f"🔧 DEBUG: Fase corrente: {current_phase}")
-    
-    # Mostra risultati della generazione con possibilità di modifica
-    st.subheader("✏️ Elaborazione Sottotitoli e Manuali")
-    st.info("📝 Modifica i sottotitoli e manuali generati prima di procedere con l'elaborazione video")
+    # Sezione modifica sottotitoli
+    st.subheader("✏️ Modifica Sottotitoli e Manuali")
+    st.info("📝 Modifica i sottotitoli e manuali prima di procedere con l'elaborazione video")
     
     for i, video in enumerate(st.session_state.bulk_processing['videos']):
         with st.expander(f"🎬 {video['name']} - {video.get('video_type', 'N/A')}"):
@@ -646,11 +629,9 @@ if current_phase == 'generate':
                 st.write("**Sottotitoli Inglesi:**")
                 if video['subtitles']['en']:
                     for j, segment in enumerate(video['subtitles']['en']):
-                        # Gestisci sia il formato dizionario che tuple
                         if isinstance(segment, dict):
                             current_text = segment.get('text', '')
                         else:
-                            # Se è una tuple (start_time, end_time, text)
                             current_text = segment[2] if len(segment) > 2 else ''
                         
                         edited_text = st.text_area(
@@ -661,11 +642,9 @@ if current_phase == 'generate':
                             label_visibility="collapsed"
                         )
                         
-                        # Aggiorna il segmento nel formato corretto
                         if isinstance(segment, dict):
                             video['subtitles']['en'][j]['text'] = edited_text
                         else:
-                            # Se era una tuple, converti in dizionario
                             video['subtitles']['en'][j] = {
                                 'start': segment[0],
                                 'end': segment[1],
@@ -696,7 +675,7 @@ if current_phase == 'generate':
                     label_visibility="collapsed"
                 )
     
-    # Pulsante unico per elaborare i video
+    # Pulsante per elaborare i video
     st.markdown("---")
     st.subheader("🚀 Elaborazione Video")
     st.info("📝 Dopo aver modificato i sottotitoli e manuali, clicca qui per elaborare tutti i video:")
