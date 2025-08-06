@@ -15,7 +15,7 @@ import json
 SCOPES = ['https://www.googleapis.com/auth/drive']
 
 def get_drive_service():
-    """Ottiene il servizio Google Drive"""
+    """Ottiene il servizio Google Drive per l'account xeniamilano.info@gmail.com"""
     try:
         # Prova prima da Streamlit secrets
         credentials_str = st.secrets.get('GOOGLE_SHEETS_CREDENTIALS')
@@ -45,6 +45,27 @@ def get_drive_service():
     except Exception as e:
         st.error(f"❌ Errore nel caricamento delle credenziali Google Drive: {e}")
         return None
+
+def make_file_public_with_editor_permissions(service, file_id):
+    """Rende il file pubblico con ruolo Editor per chiunque"""
+    try:
+        # Crea un permesso pubblico con ruolo Editor
+        permission = {
+            'type': 'anyone',
+            'role': 'writer',  # 'writer' = Editor in Google Drive
+            'allowFileDiscovery': True
+        }
+        
+        service.permissions().create(
+            fileId=file_id,
+            body=permission,
+            fields='id'
+        ).execute()
+        
+        return True
+    except Exception as e:
+        st.error(f"❌ Errore nel rendere pubblico il file: {e}")
+        return False
 
 def create_folder_if_not_exists(service, parent_folder_id, folder_name):
     """Crea una cartella se non esiste già"""
@@ -104,10 +125,71 @@ def upload_video_to_drive(video_path, apartment_name, video_type):
         media = MediaFileUpload(video_path, mimetype='video/mp4', resumable=True)
         file = service.files().create(body=file_metadata, media_body=media, fields='id,webViewLink').execute()
         
+        file_id = file.get('id')
+        
+        # Rendi il file pubblico con ruolo Editor
+        if make_file_public_with_editor_permissions(service, file_id):
+            print(f"✅ File {file_id} reso pubblico con ruolo Editor")
+        else:
+            print(f"⚠️ Impossibile rendere pubblico il file {file_id}")
+        
         return file.get('webViewLink')
         
     except HttpError as error:
         st.error(f'Errore nel caricamento su Drive: {error}')
+        return None
+
+def upload_manual_to_drive(manual_content, filename, apartment_name, video_type):
+    """Carica un manuale su Google Drive con permessi pubblici"""
+    try:
+        service = get_drive_service()
+        
+        # ID della cartella principale
+        main_folder_id = "1w9P2oiRfFgsOOj82V7xOruhjnl-APCCi"
+        
+        # Crea cartella appartamento se non esiste
+        apartment_folder_id = create_folder_if_not_exists(service, main_folder_id, apartment_name)
+        if not apartment_folder_id:
+            return None
+        
+        # Crea cartella tipologia video se non esiste
+        type_folder_id = create_folder_if_not_exists(service, apartment_folder_id, video_type)
+        if not type_folder_id:
+            return None
+        
+        # Carica il manuale
+        file_metadata = {
+            'name': filename,
+            'parents': [type_folder_id]
+        }
+        
+        # Crea il file temporaneo
+        import tempfile
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as temp_file:
+            temp_file.write(manual_content)
+            temp_file_path = temp_file.name
+        
+        try:
+            media = MediaFileUpload(temp_file_path, mimetype='text/plain', resumable=True)
+            file = service.files().create(body=file_metadata, media_body=media, fields='id,webViewLink').execute()
+            
+            file_id = file.get('id')
+            
+            # Rendi il file pubblico con ruolo Editor
+            if make_file_public_with_editor_permissions(service, file_id):
+                print(f"✅ Manuale {file_id} reso pubblico con ruolo Editor")
+            else:
+                print(f"⚠️ Impossibile rendere pubblico il manuale {file_id}")
+            
+            return file.get('webViewLink')
+            
+        finally:
+            # Pulisci il file temporaneo
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+        
+    except HttpError as error:
+        st.error(f'Errore nel caricamento del manuale su Drive: {error}')
         return None
 
 def load_tracking_csv():
