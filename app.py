@@ -614,6 +614,9 @@ if current_phase == 'generate':
     
     status_text.text("✅ Generazione completata!")
     
+    # Debug: mostra la fase corrente
+    st.info(f"🔧 DEBUG: Fase corrente: {current_phase}")
+    
     # Mostra risultati della generazione
     st.subheader("📋 Risultati Generazione")
     
@@ -648,19 +651,34 @@ if current_phase == 'generate':
                         st.write("❌ Nessun sottotitolo generato")
             
             st.write("**Manuale Italiano:**")
-            st.text_area("", value=video['manuals']['it'], height=100, disabled=True, key=f"manual_it_display_{i}")
+            st.text_area("Manuale IT", value=video['manuals']['it'], height=100, disabled=True, key=f"manual_it_display_{i}", label_visibility="collapsed")
             
             st.write("**Manuale Inglese:**")
-            st.text_area("", value=video['manuals']['en'], height=100, disabled=True, key=f"manual_en_display_{i}")
+            st.text_area("Manuale EN", value=video['manuals']['en'], height=100, disabled=True, key=f"manual_en_display_{i}", label_visibility="collapsed")
     
-    # Pulsante per passare alla fase di modifica
-    if st.button("✏️ Modifica Sottotitoli e Manuali", type="primary"):
-        st.session_state.bulk_processing['current_phase'] = 'modify'
-        st.rerun()
+    # Pulsanti per il prossimo passo
+    st.markdown("---")
+    st.subheader("🎯 Prossimo Passo")
+    st.info("📝 Scegli come procedere con i sottotitoli e manuali generati:")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("✏️ Modifica Sottotitoli e Manuali", type="primary", use_container_width=True):
+            st.session_state.bulk_processing['current_phase'] = 'modify'
+            st.rerun()
+    
+    with col2:
+        if st.button("🚀 Elabora Video Direttamente", type="secondary", use_container_width=True):
+            st.session_state.bulk_processing['current_phase'] = 'process'
+            st.rerun()
 
 elif current_phase == 'modify':
     st.markdown("---")
     st.header("✏️ Modifica Sottotitoli e Manuali")
+    
+    # Debug: mostra la fase corrente
+    st.info(f"🔧 DEBUG: Fase corrente: {current_phase}")
     
     # Crea tab per ogni video
     if st.session_state.bulk_processing['videos']:
