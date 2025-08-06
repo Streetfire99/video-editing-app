@@ -737,9 +737,14 @@ elif current_phase == 'modify':
         
         # Pulsante per elaborare tutti i video
         st.markdown("---")
-        if st.button("🚀 Elabora Tutti i Video", type="primary"):
-            st.session_state.bulk_processing['current_phase'] = 'process'
-            st.rerun()
+        st.subheader("🚀 Elaborazione Video")
+        st.write("Dopo aver modificato i sottotitoli e manuali, clicca qui per elaborare tutti i video:")
+        
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            if st.button("🚀 Elabora Tutti i Video", type="primary", use_container_width=True):
+                st.session_state.bulk_processing['current_phase'] = 'process'
+                st.rerun()
 
 elif current_phase == 'process':
     st.markdown("---")
