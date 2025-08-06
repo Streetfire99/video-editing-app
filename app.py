@@ -21,16 +21,20 @@ except:
 sys.path.append('Elaborazione')
 
 # Importa le funzioni da prova.py
-from Elaborazione.prova import (
-    process_video, 
-    generate_subtitles_only,
-    finalize_video_processing,
-    get_openai_client, 
-    create_srt_file, 
-    add_subtitles_to_video,
-    format_timestamp,
-    split_text
-)
+try:
+    from prova import (
+        process_video, 
+        generate_subtitles_only,
+        finalize_video_processing,
+        get_openai_client, 
+        create_srt_file, 
+        add_subtitles_to_video,
+        format_timestamp,
+        split_text
+    )
+except ImportError as e:
+    st.error(f"❌ Errore importazione modulo prova: {e}")
+    st.stop()
 
 # Importa le funzioni per YouTube e Drive
 from youtube_manager import upload_to_youtube, check_youtube_setup, get_youtube_status
@@ -632,6 +636,17 @@ if current_phase == 'generate':
     # Debug: mostra la fase corrente
     st.info(f"🔧 DEBUG: Fase corrente: {current_phase}")
     
+    # Se tutti i video hanno sottotitoli, passa automaticamente alla fase 'process'
+    all_videos_have_subtitles = all(
+        video.get('subtitles', {}).get('it') and video.get('subtitles', {}).get('en')
+        for video in st.session_state.bulk_processing['videos']
+    )
+    
+    if all_videos_have_subtitles:
+        st.success("✅ Tutti i video hanno sottotitoli! Passaggio automatico alla fase di elaborazione...")
+        st.session_state.bulk_processing['current_phase'] = 'process'
+        st.rerun()
+    
     # Mostra risultati della generazione con possibilità di modifica
     st.subheader("✏️ Elaborazione Sottotitoli e Manuali")
     st.info("📝 Modifica i sottotitoli e manuali generati prima di procedere con l'elaborazione video")
@@ -734,6 +749,15 @@ elif current_phase == 'process':
     
     for i, video in enumerate(st.session_state.bulk_processing['videos']):
         status_text.text(f"🔄 Elaborando {video['name']}... ({i+1}/{total_videos})")
+        
+        # Controlla se il video è già stato elaborato
+        if video.get('processed_video') and video['processed_video'].get('success'):
+            final_video_path = video['processed_video'].get('final_video')
+            if final_video_path and os.path.exists(final_video_path):
+                st.success(f"✅ {video['name']} - Video già elaborato!")
+                st.write(f"🔧 DEBUG: Video già esistente: {final_video_path}")
+                progress_bar.progress((i + 1) / total_videos)
+                continue
         
         try:
             # Crea file SRT temporanei con i sottotitoli modificati
