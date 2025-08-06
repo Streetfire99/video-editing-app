@@ -71,26 +71,25 @@ def optimize_transcription(raw_transcription, client, custom_prompt=None, video_
 Your task is to optimize the following raw transcription of an instructional video. The video shows a person performing the actions described in the audio. Follow these steps:
 
 1. Keep the text in Italian, as it is the original language.
-2. Write short, complete sentences that describe exactly what is shown in the video.
-3. Each sentence should be self-contained and not reference previous or next actions.
-4. Avoid long explanations or multiple actions in one sentence.
-5. Keep each line under 30 characters to prevent overlap.
-6. Each subtitle should be exactly 2 lines maximum.
-7. NEVER truncate sentences with ellipsis (...).
-8. Write complete, self-contained sentences.
+2. Write COMPLETE sentences that describe exactly what is shown in the video.
+3. Each sentence should be self-contained and describe a single action clearly.
+4. Write sentences that are 8-12 words long - NOT too short, NOT too long.
+5. NEVER truncate sentences with ellipsis (...) or cut them mid-sentence.
+6. Write natural, flowing sentences that make sense on their own.
 7. DO NOT add any prefix to the text - just write the Italian text as is.
 8. DO NOT add periods, exclamation marks, or question marks at the end of sentences.
-9. Provide the output as a JSON array of segments, where each segment has:
-   - text: subtitle text in Italian (complete sentence, ready for subtitles)
+9. The text will be automatically formatted for subtitles later - focus on content quality.
+10. Provide the output as a JSON array of segments, where each segment has:
+    - text: subtitle text in Italian (complete, natural sentence)
 
 Raw transcription:
 {raw_transcription}
 
 Example output:
 [
-  {{"text": "Apri lo sportello"}},
-  {{"text": "Inserisci il bucato"}},
-  {{"text": "Aggiungi il detersivo"}}
+  {{"text": "Apri lo sportello della lavatrice"}},
+  {{"text": "Inserisci il bucato all'interno del cestello"}},
+  {{"text": "Aggiungi il detersivo nel cassetto superiore"}}
 ]
 """
 
@@ -530,9 +529,12 @@ def translate_subtitles(segments, client, output_file, video_type=None):
 Translate the following Italian text to English, ensuring:
 - The translation is clear, concise, and suitable for subtitles.
 - Use an imperative tone, avoiding questions or incomplete sentences.
-- Keep each line under 20 characters to prevent overlap.
+- Write COMPLETE sentences that are 8-12 words long.
+- NEVER truncate sentences with ellipsis (...) or cut them mid-sentence.
+- Write natural, flowing sentences that make sense on their own.
 - IMPORTANT: Always translate to English, never leave any Italian text.
 - DO NOT add any prefix to the translation.
+- The text will be automatically formatted for subtitles later - focus on content quality.
 """
     
     with open(output_file, "w", encoding="utf-8") as srt:
