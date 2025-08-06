@@ -146,6 +146,82 @@ def cleanup_session_state():
         if key in st.session_state:
             del st.session_state[key]
 
+def create_instructions_from_transcription(transcription, video_name, language="italiano", openai_api_key=None):
+    """Crea istruzioni in formato elenco puntato dalla trascrizione"""
+    try:
+        if not openai_api_key:
+            return None
+            
+        client = get_openai_client(openai_api_key)
+        
+        # Se la trascrizione è troppo breve o generica, usa il nome del video
+        if len(transcription) < 50 or "amara" in transcription.lower():
+            return f"Manuale {language} per {video_name}"
+        
+        if language == "italiano":
+            prompt = f"""
+Analizza attentamente questa trascrizione audio e crea istruzioni SPECIFICHE per il contenuto del video.
+
+Video: {video_name}
+Trascrizione: "{transcription}"
+
+IMPORTANTE: 
+- Le istruzioni devono essere SPECIFICHE per il contenuto del video
+- NON creare istruzioni generiche come "accedi al sito" o "seguire le istruzioni"
+- Analizza il contenuto della trascrizione e crea istruzioni concrete
+- Se la trascrizione è troppo breve, deduci il contenuto dal nome del video
+- Massimo 5 punti in formato elenco numerato (1., 2., 3., ecc.)
+- Frasi brevi e concrete
+- NON mettere punti alla fine delle istruzioni
+
+Esempio di istruzioni specifiche (non generiche):
+1. Verifica che la caldaia sia spenta prima di iniziare
+2. Controlla il livello dell'acqua nel serbatoio
+3. Regola la temperatura al valore desiderato
+4. Monitora la pressione durante il funzionamento
+5. Chiudi la valvola principale quando hai finito
+
+Istruzioni specifiche per questo video:
+"""
+        else:  # inglese - traduci da italiano
+            prompt = f"""
+Traduci queste istruzioni italiane in inglese, mantenendo lo stesso formato e struttura:
+
+Istruzioni italiane:
+{transcription}
+
+IMPORTANTE:
+- Mantieni il formato elenco numerato 1., 2., 3., ecc.
+- NON mettere punti alla fine delle istruzioni
+- Traduci fedelmente mantenendo la stessa struttura
+
+Traduzione in inglese:"""
+        
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "Sei un esperto nell'analisi di contenuti video. Crea SEMPRE istruzioni specifiche e concrete basate sul contenuto reale del video. MAI istruzioni generiche o vaghe. Analizza attentamente la trascrizione e deduci il contenuto specifico."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=500,
+            temperature=0.1
+        )
+        
+        instructions = response.choices[0].message.content.strip()
+        
+        # Pulisci il testo rimuovendo il prompt se presente
+        if language == "inglese":
+            # Rimuovi il prompt se presente nel risultato
+            if "IMPORTANT:" in instructions:
+                instructions = instructions.split("IMPORTANT:")[0].strip()
+            if "Traduzione in inglese:" in instructions:
+                instructions = instructions.split("Traduzione in inglese:")[1].strip()
+        
+        return instructions
+    except Exception as e:
+        print(f"❌ Errore creazione istruzioni: {e}")
+        return None
+
 # Esegui pulizia ogni 10 minuti
 if 'last_cleanup' not in st.session_state:
     st.session_state.last_cleanup = time.time()
@@ -271,54 +347,112 @@ with st.sidebar:
     5. **Scarica o carica su YouTube**
     """)
 
-# Inizializza session state
-if 'processed_video' not in st.session_state:
-    st.session_state.processed_video = None
-if 'segments' not in st.session_state:
-    st.session_state.segments = []
-if 'current_video_path' not in st.session_state:
-    st.session_state.current_video_path = None
-if 'subtitles_generated' not in st.session_state:
-    st.session_state.subtitles_generated = False
-if 'subtitles_data' not in st.session_state:
-    st.session_state.subtitles_data = None
+# ============================================================================
+# NUOVO SISTEMA BULK PROCESSING
+# ============================================================================
 
-# Sezione principale
-st.header("📤 Carica Video")
+# Inizializza session state per bulk processing
+if 'bulk_processing' not in st.session_state:
+    st.session_state.bulk_processing = {
+        'videos': [],
+        'global_config': {
+            'apartment': None,
+            'video_type': None
+        },
+        'current_phase': 'upload'  # upload, generate, modify, process, results
+    }
 
-# Upload del video
-uploaded_video = st.file_uploader(
-    "Scegli un file video",
+# Sezione principale - Upload multiplo
+st.header("📤 Carica Video Multipli")
+
+# Upload multiplo di video
+uploaded_videos = st.file_uploader(
+    "Scegli i file video da elaborare",
     type=['mp4', 'avi', 'mov', 'mkv'],
-    help="Formati supportati: MP4, AVI, MOV, MKV"
+    help="Formati supportati: MP4, AVI, MOV, MKV",
+    accept_multiple_files=True
 )
 
-if uploaded_video is not None:
-    # Salva il video temporaneamente con nome unico per la sessione
-    video_path = create_session_temp_file("video", ".mp4")
-    with open(video_path, "wb") as f:
-        f.write(uploaded_video.getvalue())
-    st.session_state.current_video_path = video_path
+# Mostra video caricati
+if uploaded_videos:
+    st.subheader("📋 Video Caricati")
     
-    # Mostra informazioni del video
-    st.success(f"✅ Video caricato: {uploaded_video.name}")
+    # Salva i video e aggiorna session state
+    for uploaded_video in uploaded_videos:
+        # Salva il video temporaneamente
+        video_path = create_session_temp_file(f"video_{uploaded_video.name}", ".mp4")
+        with open(video_path, "wb") as f:
+            f.write(uploaded_video.getvalue())
+        
+        # Aggiungi alla lista se non esiste già
+        video_exists = any(v['name'] == uploaded_video.name for v in st.session_state.bulk_processing['videos'])
+        if not video_exists:
+            st.session_state.bulk_processing['videos'].append({
+                'file': uploaded_video,
+                'name': uploaded_video.name,
+                'path': video_path,
+                'apartment': None,
+                'video_type': None,
+                'subtitles': {'it': [], 'en': []},
+                'manuals': {'it': '', 'en': ''},
+                'processed_video': None,
+                'drive_links': {'video': None, 'manual_it': None, 'manual_en': None},
+                'youtube_link': None
+            })
+    
+    # Mostra lista video
+    for i, video in enumerate(st.session_state.bulk_processing['videos']):
+        col1, col2, col3 = st.columns([3, 1, 1])
+        with col1:
+            st.write(f"**{video['name']}** ({video['file'].size / (1024*1024):.1f} MB)")
+        with col2:
+            st.write(f"🎬 Video")
+        with col3:
+            if st.button("🗑️", key=f"remove_{i}"):
+                st.session_state.bulk_processing['videos'].pop(i)
+                st.rerun()
 
-# Sezione di selezione
-st.header("📋 Configurazione Video")
+# Sezione configurazione globale
+if st.session_state.bulk_processing['videos']:
+    st.markdown("---")
+    st.header("📋 Configurazione Globale")
+    
+    # Selezione appartamento globale
+    selected_apartment = st.selectbox(
+        "🏠 Seleziona Appartamento (valido per tutti i video)",
+        options=[""] + apartments,
+        help="Scegli l'appartamento per cui stai creando i video",
+        key="global_apartment"
+    )
+    
+    # Selezione tipologia video globale
+    selected_video_type = st.selectbox(
+        "🎥 Tipologia Video (valida per tutti i video)",
+        options=[""] + video_types,
+        help="Scegli la tipologia di video che stai creando",
+        key="global_video_type"
+    )
+    
+    # Aggiorna configurazione globale
+    if selected_apartment and selected_video_type:
+        st.session_state.bulk_processing['global_config']['apartment'] = selected_apartment
+        st.session_state.bulk_processing['global_config']['video_type'] = selected_video_type
+        
+        # Aggiorna tutti i video con la configurazione globale
+        for video in st.session_state.bulk_processing['videos']:
+            video['apartment'] = selected_apartment
+            video['video_type'] = selected_video_type
+        
+        st.success(f"✅ Configurazione applicata: **{selected_apartment} - {selected_video_type}**")
+        
+        # Pulsante per generare sottotitoli e manuali
+        if st.button("🎬 Genera Sottotitoli e Manuali per Tutti i Video", type="primary"):
+            st.session_state.bulk_processing['current_phase'] = 'generate'
+            st.rerun()
 
-# Selezione appartamento
-selected_apartment = st.selectbox(
-    "🏠 Seleziona Appartamento",
-    options=[""] + apartments,
-    help="Scegli l'appartamento per cui stai creando il video"
-)
-
-# Selezione tipologia video
-selected_video_type = st.selectbox(
-    "🎥 Tipologia Video",
-    options=[""] + video_types,
-    help="Scegli la tipologia di video che stai creando"
-)
+# ============================================================================
+# GESTIONE FASI BULK PROCESSING
+# ============================================================================
 
 # Campo per aggiungere nuove tipologie
 with st.expander("➕ Aggiungi Nuova Tipologia"):
@@ -334,452 +468,268 @@ with st.expander("➕ Aggiungi Nuova Tipologia"):
             st.success(f"✅ Tipologia '{new_video_type}' aggiunta!")
             st.rerun()
 
-# Verifica che siano state selezionate entrambe le opzioni
-if not selected_apartment or not selected_video_type:
-    st.warning("⚠️ Seleziona sia l'appartamento che la tipologia di video per procedere")
-    st.stop()
+# Gestione fasi del bulk processing
+current_phase = st.session_state.bulk_processing['current_phase']
 
-# Mostra il titolo del video
-video_title = f"{selected_apartment} {selected_video_type}"
-st.success(f"📹 Titolo video: **{video_title}**")
-
-# Pulsante per elaborare (solo se video caricato e selezioni fatte)
-if uploaded_video is not None and selected_apartment and selected_video_type:
-    # Crea directory temporanea per questa sessione
-    output_dir = create_session_temp_dir()
+if current_phase == 'generate':
+    st.markdown("---")
+    st.header("🎬 Generazione Sottotitoli e Manuali")
     
-    col1, col2 = st.columns(2)
+    if not openai_api_key:
+        st.error("❌ Inserisci la tua OpenAI API Key")
+        st.stop()
     
-    with col1:
-        if st.button("🎬 Genera Sottotitoli", type="primary"):
-            if not openai_api_key:
-                st.error("❌ Inserisci la tua OpenAI API Key")
-                st.stop()
+    # Progress bar per la generazione
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    total_videos = len(st.session_state.bulk_processing['videos'])
+    
+    for i, video in enumerate(st.session_state.bulk_processing['videos']):
+        status_text.text(f"🔄 Generando sottotitoli per {video['name']}... ({i+1}/{total_videos})")
+        
+        try:
+            # Crea directory temporanea per questo video
+            output_dir = create_session_temp_dir()
             
-            with st.spinner("🔄 Generazione sottotitoli in corso..."):
+            # Genera sottotitoli
+            result = generate_subtitles_only(
+                input_video=video['path'],
+                openai_api_key=openai_api_key,
+                output_dir=output_dir,
+                video_type=video['video_type']
+            )
+            
+            if result['success']:
+                # Salva sottotitoli nel video
+                video['subtitles'] = {
+                    'it': result.get('segments', []),
+                    'en': result.get('segments_en', [])
+                }
+                video['subtitles_data'] = result
+                video['output_dir'] = output_dir
+                
+                # Genera manuali usando la trascrizione
                 try:
-                    # Genera solo i sottotitoli
-                    result = generate_subtitles_only(
-                        input_video=video_path,
-                        openai_api_key=openai_api_key,
-                        output_dir=output_dir,
-                        video_type=selected_video_type
+                    # Estrai il testo dalla trascrizione per creare i manuali
+                    transcription_text = ""
+                    for segment in result.get('segments', []):
+                        transcription_text += segment.get('text', '') + " "
+                    
+                    # Genera manuale italiano
+                    manual_it = create_instructions_from_transcription(
+                        transcription_text, 
+                        video['name'], 
+                        "italiano",
+                        openai_api_key
                     )
                     
-                    if result['success']:
-                        st.session_state.subtitles_data = result
-                        st.session_state.segments = result.get('segments', [])
-                        st.session_state.subtitles_generated = True
-                        st.success("✅ Sottotitoli generati con successo!")
-                        st.rerun()
-                    else:
-                        st.error(f"❌ Errore durante la generazione: {result.get('error', 'Errore sconosciuto')}")
-                        
+                    # Genera manuale inglese
+                    manual_en = create_instructions_from_transcription(
+                        transcription_text, 
+                        video['name'], 
+                        "inglese",
+                        openai_api_key
+                    )
+                    
+                    video['manuals'] = {
+                        'it': manual_it or f"Manuale italiano per {video['name']}",
+                        'en': manual_en or f"English manual for {video['name']}"
+                    }
                 except Exception as e:
-                    st.error(f"❌ Errore durante la generazione: {str(e)}")
-                    cleanup_session_files()
+                    st.error(f"❌ Errore generazione manuali per {video['name']}: {str(e)}")
+                    video['manuals'] = {
+                        'it': f"Manuale italiano per {video['name']}",
+                        'en': f"English manual for {video['name']}"
+                    }
+                
+                st.success(f"✅ {video['name']} - Sottotitoli e manuali generati!")
+            else:
+                st.error(f"❌ {video['name']} - Errore: {result.get('error', 'Errore sconosciuto')}")
+                
+        except Exception as e:
+            st.error(f"❌ {video['name']} - Errore: {str(e)}")
+        
+        # Aggiorna progress bar
+        progress_bar.progress((i + 1) / total_videos)
     
-    with col2:
-        if st.session_state.subtitles_generated and st.button("🚀 Completa Elaborazione", type="secondary"):
-            with st.spinner("🔄 Completamento elaborazione in corso..."):
-                try:
-                    # Valori di default per l'altezza dei sottotitoli (stessi del file locale)
-                    italian_height = 120
-                    english_height = 60
-                    
-                    # Completa l'elaborazione
-                    result = finalize_video_processing(
-                        input_video=video_path,
-                        srt_it_file=st.session_state.subtitles_data['srt_it_file'],
-                        srt_en_file=st.session_state.subtitles_data['srt_en_file'],
-                        output_dir=output_dir,
-                        italian_height=italian_height,
-                        english_height=english_height
+    status_text.text("✅ Generazione completata!")
+    
+    # Pulsante per passare alla fase di modifica
+    if st.button("✏️ Modifica Sottotitoli e Manuali", type="primary"):
+        st.session_state.bulk_processing['current_phase'] = 'modify'
+        st.rerun()
+
+elif current_phase == 'modify':
+    st.markdown("---")
+    st.header("✏️ Modifica Sottotitoli e Manuali")
+    
+    # Crea tab per ogni video
+    if st.session_state.bulk_processing['videos']:
+        tab_names = [f"🎬 {video['name']}" for video in st.session_state.bulk_processing['videos']]
+        tabs = st.tabs(tab_names)
+        
+        for i, (video, tab) in enumerate(zip(st.session_state.bulk_processing['videos'], tabs)):
+            with tab:
+                st.subheader(f"Modifica: {video['name']}")
+                
+                # Modifica sottotitoli
+                st.write("**Sottotitoli Italiani:**")
+                for j, segment in enumerate(video['subtitles']['it']):
+                    edited_text = st.text_area(
+                        f"IT {j+1}",
+                        value=segment.get('text', ''),
+                        key=f"it_{i}_{j}",
+                        height=60
                     )
-                    
-                    if result['success']:
-                        st.session_state.processed_video = result
-                        st.success("✅ Video elaborato con successo!")
+                    video['subtitles']['it'][j]['text'] = edited_text
+                
+                # Modifica manuali
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.write("**Manuale Italiano:**")
+                    video['manuals']['it'] = st.text_area(
+                        "Manuale IT",
+                        value=video['manuals']['it'],
+                        key=f"manual_it_{i}",
+                        height=200
+                    )
+                
+                with col2:
+                    st.write("**Manuale Inglese:**")
+                    video['manuals']['en'] = st.text_area(
+                        "Manuale EN",
+                        value=video['manuals']['en'],
+                        key=f"manual_en_{i}",
+                        height=200
+                    )
+        
+        # Pulsante per elaborare tutti i video
+        st.markdown("---")
+        if st.button("🚀 Elabora Tutti i Video", type="primary"):
+            st.session_state.bulk_processing['current_phase'] = 'process'
+            st.rerun()
+
+elif current_phase == 'process':
+    st.markdown("---")
+    st.header("🚀 Elaborazione Video")
+    
+    # Progress bar per l'elaborazione
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    total_videos = len(st.session_state.bulk_processing['videos'])
+    
+    for i, video in enumerate(st.session_state.bulk_processing['videos']):
+        status_text.text(f"🔄 Elaborando {video['name']}... ({i+1}/{total_videos})")
+        
+        try:
+            # Elabora video con sottotitoli modificati
+            result = finalize_video_processing(
+                input_video=video['path'],
+                srt_it_file=video['subtitles_data']['srt_it_file'],
+                srt_en_file=video['subtitles_data']['srt_en_file'],
+                output_dir=video['output_dir'],
+                italian_height=120,
+                english_height=60
+            )
+            
+            if result['success']:
+                video['processed_video'] = result
+                st.success(f"✅ {video['name']} - Video elaborato!")
+            else:
+                st.error(f"❌ {video['name']} - Errore: {result.get('error', 'Errore sconosciuto')}")
+                
+        except Exception as e:
+            st.error(f"❌ {video['name']} - Errore: {str(e)}")
+        
+        # Aggiorna progress bar
+        progress_bar.progress((i + 1) / total_videos)
+    
+    status_text.text("✅ Elaborazione completata!")
+    
+    # Pulsante per passare ai risultati
+    if st.button("📊 Visualizza Risultati", type="primary"):
+        st.session_state.bulk_processing['current_phase'] = 'results'
+        st.rerun()
+
+elif current_phase == 'results':
+    st.markdown("---")
+    st.header("📊 Risultati Elaborazione")
+    
+    # Crea tab per ogni video elaborato
+    if st.session_state.bulk_processing['videos']:
+        tab_names = [f"🎬 {video['name']}" for video in st.session_state.bulk_processing['videos']]
+        tabs = st.tabs(tab_names)
+        
+        for i, (video, tab) in enumerate(zip(st.session_state.bulk_processing['videos'], tabs)):
+            with tab:
+                st.subheader(f"Risultati: {video['name']}")
+                
+                if video['processed_video']:
+                    # Mostra video elaborato
+                    if os.path.exists(video['processed_video']['final_video']):
+                        st.video(video['processed_video']['final_video'])
                         
-                        # Mostra il video elaborato
-                        if os.path.exists(result['final_video']):
-                            st.video(result['final_video'])
-                            
-                            # Aggiungi pulsante di download
-                            with open(result['final_video'], "rb") as video_file:
+                        # Pulsanti individuali
+                        col1, col2, col3 = st.columns(3)
+                        
+                        with col1:
+                            with open(video['processed_video']['final_video'], "rb") as video_file:
                                 st.download_button(
-                                    label="📥 Scarica Video Elaborato",
+                                    label="📥 Scarica Video",
                                     data=video_file.read(),
-                                    file_name=f"video_elaborato_{int(time.time())}.mp4",
+                                    file_name=f"{video['name']}_elaborato.mp4",
                                     mime="video/mp4"
                                 )
-                    else:
-                        st.error(f"❌ Errore durante l'elaborazione: {result.get('error', 'Errore sconosciuto')}")
                         
-                except Exception as e:
-                    st.error(f"❌ Errore durante l'elaborazione: {str(e)}")
-                    cleanup_session_files()
-
-# Sezione per modificare i sottotitoli (solo se i sottotitoli sono stati generati)
-if st.session_state.segments and (st.session_state.subtitles_generated or (st.session_state.processed_video and st.session_state.processed_video.get("has_voice", True))):
-    st.markdown("---")
-    st.header("✏️ Modifica Sottotitoli")
-    st.info("Modifica i sottotitoli italiani e inglesi. I sottotitoli inglesi manterranno la stessa durata di quelli italiani.")
-    
-    # Crea le colonne per la tabella
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.write("**Inizio**")
-    with col2:
-        st.write("**Italiano**")
-    with col3:
-        st.write("**Inglese**")
-    with col4:
-        st.write("**Fine**")
-    
-    # Inizializza edited_segments se non esiste
-    if 'edited_segments' not in st.session_state:
-        st.session_state.edited_segments = st.session_state.segments.copy()
-    
-    # Mostra i sottotitoli modificabili
-    for i, segment in enumerate(st.session_state.edited_segments):
-        col1, col2, col3, col4 = st.columns(4)
+                        with col2:
+                            if st.button("☁️ Upload Drive", key=f"drive_{i}"):
+                                # Upload su Drive
+                                pass
+                        
+                        with col3:
+                            if st.button("📺 Upload YouTube", key=f"youtube_{i}"):
+                                # Upload su YouTube
+                                pass
+                    
+                    # Manuali
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.write("**Manuale Italiano:**")
+                        st.text_area("", value=video['manuals']['it'], height=150, disabled=True)
+                        
+                        if st.button("📥 Scarica Manuale IT", key=f"download_it_{i}"):
+                            # Download manuale IT
+                            pass
+                    
+                    with col2:
+                        st.write("**Manuale Inglese:**")
+                        st.text_area("", value=video['manuals']['en'], height=150, disabled=True)
+                        
+                        if st.button("📥 Scarica Manuale EN", key=f"download_en_{i}"):
+                            # Download manuale EN
+                            pass
+        
+        # Pulsanti bulk
+        st.markdown("---")
+        col1, col2, col3 = st.columns(3)
         
         with col1:
-            st.write(format_timestamp(segment['start']))
+            if st.button("📥 Scarica Tutto", type="primary"):
+                # Download di tutti i file
+                pass
         
         with col2:
-            # Campo per il testo italiano
-            edited_text = st.text_area(
-                f"IT {i+1}",
-                value=segment['text'],
-                key=f"it_{i}",
-                height=60
-            )
-            st.session_state.edited_segments[i]['text'] = edited_text
+            if st.button("☁️ Salva Tutto su Drive", type="primary"):
+                # Upload di tutti i file su Drive
+                pass
         
         with col3:
-            # Campo per il testo inglese
-            edited_text_en = st.text_area(
-                f"EN {i+1}",
-                value=segment.get('text_en', ''),
-                key=f"en_{i}",
-                height=60
-            )
-            st.session_state.edited_segments[i]['text_en'] = edited_text_en
-        
-        with col4:
-            st.write(format_timestamp(segment['end']))
-    
-    # Pulsanti per rielaborare con i sottotitoli modificati
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        if st.button("🔄 Rielabora con Sottotitoli Modificati"):
-            with st.spinner("Rielaborazione in corso..."):
-                try:
-                    # Crea i file SRT temporanei
-                    temp_srt_it = tempfile.NamedTemporaryFile(mode='w', suffix='.srt', delete=False)
-                    temp_srt_en = tempfile.NamedTemporaryFile(mode='w', suffix='.srt', delete=False)
-                    
-                    # Scrivi i sottotitoli modificati
-                    create_srt_file(st.session_state.edited_segments, temp_srt_it.name, "IT")
-                    create_srt_file(st.session_state.edited_segments, temp_srt_en.name, "EN")
-                    
-                    # Se il video è già stato elaborato, rielabora con i nuovi sottotitoli
-                    if st.session_state.processed_video:
-                        result = add_subtitles_to_video(
-                            input_video=st.session_state.processed_video['video_with_music'],
-                            subtitle_file_it=temp_srt_it.name,
-                            subtitle_file_en=temp_srt_en.name,
-                            output_video=st.session_state.processed_video['final_video']
-                        )
-                        
-                        st.success("✅ Video rielaborato con successo!")
-                        
-                        # Mostra il video rielaborato
-                        if os.path.exists(st.session_state.processed_video['final_video']):
-                            st.video(st.session_state.processed_video['final_video'])
-                            
-                            # Aggiungi pulsante di download
-                            with open(st.session_state.processed_video['final_video'], "rb") as video_file:
-                                st.download_button(
-                                    label="📥 Scarica Video Elaborato",
-                                    data=video_file.read(),
-                                    file_name=f"video_elaborato_{int(time.time())}.mp4",
-                                    mime="video/mp4"
-                                )
-                    else:
-                        # Aggiorna i file SRT per la prossima elaborazione
-                        st.session_state.subtitles_data['srt_it_file'] = temp_srt_it.name
-                        st.session_state.subtitles_data['srt_en_file'] = temp_srt_en.name
-                        st.success("✅ Sottotitoli aggiornati! Ora puoi completare l'elaborazione.")
-                    
-                    # Pulisci i file temporanei
-                    os.unlink(temp_srt_it.name)
-                    os.unlink(temp_srt_en.name)
-                    
-                except Exception as e:
-                    st.error(f"❌ Errore durante la rielaborazione: {str(e)}")
-    
-    with col2:
-        if st.button("🔄 Rigenera Sottotitoli"):
-            with st.spinner("Rigenerazione sottotitoli in corso..."):
-                try:
-                    # Rigenera i sottotitoli
-                    result = generate_subtitles_only(
-                        input_video=video_path,
-                        openai_api_key=openai_api_key,
-                        output_dir=output_dir,
-                        video_type=selected_video_type
-                    )
-                    
-                    if result['success']:
-                        st.session_state.subtitles_data = result
-                        st.session_state.segments = result.get('segments', [])
-                        st.session_state.edited_segments = st.session_state.segments.copy()
-                        st.success("✅ Sottotitoli rigenerati con successo!")
-                        st.rerun()
-                    else:
-                        st.error(f"❌ Errore durante la rigenerazione: {result.get('error', 'Errore sconosciuto')}")
-                        
-                except Exception as e:
-                    st.error(f"❌ Errore durante la rigenerazione: {str(e)}")
+            if st.button("📺 Upload Tutti su YouTube", type="primary"):
+                # Upload di tutti i video su YouTube
+                pass
 
-# Sezione per personalizzare l'altezza dei sottotitoli - RIMOSSA PER PROBLEMI FFMPEG
-
-
-
-# Sezione per modifiche personalizzate al prompt
-st.markdown("---")
-st.header("✏️ Modifiche personalizzate al prompt")
-
-custom_prompt = st.text_area(
-    "Prompt personalizzato per l'ottimizzazione dei sottotitoli",
-    placeholder="Inserisci un prompt personalizzato per l'ottimizzazione dei sottotitoli...",
-    help="Questo prompt verrà utilizzato per ottimizzare i sottotitoli del video"
-)
-
-# Sezione per l'upload su YouTube
-st.markdown("---")
-st.header("📺 Upload YouTube")
-
-# Controlla lo stato di YouTube
-youtube_status = check_youtube_setup()
-st.info(youtube_status[1])
-
-# Form per l'upload su YouTube
-with st.form("youtube_upload_form"):
-    st.subheader("📤 Carica su YouTube")
-    
-    # Campo per il titolo del video
-    youtube_title = st.text_input(
-        "Titolo del video",
-        value=video_title,
-        help="Titolo del video su YouTube"
-    )
-    
-    # Campo per la privacy
-    privacy_status = st.selectbox(
-        "Privacy",
-        options=["unlisted", "private", "public"],
-        index=0,
-        help="Impostazioni di privacy del video"
-    )
-    
-    # Pulsante per caricare
-    if st.form_submit_button("🚀 Carica su YouTube"):
-        print("🔧 DEBUG: YouTube upload button clicked")
-        print(f"🔧 DEBUG: Video title: {youtube_title}")
-        print(f"🔧 DEBUG: Privacy status: {privacy_status}")
-        
-        # Controlla se c'è un codice di autenticazione in attesa (logica rimossa - ora usa youtube_manager)
-        
-        if youtube_status[0]:
-            print("🔧 DEBUG: YouTube status is OK, starting upload")
-            with st.spinner("Caricamento su YouTube..."):
-                try:
-                    print("🔧 DEBUG: Getting processed video path")
-                    if st.session_state.processed_video and 'final_video' in st.session_state.processed_video:
-                        video_path = st.session_state.processed_video['final_video']
-                        print(f"🔧 DEBUG: Video path: {video_path}")
-                        print(f"🔧 DEBUG: File exists: {os.path.exists(video_path)}")
-                        
-                        if os.path.exists(video_path):
-                            print("🔧 DEBUG: Calling upload_to_youtube")
-                            youtube_link = upload_to_youtube(
-                                video_path=video_path,
-                                title=youtube_title,
-                                privacy_status=privacy_status
-                            )
-                            print(f"🔧 DEBUG: Upload result: {youtube_link}")
-                            
-                            if youtube_link:
-                                st.success("✅ Video caricato su YouTube con successo!")
-                                st.markdown(f"**Link YouTube:** {youtube_link}")
-                                st.session_state.youtube_link = youtube_link
-                            else:
-                                st.error("❌ Errore durante l'upload su YouTube")
-                        else:
-                            st.error("❌ File video non trovato")
-                            print(f"❌ DEBUG: Video file not found at {video_path}")
-                    else:
-                        st.error("❌ Nessun video elaborato disponibile")
-                        print("❌ DEBUG: No processed video in session state")
-                        
-                except Exception as e:
-                    st.error(f"❌ Errore durante l'upload su YouTube: {str(e)}")
-                    print(f"❌ DEBUG: Exception in YouTube upload: {e}")
-        else:
-            print("❌ DEBUG: YouTube status is not OK")
-            st.error("❌ YouTube non configurato correttamente")
-            
-            # Mostra banner di autenticazione se necessario
-            from youtube_manager import get_next_available_account, authenticate_youtube_account
-            next_account = get_next_available_account()
-            if next_account:
-                st.warning("🔐 **Autenticazione YouTube richiesta**")
-                st.info(f"Per caricare video su YouTube, devi autenticare l'account: **{next_account}**")
-                
-                # Inizializza session state per l'autenticazione
-                if 'youtube_auth_account' not in st.session_state:
-                    st.session_state.youtube_auth_account = None
-                if 'youtube_auth_url' not in st.session_state:
-                    st.session_state.youtube_auth_url = None
-                
-                if st.button(f"🔐 Genera URL Autenticazione {next_account}"):
-                    success, message = authenticate_youtube_account(next_account)
-                    if not success:
-                        # Mostra l'URL di autenticazione
-                        st.session_state.youtube_auth_account = next_account
-                        st.session_state.youtube_auth_url = message
-                        st.info("🔐 **URL di autenticazione generato**")
-                        st.code(message, language=None)
-                        
-                        # Campo per inserire il codice di autorizzazione
-                        auth_code = st.text_input("Inserisci il codice di autorizzazione:", key="youtube_auth_code")
-                        
-                        if st.button("✅ Completa Autenticazione"):
-                            if auth_code:
-                                success, message = authenticate_youtube_account(next_account, auth_code)
-                                if success:
-                                    st.success(message)
-                                    # Pulisci session state
-                                    del st.session_state.youtube_auth_account
-                                    del st.session_state.youtube_auth_url
-                                    st.rerun()
-                                else:
-                                    st.error(message)
-                            else:
-                                st.error("❌ Inserisci il codice di autorizzazione")
-                    else:
-                        st.success(message)
-                        st.rerun()
-                
-                # Se abbiamo già un URL di autenticazione, mostralo
-                elif st.session_state.youtube_auth_url:
-                    st.info("🔐 **URL di autenticazione generato**")
-                    st.code(st.session_state.youtube_auth_url, language=None)
-                    
-                    # Campo per inserire il codice di autorizzazione
-                    auth_code = st.text_input("Inserisci il codice di autorizzazione:", key="youtube_auth_code")
-                    
-                    if st.button("✅ Completa Autenticazione"):
-                        if auth_code:
-                            success, message = authenticate_youtube_account(st.session_state.youtube_auth_account, auth_code)
-                            if success:
-                                st.success(message)
-                                # Pulisci session state
-                                del st.session_state.youtube_auth_account
-                                del st.session_state.youtube_auth_url
-                                st.rerun()
-                            else:
-                                st.error(message)
-                        else:
-                            st.error("❌ Inserisci il codice di autorizzazione")
-
-# Sezione per l'upload su Google Drive
-st.subheader("☁️ Carica su Google Drive")
-
-if st.session_state.processed_video and os.path.exists(st.session_state.processed_video['final_video']):
-    if st.button("🚀 Carica su Drive"):
-        with st.spinner("Caricamento su Google Drive..."):
-            drive_link = upload_video_to_drive(
-                video_path=st.session_state.processed_video['final_video'],
-                apartment_name=selected_apartment,
-                video_type=selected_video_type
-            )
-            
-            if drive_link:
-                st.success("✅ Video caricato su Drive con successo!")
-                st.markdown(f"**Link Drive:** {drive_link}")
-                
-                # Salva nel tracking
-                youtube_link = st.session_state.get('youtube_link', '')
-                italian_transcript_path = st.session_state.get('italian_transcript_path', '')
-                english_transcript_path = st.session_state.get('english_transcript_path', '')
-                add_tracking_entry(
-                    apartment=selected_apartment,
-                    video_type=selected_video_type,
-                    youtube_link=youtube_link,
-                    drive_link=drive_link,
-                    italian_transcript_path=italian_transcript_path,
-                    english_transcript_path=english_transcript_path
-                )
-                
-                st.session_state.drive_link = drive_link
-                st.success("✅ Entry aggiunta al tracking!")
-            else:
-                st.error("❌ Errore durante il caricamento su Drive")
-                st.info("""
-                **Possibili cause:**
-                1. Problemi di autenticazione Google Drive
-                2. Permessi insufficienti sulla cartella
-                3. Connessione internet instabile
-                
-                **Soluzione:**
-                1. Verifica le credenziali Google Drive
-                2. Controlla i permessi sulla cartella condivisa
-                3. Riprova più tardi
-                """)
-
-# Sezione per i transcript modificabili (solo se c'è voce)
-if st.session_state.processed_video and (st.session_state.segments or st.session_state.get('edited_segments')) and st.session_state.processed_video.get("has_voice", True):
-    st.markdown("---")
-    st.header("📝 Transcript per Manuali")
-    st.info("Modifica i testi per creare i manuali di istruzioni. I file verranno salvati nella cartella del video.")
-    
-    # Usa i segmenti modificati se disponibili, altrimenti quelli originali
-    segments_for_transcript = st.session_state.get('edited_segments', st.session_state.segments)
-    
-    # Prepara i testi per le box
-    italian_text = ""
-    english_text = ""
-    
-    for i, segment in enumerate(segments_for_transcript, 1):
-        italian_text += f"{i}. {segment['text']}\n"
-        
-        # Usa il testo inglese se disponibile, altrimenti traduci
-        english_segment = segment.get('text_en', '')
-        if not english_segment and segment['text']:
-            # Traduci automaticamente se non c'è già
-            try:
-                client = get_openai_client(openai_api_key)
-                translation = client.chat.completions.create(
-                    model="gpt-4",
-                    messages=[
-                        {"role": "system", "content": "Traduci in inglese questo testo per manuali:"},
-                        {"role": "user", "content": segment['text']}
-                    ]
-                )
-                english_segment = translation.choices[0].message.content.strip()
-            except:
-                english_segment = ""
-        
-        english_text += f"{i}. {english_segment}\n"
-    
-    col1, col2 = st.columns(2)
     
     with col1:
         st.subheader("🇮🇹 Italiano")
