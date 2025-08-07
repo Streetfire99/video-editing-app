@@ -34,11 +34,18 @@ def get_drive_service():
             
             credentials_dict = json.loads(credentials_str)
         
+        # Forza l'uso dell'account xeniamilano.info@gmail.com
+        if 'client_email' in credentials_dict:
+            credentials_dict['client_email'] = 'xeniamilano.info@gmail.com'
+        
         # Crea le credenziali con gli scope
         credentials = Credentials.from_service_account_info(credentials_dict, scopes=SCOPES)
         
         # Crea il servizio Drive
         service = build('drive', 'v3', credentials=credentials)
+        
+        # Debug: mostra l'account utilizzato
+        st.info(f"🔧 DEBUG: Account Drive utilizzato: {credentials.service_account_email}")
         
         return service
         

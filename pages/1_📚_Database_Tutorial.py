@@ -21,7 +21,7 @@ st.title("📚 Database Tutorial")
 col1, col2 = st.columns([1, 4])
 with col1:
     if st.button("🏠 Home"):
-        st.switch_page("Home.py")
+        st.switch_page("Elaborazione_Video.py")
 
 # Carica appartamenti elaborati
 processed_apartments = get_processed_apartments()
@@ -65,4 +65,4 @@ else:
                 # Pulsante per andare alla pagina dei dettagli dell'appartamento
                 if st.button(f"📋 Gestisci", key=f"btn_{apartment}"):
                     st.session_state.selected_apartment = apartment
-                    st.switch_page("pages/_📋_Dettagli_Appartamento.py") 
+                    st.switch_page("pages/__📋_Dettagli_Appartamento.py") 

@@ -42,7 +42,7 @@ with col1:
     """)
     
     if st.button("🏢 Vai agli Appartamenti", type="primary"):
-        st.switch_page("pages/1_🏠_Appartamenti.py")
+        st.switch_page("pages/1_📚_Database_Tutorial.py")
 
 with col2:
     st.header("📹 Editing Video")

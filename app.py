@@ -889,29 +889,25 @@ elif current_phase == 'results':
                     st.write("**Manuale Italiano:**")
                     st.text_area("", value=video['manuals']['it'], height=150, disabled=True)
                     
-                    if st.button("📥 Scarica Manuale IT", key=f"download_it_{i}"):
-                        # Crea file temporaneo per il download
-                        manual_content = video['manuals']['it']
-                        st.download_button(
-                            label="📥 Scarica Manuale IT",
-                            data=manual_content,
-                            file_name=f"{video['name']}_manuale_IT.txt",
-                            mime="text/plain"
-                        )
+                    st.download_button(
+                        label="📥 Scarica Manuale IT",
+                        data=video['manuals']['it'],
+                        file_name=f"{video['name']}_manuale_IT.txt",
+                        mime="text/plain",
+                        key=f"download_it_{i}"
+                    )
                 
                 with col2:
                     st.write("**Manuale Inglese:**")
                     st.text_area("", value=video['manuals']['en'], height=150, disabled=True)
                     
-                    if st.button("📥 Scarica Manuale EN", key=f"download_en_{i}"):
-                        # Crea file temporaneo per il download
-                        manual_content = video['manuals']['en']
-                        st.download_button(
-                            label="📥 Scarica Manuale EN",
-                            data=manual_content,
-                            file_name=f"{video['name']}_manuale_EN.txt",
-                            mime="text/plain"
-                        )
+                    st.download_button(
+                        label="📥 Scarica Manuale EN",
+                        data=video['manuals']['en'],
+                        file_name=f"{video['name']}_manuale_EN.txt",
+                        mime="text/plain",
+                        key=f"download_en_{i}"
+                    )
         
         # Pulsanti bulk
         st.markdown("---")
