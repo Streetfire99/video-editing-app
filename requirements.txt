@@ -9,4 +9,4 @@ google-auth
 python-dotenv
 openai-whisper
 numpy
-st_audiorec 
+geocoder 

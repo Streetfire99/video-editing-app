@@ -5,7 +5,6 @@ Gestisce la logica e il rendering della sezione check-in per add_property.
 import streamlit as st
 import pandas as pd
 from utils import get_data, save_to_sheets, upload_file_to_drive, get_apartment_data
-import geocoder
 import os
 from datetime import datetime
 
@@ -43,11 +42,12 @@ def get_cap_from_contratti(selected_apartment):
 def get_coordinates(address):
     """Genera le coordinate da un indirizzo."""
     try:
+        import geocoder
         g = geocoder.osm(address)
         if g.ok:
             return g.lat, g.lng
     except Exception as e:
-        st.error(f"Errore nel generare le coordinate: {e}")
+        st.warning(f"Coordinate non generate per: {address}")
     return None, None
 
 def handle_file_upload(uploaded_file, file_type, apartment_name):
