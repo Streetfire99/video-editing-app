@@ -265,7 +265,12 @@ with st.expander("🔧 Debug Info"):
 
 # Carica gli appartamenti e le tipologie
 apartments = load_apartments()
-video_types = get_video_types()
+
+# Inizializza video_types nel session state se non esiste
+if 'video_types' not in st.session_state:
+    st.session_state.video_types = get_video_types()
+
+video_types = st.session_state.video_types
 
 # Carica configurazioni
 def load_config():
@@ -428,8 +433,8 @@ with st.expander("➕ Aggiungi Nuova Tipologia"):
     )
     if st.button("Aggiungi"):
         if new_video_type and new_video_type not in video_types:
-            video_types.append(new_video_type)
-            video_types.sort()
+            st.session_state.video_types.append(new_video_type)
+            st.session_state.video_types.sort()
             st.success(f"✅ Tipologia '{new_video_type}' aggiunta!")
             st.rerun()
 
