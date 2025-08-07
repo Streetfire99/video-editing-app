@@ -11,6 +11,9 @@ from pages.subpages.appartamenti_subpage import render_appartamenti_subpage
 from pages.subpages.wifi_subpage import render_wifi_subpage
 from pages.subpages.inventario_subpage import render_inventario_subpage
 from pages.subpages.elettrodomestici_subpage import render_elettrodomestici_subpage
+from pages.subpages.checkin_subpage import render_checkin_subpage
+from pages.subpages.climatizzazione_subpage import render_climatizzazione_subpage
+from pages.subpages.utenze_subpage import render_utenze_subpage
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -54,8 +57,8 @@ def main():
     if selected_apartment:
         st.subheader(f"Configurazione per: {selected_apartment}")
             
-        # Create tabs for different sections - ORDINE: Appartamento, Inventario, Elettrodomestici, Wi-Fi, Servizi
-        tab1, tab2, tab3, tab4, tab5 = st.tabs(["🏠 Appartamenti", "📦 Inventario", "🔌 Elettrodomestici", "📶 Wi-Fi", "🔧 Servizi"])
+        # Create tabs for different sections - ORDINE: Appartamento, Inventario, Elettrodomestici, Wi-Fi, Servizi, Check-in, Climatizzazione, Utenze
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(["🏠 Appartamenti", "📦 Inventario", "🔌 Elettrodomestici", "📶 Wi-Fi", "🔧 Servizi", "🏠 Check-in", "❄️ Climatizzazione", "💧 Utenze"])
         
         with tab1:
             render_appartamenti_subpage(selected_apartment)
@@ -71,6 +74,15 @@ def main():
         
         with tab5:
             render_servizi_subpage(selected_apartment)
+            
+        with tab6:
+            render_checkin_subpage(selected_apartment)
+            
+        with tab7:
+            render_climatizzazione_subpage(selected_apartment)
+            
+        with tab8:
+            render_utenze_subpage(selected_apartment)
 
 if __name__ == "__main__":
     main() 

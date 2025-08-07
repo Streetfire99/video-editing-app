@@ -8,4 +8,5 @@ pandas
 google-auth
 python-dotenv
 openai-whisper
-numpy 
+numpy
+st_audiorec 
