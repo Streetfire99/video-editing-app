@@ -296,77 +296,7 @@ openai_api_key = st.text_input(
     help="Inserisci la tua chiave API OpenAI"
 )
 
-# Sidebar per configurazioni
-with st.sidebar:
-    st.header("⚙️ Configurazioni")
-    
-    # Debug section
-    with st.expander("🔍 Debug Secrets"):
-        st.write("**Testing secrets loading...**")
-        
-        # Test OpenAI API Key
-        openai_secret = st.secrets.get('OPENAI_API_KEY')
-        st.write(f"OpenAI API Key loaded: {'✅' if openai_secret else '❌'}")
-        
-        # Test Google Sheets Credentials
-        google_secret = st.secrets.get('GOOGLE_SHEETS_CREDENTIALS')
-        st.write(f"Google Sheets Credentials loaded: {'✅' if google_secret else '❌'}")
-        
-        if google_secret:
-            st.write(f"Type: {type(google_secret)}")
-            if isinstance(google_secret, str):
-                st.write("Is string, attempting JSON parse...")
-                try:
-                    import json
-                    parsed = json.loads(google_secret)
-                    st.write("✅ JSON parsing successful")
-                    
-                    # Test private key
-                    private_key = parsed.get('private_key', '')
-                    if private_key:
-                        st.write(f"Private key length: {len(private_key)}")
-                        st.write(f"Private key starts with: {private_key[:50]}...")
-                        st.write(f"Contains \\n: {'✅' if '\\n' in private_key else '❌'}")
-                        st.write(f"Contains \\\\n: {'✅' if '\\\\n' in private_key else '❌'}")
-                    else:
-                        st.write("❌ No private_key found")
-                        
-                except Exception as e:
-                    st.write(f"❌ JSON parsing failed: {e}")
-        
-        # Test YouTube Credentials
-        youtube_secret = st.secrets.get('YOUTUBE_CLIENT_SECRETS')
-        st.write(f"YouTube Credentials loaded: {'✅' if youtube_secret else '❌'}")
-    
-    # Mostra stato API Key
-    if openai_api_key:
-        # Test della chiave API
-        try:
-            client = get_openai_client(openai_api_key)
-            client.models.list()
-            st.success("✅ OpenAI API Key valida!")
-        except Exception as e:
-            st.error(f"❌ Errore con OpenAI API Key: {str(e)}")
-            st.info("💡 Verifica che la chiave API sia corretta e abbia crediti sufficienti")
-    else:
-        st.warning("⚠️ Inserisci la tua OpenAI API Key per iniziare")
-    
-    # Pulsante per ricaricare configurazione
-    if st.button("🔄 Ricarica Configurazione"):
-        config = load_config()
-        openai_api_key = os.getenv('OPENAI_API_KEY') or config.get('openai_api_key', '')
-        st.success("✅ Configurazione ricaricata!")
-        st.rerun()
-    
-    st.markdown("---")
-    st.markdown("### 📋 Istruzioni")
-    st.markdown("""
-    1. **Inserisci la tua OpenAI API Key**
-    2. **Carica il video** nel box principale
-    3. **Clicca 'Elabora Video'**
-    4. **Modifica i sottotitoli** se necessario
-    5. **Scarica o carica su YouTube**
-    """)
+# Sidebar vuota - rimossa per interfaccia più pulita
 
 # ============================================================================
 # NUOVO SISTEMA BULK PROCESSING
