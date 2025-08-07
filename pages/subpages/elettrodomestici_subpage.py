@@ -59,15 +59,87 @@ def render_elettrodomestici_subpage(selected_apartment):
         if appliance_name and appliance_name.strip():
             existing_data_dict[appliance_name] = row
     
-    # Mostra tutti gli elettrodomestici (esistenti + standard mancanti)
-    st.markdown("### Elettrodomestici:")
+    # Ottieni tutte le tipologie esistenti (dal foglio + standard)
+    all_tipologie = list(existing_data_dict.keys()) + standard_appliances
+    all_tipologie = list(set(all_tipologie))  # Rimuovi duplicati
+    all_tipologie.sort()
     
-    # Prima mostra gli elettrodomestici esistenti
-    for appliance_name in existing_data_dict.keys():
-        existing_data = existing_data_dict[appliance_name]
+    # Sezione per aggiungere nuovo elettrodomestico
+    st.markdown("### ➕ Aggiungi Nuovo Elettrodomestico")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        # Menu a discesa per tipologie esistenti
+        selected_tipologia = st.selectbox(
+            "Seleziona Tipologia",
+            options=all_tipologie + ["➕ Aggiungi nuova tipologia"],
+            key="new_appliance_type"
+        )
+    
+    with col2:
+        # Campo per nuova tipologia se selezionato
+        if selected_tipologia == "➕ Aggiungi nuova tipologia":
+            new_tipologia = st.text_input("Nuova Tipologia", key="new_tipologia_input")
+            if new_tipologia:
+                selected_tipologia = new_tipologia
+    
+    # Form per nuovo elettrodomestico
+    if selected_tipologia and selected_tipologia != "➕ Aggiungi nuova tipologia":
+        st.markdown(f"#### 🔧 {selected_tipologia}")
         
-        with st.expander(f"🔧 {appliance_name}", expanded=True):
-            col1, col2 = st.columns(2)
+        col1, col2 = st.columns(2)
+        with col1:
+            nuovo_modello = st.text_input("Modello", key=f"nuovo_modello_{selected_tipologia}")
+            nuova_marca = st.text_input("Marca", key=f"nuova_marca_{selected_tipologia}")
+            nuovo_anno = st.text_input("Anno", key=f"nuovo_anno_{selected_tipologia}")
+        
+        with col2:
+            nuova_posizione = st.text_input("Posizione", key=f"nuova_posizione_{selected_tipologia}")
+        
+        nuova_descrizione = st.text_area("Descrizione", key=f"nuova_descrizione_{selected_tipologia}")
+        nuova_descrizione_problemi = st.text_area("Descrizione Problemi", key=f"nuova_descrizione_problemi_{selected_tipologia}")
+        
+        # Gestione foto per nuovo elettrodomestico
+        st.markdown("#### Foto")
+        nuovo_foto = st.file_uploader(
+            "Carica foto (opzionale)", 
+            type=["jpg", "jpeg", "png"], 
+            key=f"nuovo_foto_upload_{selected_tipologia}"
+        )
+        if nuovo_foto:
+            st.image(nuovo_foto, caption=f"Foto {selected_tipologia}")
+        
+        # Pulsante per salvare nuovo elettrodomestico
+        if st.button(f"💾 Salva Nuovo {selected_tipologia}", key=f"save_new_{selected_tipologia}"):
+            # Gestisce la foto
+            foto_url = ""
+            if nuovo_foto:
+                foto_url = upload_file_to_drive(nuovo_foto, selected_apartment, f"Foto {selected_tipologia}")
+            
+            data_to_save = {
+                "appartamento": selected_apartment,
+                "tipologia": selected_tipologia,
+                "modello": nuovo_modello,
+                "marca": nuova_marca,
+                "anno": nuovo_anno,
+                "posizione": nuova_posizione,
+                "descrizione": nuova_descrizione,
+                "descrizione_problemi": nuova_descrizione_problemi,
+                "foto": foto_url
+            }
+            save_to_sheets("elettrodomestici", data_to_save)
+            st.success(f"✅ Nuovo {selected_tipologia} salvato con successo!")
+            st.rerun()
+    
+    # Sezione per elettrodomestici esistenti
+    if existing_data_dict:
+        st.markdown("### 🔧 Elettrodomestici Esistenti")
+        
+        for appliance_name in existing_data_dict.keys():
+            existing_data = existing_data_dict[appliance_name]
+            
+            with st.expander(f"🔧 {appliance_name}", expanded=True):
+                col1, col2 = st.columns(2)
             
             with col1:
                 modello = st.text_input(
@@ -142,105 +214,4 @@ def render_elettrodomestici_subpage(selected_apartment):
                 save_to_sheets("elettrodomestici", data_to_save)
                 st.success(f"✅ {appliance_name} salvato con successo!")
     
-    # Poi mostra gli elettrodomestici standard che NON esistono ancora
-    # Normalizza i nomi per il confronto (case insensitive)
-    existing_names_normalized = [name.lower().strip() for name in existing_data_dict.keys()]
-    
-    missing_standard_appliances = []
-    for appliance_name in standard_appliances:
-        if appliance_name.lower().strip() not in existing_names_normalized:
-            missing_standard_appliances.append(appliance_name)
-    
-    if missing_standard_appliances:
-        st.markdown("### Elettrodomestici standard disponibili:")
-        
-        for appliance_name in missing_standard_appliances:
-            with st.expander(f"🔧 {appliance_name}", expanded=False):
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    modello = st.text_input(
-                        "Modello", 
-                        value="", 
-                        key=f"modello_{appliance_name}_{selected_apartment}"
-                    )
-                    marca_serial = st.text_input(
-                        "Marca/Serial", 
-                        value="", 
-                        key=f"marca_serial_{appliance_name}_{selected_apartment}"
-                    )
-                    anno = st.text_input(
-                        "Anno", 
-                        value="", 
-                        key=f"anno_{appliance_name}_{selected_apartment}"
-                    )
-                
-                with col2:
-                    posizione = st.text_input(
-                        "Posizione", 
-                        value="", 
-                        key=f"posizione_{appliance_name}_{selected_apartment}"
-                    )
-                
-                descrizione = st.text_area(
-                    "Descrizione", 
-                    value="", 
-                    key=f"descrizione_{appliance_name}_{selected_apartment}"
-                )
-                
-                # Gestione video
-                st.markdown("#### Video Tutorial")
-                
-                nuovo_video = st.file_uploader(
-                    "Carica nuovo video (opzionale)", 
-                    type=["mp4", "mov"], 
-                    key=f"video_upload_{appliance_name}_{selected_apartment}"
-                )
-                
-                if nuovo_video:
-                    video_url = upload_file_to_drive(nuovo_video, selected_apartment, f"Tutorial {appliance_name}")
-                    st.success(f"Video caricato per {appliance_name}!")
-                    st.video(nuovo_video)
-                
-                # Pulsante per salvare questo elettrodomestico
-                if st.button(f"💾 Salva {appliance_name}", key=f"save_{appliance_name}_{selected_apartment}"):
-                    data_to_save = {
-            "appartamento": selected_apartment,
-                        "nome_elettrodomestico": appliance_name,
-            "modello": modello,
-            "marca_serial": marca_serial,
-            "anno": anno,
-            "posizione": posizione,
-            "descrizione": descrizione,
-                        "url_video": ""
-                    }
-                    save_to_sheets("elettrodomestici", data_to_save)
-                    st.success(f"✅ {appliance_name} salvato con successo!")
-    
-    # Sezione per aggiungere nuovi elettrodomestici
-    st.markdown("---")
-    st.markdown("### Aggiungi nuovo elettrodomestico")
-    
-    nuovo_nome = st.text_input("Nome elettrodomestico", key="nuovo_elettro_nome")
-    
-    if st.button("Aggiungi elettrodomestico", key="aggiungi_elettro"):
-        if nuovo_nome and nuovo_nome.strip():
-            # Verifica se esiste già
-            existing_names = existing_appliances["nome_elettrodomestico"].tolist()
-            if nuovo_nome.strip() in existing_names:
-                st.error(f"L'elettrodomestico '{nuovo_nome}' esiste già!")
-            else:
-                # Salva il nuovo elettrodomestico vuoto
-                data_to_save = {
-                    "appartamento": selected_apartment,
-                    "nome_elettrodomestico": nuovo_nome.strip(),
-                    "modello": "",
-                    "marca_serial": "",
-                    "anno": "",
-                    "posizione": "",
-                    "descrizione": "",
-                    "url_video": ""
-                }
-                save_to_sheets("elettrodomestici", data_to_save)
-                st.success(f"✅ Elettrodomestico '{nuovo_nome}' aggiunto! Ricarica la pagina per vederlo.")
-                st.rerun() 
+    # Fine della funzione 
