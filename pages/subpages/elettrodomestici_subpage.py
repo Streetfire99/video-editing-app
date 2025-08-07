@@ -102,6 +102,9 @@ def render_elettrodomestici_subpage(selected_apartment):
         # Gestione foto per nuovo elettrodomestico
         st.markdown("#### 📸 Foto")
         
+        # Inizializza nuovo_foto
+        nuovo_foto = None
+        
         # Opzioni per foto: upload o scatta
         foto_option = st.radio(
             "Scegli opzione foto:",
@@ -200,6 +203,9 @@ def render_elettrodomestici_subpage(selected_apartment):
                 if existing_foto:
                     st.markdown(f"**Foto già presente:** [Vedi foto]({existing_foto})")
                 
+                # Inizializza nuovo_foto
+                nuovo_foto = None
+                
                 # Opzioni per foto: upload o scatta
                 foto_option = st.radio(
                     "Scegli opzione foto:",
@@ -230,8 +236,8 @@ def render_elettrodomestici_subpage(selected_apartment):
                 if st.button(f"💾 Salva {appliance_name}", key=f"save_{appliance_name}_{selected_apartment}"):
                     # Gestisce la foto (nuova o esistente)
                     foto_url = existing_data.get("foto", "")
-                if nuovo_foto:
-                    foto_url = upload_file_to_drive(nuovo_foto, selected_apartment, f"Foto {appliance_name}")
+                    if nuovo_foto:
+                        foto_url = upload_file_to_drive(nuovo_foto, selected_apartment, f"Foto {appliance_name}")
                 
                 data_to_save = {
                     "appartamento": selected_apartment,
