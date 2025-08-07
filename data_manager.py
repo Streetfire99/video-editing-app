@@ -69,6 +69,7 @@ def load_apartments():
 
 # Tipologie di video predefinite
 DEFAULT_VIDEO_TYPES = [
+    "acqua",
     "asciugatrice",
     "caldaia", 
     "check-in",
@@ -77,6 +78,7 @@ DEFAULT_VIDEO_TYPES = [
     "frigorifero",
     "lavastoviglie",
     "lavatrice",
+    "luce",
     "microonde",
     "piano_cottura",
     "riscaldamento",
@@ -103,7 +105,9 @@ def get_prompt_for_video_type(video_type):
         "asciugatrice": "You are a video subtitle editor specializing in household appliance instructions. Your task is to optimize the following raw transcription of an instructional video about dryer operation and maintenance.",
         "riscaldamento": "You are a video subtitle editor specializing in heating system instructions. Your task is to optimize the following raw transcription of an instructional video about heating system operation and maintenance.",
         "condizionamento": "You are a video subtitle editor specializing in climate control system instructions. Your task is to optimize the following raw transcription of an instructional video about air conditioning operation and maintenance.",
-        "check-in": "You are a video subtitle editor specializing in apartment check-in procedures. Your task is to optimize the following raw transcription of an instructional video about apartment check-in process and procedures."
+        "check-in": "You are a video subtitle editor specializing in apartment check-in procedures. Your task is to optimize the following raw transcription of an instructional video about apartment check-in process and procedures.",
+        "luce": "You are a video subtitle editor specializing in electrical system instructions. Your task is to optimize the following raw transcription of an instructional video about electrical panel operation and circuit management.",
+        "acqua": "You are a video subtitle editor specializing in water system instructions. Your task is to optimize the following raw transcription of an instructional video about water system operation and maintenance."
     }
     
     return prompts.get(video_type, "You are a video subtitle editor specializing in instructional videos. Your task is to optimize the following raw transcription of an instructional video.")
@@ -123,7 +127,9 @@ def get_translation_prompt_for_video_type(video_type):
         "asciugatrice": "You are a translator specializing in household appliance instructions. Translate the following Italian text to English, ensuring the translation is clear, concise, and suitable for subtitles.",
         "riscaldamento": "You are a translator specializing in heating system instructions. Translate the following Italian text to English, ensuring the translation is clear, concise, and suitable for subtitles.",
         "condizionamento": "You are a translator specializing in climate control system instructions. Translate the following Italian text to English, ensuring the translation is clear, concise, and suitable for subtitles.",
-        "check-in": "You are a translator specializing in apartment check-in procedures. Translate the following Italian text to English, ensuring the translation is clear, concise, and suitable for subtitles."
+        "check-in": "You are a translator specializing in apartment check-in procedures. Translate the following Italian text to English, ensuring the translation is clear, concise, and suitable for subtitles.",
+        "luce": "You are a translator specializing in electrical system instructions. Translate the following Italian text to English, ensuring the translation is clear, concise, and suitable for subtitles.",
+        "acqua": "You are a translator specializing in water system instructions. Translate the following Italian text to English, ensuring the translation is clear, concise, and suitable for subtitles."
     }
     
     return prompts.get(video_type, "You are a translator specializing in instructional videos. Translate the following Italian text to English, ensuring the translation is clear, concise, and suitable for subtitles.") 

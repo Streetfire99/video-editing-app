@@ -262,7 +262,11 @@ apartments = load_apartments()
 
 # Inizializza video_types nel session state se non esiste
 if 'video_types' not in st.session_state:
-    st.session_state.video_types = get_video_types()
+    # Usa le tipologie persistenti se disponibili, altrimenti quelle di default
+    if 'persistent_video_types' in st.session_state:
+        st.session_state.video_types = st.session_state.persistent_video_types
+    else:
+        st.session_state.video_types = get_video_types()
 
 video_types = st.session_state.video_types
 
@@ -429,7 +433,14 @@ with st.expander("➕ Aggiungi Nuova Tipologia"):
         if new_video_type and new_video_type not in video_types:
             st.session_state.video_types.append(new_video_type)
             st.session_state.video_types.sort()
-            st.success(f"✅ Tipologia '{new_video_type}' aggiunta!")
+            
+            # Salva le tipologie aggiornate per le sessioni future
+            if 'persistent_video_types' not in st.session_state:
+                st.session_state.persistent_video_types = st.session_state.video_types.copy()
+            else:
+                st.session_state.persistent_video_types = st.session_state.video_types.copy()
+            
+            st.success(f"✅ Tipologia '{new_video_type}' aggiunta e salvata per le sessioni future!")
             st.rerun()
 
 # Gestione fasi del bulk processing
