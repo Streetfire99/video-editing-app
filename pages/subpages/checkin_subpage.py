@@ -46,18 +46,46 @@ def render_checkin_subpage(selected_apartment, existing_data=None):
         portone_img_url = existing_data.get("ingresso_portone_immagine", "")
         if portone_img_url:
             st.markdown(f"[Vedi foto portone]({portone_img_url})")
-        portone_img = st.file_uploader("Carica foto portone", type=["jpg", "jpeg", "png"], key=f"portone_img_{selected_apartment}")
-        if portone_img:
-            portone_img_url = upload_file_to_drive(portone_img, selected_apartment, "Foto portone")
+        
+        # Opzioni per foto portone: upload o scatta
+        portone_foto_option = st.radio(
+            "Scegli opzione foto portone:",
+            ["📁 Carica foto", "📷 Scatta foto"],
+            key=f"portone_foto_option_{selected_apartment}"
+        )
+        
+        if portone_foto_option == "📁 Carica foto":
+            portone_img = st.file_uploader("Carica foto portone", type=["jpg", "jpeg", "png"], key=f"portone_img_{selected_apartment}")
+            if portone_img:
+                portone_img_url = upload_file_to_drive(portone_img, selected_apartment, "Foto portone")
+        else:
+            # Scatta foto con webcam
+            portone_img = st.camera_input("Scatta foto portone", key=f"portone_camera_{selected_apartment}")
+            if portone_img:
+                portone_img_url = upload_file_to_drive(portone_img, selected_apartment, "Foto portone")
     
     with col2:
         st.markdown("#### Foto Porta Blindata")
         blindata_img_url = existing_data.get("porta_blindata_immagine", "")
         if blindata_img_url:
             st.markdown(f"[Vedi foto porta blindata]({blindata_img_url})")
-        blindata_img = st.file_uploader("Carica foto porta blindata", type=["jpg", "jpeg", "png"], key=f"blindata_img_{selected_apartment}")
-        if blindata_img:
-            blindata_img_url = upload_file_to_drive(blindata_img, selected_apartment, "Foto porta blindata")
+        
+        # Opzioni per foto porta blindata: upload o scatta
+        blindata_foto_option = st.radio(
+            "Scegli opzione foto porta blindata:",
+            ["📁 Carica foto", "📷 Scatta foto"],
+            key=f"blindata_foto_option_{selected_apartment}"
+        )
+        
+        if blindata_foto_option == "📁 Carica foto":
+            blindata_img = st.file_uploader("Carica foto porta blindata", type=["jpg", "jpeg", "png"], key=f"blindata_img_{selected_apartment}")
+            if blindata_img:
+                blindata_img_url = upload_file_to_drive(blindata_img, selected_apartment, "Foto porta blindata")
+        else:
+            # Scatta foto con webcam
+            blindata_img = st.camera_input("Scatta foto porta blindata", key=f"blindata_camera_{selected_apartment}")
+            if blindata_img:
+                blindata_img_url = upload_file_to_drive(blindata_img, selected_apartment, "Foto porta blindata")
     
     # Note speciali
     st.markdown("### Note Speciali")
