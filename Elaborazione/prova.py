@@ -311,10 +311,18 @@ def create_srt_file(segments, output_file, language="IT"):
             # Usa il testo appropriato in base alla lingua
             if language == "IT":
                 text = segment['text']
-                prefix = "[IT] "
+                # Controlla se il prefisso è già presente
+                if text.startswith('[IT] '):
+                    prefix = ""
+                else:
+                    prefix = "[IT] "
             else:
                 text = segment.get('text_en', segment['text'])  # Fallback al testo italiano se non c'è inglese
-                prefix = "[EN] "
+                # Controlla se il prefisso è già presente
+                if text.startswith('[EN] '):
+                    prefix = ""
+                else:
+                    prefix = "[EN] "
             
             # CONTROLLO DIRETTO DEL TESTO - Forza massimo 2 righe
             max_chars_per_line = 40  # Aumentato per evitare tagli eccessivi

@@ -253,8 +253,8 @@ if time.time() - st.session_state.last_cleanup > 600:  # 10 minuti
     st.session_state.last_cleanup = time.time()
 
 # Titolo dell'app
-st.title("🎬 Editing Video")
-st.markdown("Sistema di elaborazione video con sottotitoli automatici per appartamenti")
+st.title("🎬 Elaborazione Video")
+st.markdown("Sistema di elaborazione video con sottotitoli automatici per database tutorial")
 
 # Mostra session ID per debug multi-tab
 with st.expander("🔧 Debug Info"):
@@ -827,13 +827,55 @@ elif current_phase == 'results':
                         
                         with col2:
                             if st.button("☁️ Upload Drive", key=f"drive_{i}"):
-                                # Upload su Drive
-                                pass
+                                try:
+                                    # Upload video su Drive
+                                    drive_link = upload_video_to_drive(
+                                        video_path=final_video_path,
+                                        apartment_name=video['apartment'],
+                                        video_type=video['video_type']
+                                    )
+                                    
+                                    if drive_link:
+                                        video['drive_links']['video'] = drive_link
+                                        st.success(f"✅ Video caricato su Drive: {drive_link}")
+                                        
+                                        # Salva nel tracking
+                                        add_tracking_entry(
+                                            apartment=video['apartment'],
+                                            video_type=video['video_type'],
+                                            youtube_link=None,
+                                            drive_link=drive_link
+                                        )
+                                    else:
+                                        st.error("❌ Errore nel caricamento su Drive")
+                                except Exception as e:
+                                    st.error(f"❌ Errore upload Drive: {str(e)}")
                         
                         with col3:
                             if st.button("📺 Upload YouTube", key=f"youtube_{i}"):
-                                # Upload su YouTube
-                                pass
+                                try:
+                                    # Upload video su YouTube
+                                    youtube_link = upload_to_youtube(
+                                        video_path=final_video_path,
+                                        title=f"{video['apartment']} - {video['video_type']}",
+                                        description=video['manuals']['it']
+                                    )
+                                    
+                                    if youtube_link:
+                                        video['youtube_link'] = youtube_link
+                                        st.success(f"✅ Video caricato su YouTube: {youtube_link}")
+                                        
+                                        # Salva nel tracking
+                                        add_tracking_entry(
+                                            apartment=video['apartment'],
+                                            video_type=video['video_type'],
+                                            youtube_link=youtube_link,
+                                            drive_link=video['drive_links']['video']
+                                        )
+                                    else:
+                                        st.error("❌ Errore nel caricamento su YouTube")
+                                except Exception as e:
+                                    st.error(f"❌ Errore upload YouTube: {str(e)}")
                     else:
                         st.error(f"❌ Video elaborato non trovato: {final_video_path}")
                 else:
@@ -848,16 +890,28 @@ elif current_phase == 'results':
                     st.text_area("", value=video['manuals']['it'], height=150, disabled=True)
                     
                     if st.button("📥 Scarica Manuale IT", key=f"download_it_{i}"):
-                        # Download manuale IT
-                        pass
+                        # Crea file temporaneo per il download
+                        manual_content = video['manuals']['it']
+                        st.download_button(
+                            label="📥 Scarica Manuale IT",
+                            data=manual_content,
+                            file_name=f"{video['name']}_manuale_IT.txt",
+                            mime="text/plain"
+                        )
                 
                 with col2:
                     st.write("**Manuale Inglese:**")
                     st.text_area("", value=video['manuals']['en'], height=150, disabled=True)
                     
                     if st.button("📥 Scarica Manuale EN", key=f"download_en_{i}"):
-                        # Download manuale EN
-                        pass
+                        # Crea file temporaneo per il download
+                        manual_content = video['manuals']['en']
+                        st.download_button(
+                            label="📥 Scarica Manuale EN",
+                            data=manual_content,
+                            file_name=f"{video['name']}_manuale_EN.txt",
+                            mime="text/plain"
+                        )
         
         # Pulsanti bulk
         st.markdown("---")
@@ -865,18 +919,112 @@ elif current_phase == 'results':
         
         with col1:
             if st.button("📥 Scarica Tutto", type="primary"):
-                # Download di tutti i file
-                pass
+                # Crea un file ZIP con tutti i video e manuali
+                import zipfile
+                import io
+                
+                zip_buffer = io.BytesIO()
+                with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                    for video in st.session_state.bulk_processing['videos']:
+                        if video.get('processed_video') and video['processed_video'].get('success'):
+                            final_video_path = video['processed_video'].get('final_video')
+                            if final_video_path and os.path.exists(final_video_path):
+                                # Aggiungi video
+                                zip_file.write(final_video_path, f"{video['name']}_elaborato.mp4")
+                                
+                                # Aggiungi manuali
+                                zip_file.writestr(f"{video['name']}_manuale_IT.txt", video['manuals']['it'])
+                                zip_file.writestr(f"{video['name']}_manuale_EN.txt", video['manuals']['en'])
+                
+                st.download_button(
+                    label="📥 Scarica Tutto (ZIP)",
+                    data=zip_buffer.getvalue(),
+                    file_name="video_elaborati.zip",
+                    mime="application/zip"
+                )
         
         with col2:
             if st.button("☁️ Salva Tutto su Drive", type="primary"):
-                # Upload di tutti i file su Drive
-                pass
+                uploaded_count = 0
+                for video in st.session_state.bulk_processing['videos']:
+                    if video.get('processed_video') and video['processed_video'].get('success'):
+                        final_video_path = video['processed_video'].get('final_video')
+                        if final_video_path and os.path.exists(final_video_path):
+                            try:
+                                # Upload video
+                                drive_link = upload_video_to_drive(
+                                    video_path=final_video_path,
+                                    apartment_name=video['apartment'],
+                                    video_type=video['video_type']
+                                )
+                                
+                                if drive_link:
+                                    video['drive_links']['video'] = drive_link
+                                    uploaded_count += 1
+                                    
+                                    # Upload manuali
+                                    upload_manual_to_drive(
+                                        manual_content=video['manuals']['it'],
+                                        filename=f"{video['name']}_manuale_IT.txt",
+                                        apartment_name=video['apartment'],
+                                        video_type=video['video_type']
+                                    )
+                                    
+                                    upload_manual_to_drive(
+                                        manual_content=video['manuals']['en'],
+                                        filename=f"{video['name']}_manuale_EN.txt",
+                                        apartment_name=video['apartment'],
+                                        video_type=video['video_type']
+                                    )
+                                    
+                                    # Salva nel tracking
+                                    add_tracking_entry(
+                                        apartment=video['apartment'],
+                                        video_type=video['video_type'],
+                                        youtube_link=None,
+                                        drive_link=drive_link
+                                    )
+                            except Exception as e:
+                                st.error(f"❌ Errore upload {video['name']}: {str(e)}")
+                
+                if uploaded_count > 0:
+                    st.success(f"✅ Caricati {uploaded_count} video su Drive!")
+                else:
+                    st.error("❌ Nessun video caricato su Drive")
         
         with col3:
             if st.button("📺 Upload Tutti su YouTube", type="primary"):
-                # Upload di tutti i video su YouTube
-                pass
+                uploaded_count = 0
+                for video in st.session_state.bulk_processing['videos']:
+                    if video.get('processed_video') and video['processed_video'].get('success'):
+                        final_video_path = video['processed_video'].get('final_video')
+                        if final_video_path and os.path.exists(final_video_path):
+                            try:
+                                # Upload video su YouTube
+                                youtube_link = upload_to_youtube(
+                                    video_path=final_video_path,
+                                    title=f"{video['apartment']} - {video['video_type']}",
+                                    description=video['manuals']['it']
+                                )
+                                
+                                if youtube_link:
+                                    video['youtube_link'] = youtube_link
+                                    uploaded_count += 1
+                                    
+                                    # Salva nel tracking
+                                    add_tracking_entry(
+                                        apartment=video['apartment'],
+                                        video_type=video['video_type'],
+                                        youtube_link=youtube_link,
+                                        drive_link=video['drive_links']['video']
+                                    )
+                            except Exception as e:
+                                st.error(f"❌ Errore upload YouTube {video['name']}: {str(e)}")
+                
+                if uploaded_count > 0:
+                    st.success(f"✅ Caricati {uploaded_count} video su YouTube!")
+                else:
+                    st.error("❌ Nessun video caricato su YouTube")
 
 # Footer
 st.markdown("---")

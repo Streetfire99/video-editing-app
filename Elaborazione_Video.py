@@ -10,8 +10,8 @@ st.set_page_config(
 )
 
 # Titolo principale
-st.title("🎬 Editing Video")
-st.markdown("Sistema di elaborazione video con sottotitoli automatici per appartamenti")
+st.title("🎬 Elaborazione Video")
+st.markdown("Sistema di elaborazione video con sottotitoli automatici per database tutorial")
 
 # Statistiche principali
 col1, col2, col3, col4 = st.columns(4)

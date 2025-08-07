@@ -9,13 +9,13 @@ from drive_manager import get_processed_apartments
 
 # Configurazione della pagina
 st.set_page_config(
-    page_title="🏠 Appartamenti",
-    page_icon="🏠",
+    page_title="📚 Database Tutorial",
+    page_icon="📚",
     layout="wide"
 )
 
 # Titolo della pagina
-st.title("🏠 Appartamenti")
+st.title("📚 Database Tutorial")
 
 # Pulsanti di navigazione
 col1, col2 = st.columns([1, 4])
@@ -29,7 +29,7 @@ processed_apartments = get_processed_apartments()
 if not processed_apartments:
     st.info("📝 Nessun appartamento elaborato ancora. Vai alla pagina di editing per iniziare!")
 else:
-    st.subheader("📋 Appartamenti con video elaborati")
+    st.subheader("📋 Database Tutorial con video elaborati")
     
     # Dizionario delle emoji per le tipologie
     video_type_icons = {
@@ -65,4 +65,4 @@ else:
                 # Pulsante per andare alla pagina dei dettagli dell'appartamento
                 if st.button(f"📋 Gestisci", key=f"btn_{apartment}"):
                     st.session_state.selected_apartment = apartment
-                    st.switch_page("pages/📋_Dettagli_Appartamento.py") 
+                    st.switch_page("pages/_📋_Dettagli_Appartamento.py") 
