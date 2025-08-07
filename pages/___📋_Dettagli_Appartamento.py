@@ -18,7 +18,7 @@ st.set_page_config(
 if 'selected_apartment' not in st.session_state:
     st.error("❌ Nessun appartamento selezionato!")
     if st.button("🏠 Torna agli Appartamenti"):
-        st.switch_page("pages/4_database_tutorial.py")
+        st.switch_page("pages/4_📚_database_tutorial.py")
     st.stop()
 
 selected_apartment = st.session_state.selected_apartment
@@ -30,10 +30,10 @@ st.title(f"📋 Dettagli: {selected_apartment}")
 col1, col2 = st.columns([1, 4])
 with col1:
     if st.button("🏠 Home"):
-        st.switch_page("Elaborazione_Video.py")
+        st.switch_page("app.py")
 with col2:
     if st.button("📋 Torna agli Appartamenti"):
-        st.switch_page("pages/4_database_tutorial.py")
+        st.switch_page("pages/4_📚_database_tutorial.py")
 
 # Carica i dati di tracking
 tracking_data = load_tracking_csv()
