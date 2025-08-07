@@ -15,7 +15,7 @@ import json
 SCOPES = ['https://www.googleapis.com/auth/drive']
 
 def get_drive_service():
-    """Ottiene il servizio Google Drive per l'account xeniamilano.info@gmail.com"""
+    """Ottiene il servizio Google Drive"""
     try:
         # Prova prima da Streamlit secrets
         credentials_str = st.secrets.get('GOOGLE_SHEETS_CREDENTIALS')
@@ -33,10 +33,6 @@ def get_drive_service():
                 return None
             
             credentials_dict = json.loads(credentials_str)
-        
-        # Forza l'uso dell'account xeniamilano.info@gmail.com
-        if 'client_email' in credentials_dict:
-            credentials_dict['client_email'] = 'xeniamilano.info@gmail.com'
         
         # Crea le credenziali con gli scope
         credentials = Credentials.from_service_account_info(credentials_dict, scopes=SCOPES)
@@ -204,37 +200,49 @@ def load_tracking_csv():
     try:
         service = get_drive_service()
         if not service:
+            st.warning("⚠️ Impossibile accedere a Google Drive. Usando dati locali.")
             return []
         
         # ID della cartella principale
         main_folder_id = "1w9P2oiRfFgsOOj82V7xOruhjnl-APCCi"
         
-        # Cerca il file CSV nella cartella principale
-        query = f"'{main_folder_id}' in parents and name='apartments_tracking.csv' and trashed=false"
-        results = service.files().list(q=query).execute()
-        files = results.get('files', [])
-        
-        if files:
-            # Scarica il file CSV
-            file_id = files[0]['id']
-            request = service.files().get_media(fileId=file_id)
-            file_content = request.execute()
+        try:
+            # Cerca il file CSV nella cartella principale
+            query = f"'{main_folder_id}' in parents and name='apartments_tracking.csv' and trashed=false"
+            results = service.files().list(q=query).execute()
+            files = results.get('files', [])
             
-            # Decodifica il contenuto
-            csv_content = file_content.decode('utf-8')
-            
-            # Parsa il CSV
-            import csv
-            from io import StringIO
-            
-            tracking_data = []
-            csv_reader = csv.DictReader(StringIO(csv_content))
-            tracking_data = list(csv_reader)
-            
-            return tracking_data
-        else:
-            # File non esiste, restituisci lista vuota
-            return []
+            if files:
+                # Scarica il file CSV
+                file_id = files[0]['id']
+                request = service.files().get_media(fileId=file_id)
+                file_content = request.execute()
+                
+                # Decodifica il contenuto
+                csv_content = file_content.decode('utf-8')
+                
+                # Parsa il CSV
+                import csv
+                from io import StringIO
+                
+                tracking_data = []
+                csv_reader = csv.DictReader(StringIO(csv_content))
+                tracking_data = list(csv_reader)
+                
+                return tracking_data
+            else:
+                # File non esiste, restituisci lista vuota
+                st.info("📝 File di tracking non trovato. Verrà creato al primo upload.")
+                return []
+                
+        except HttpError as e:
+            if 'invalid_grant' in str(e):
+                st.error("❌ Errore di accesso: Il service account non ha i permessi per accedere alla cartella Drive.")
+                st.info("💡 Verifica che il service account abbia accesso alla cartella: 1w9P2oiRfFgsOOj82V7xOruhjnl-APCCi")
+                return []
+            else:
+                st.error(f"❌ Errore HTTP nel caricamento del CSV: {e}")
+                return []
             
     except Exception as e:
         st.error(f"❌ Errore nel caricamento del CSV di tracking: {e}")
