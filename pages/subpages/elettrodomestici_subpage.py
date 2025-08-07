@@ -238,19 +238,19 @@ def render_elettrodomestici_subpage(selected_apartment):
                     foto_url = existing_data.get("foto", "")
                     if nuovo_foto:
                         foto_url = upload_file_to_drive(nuovo_foto, selected_apartment, f"Foto {appliance_name}")
-                
-                data_to_save = {
-                    "appartamento": selected_apartment,
-                    "tipologia": appliance_name,
-                    "modello": modello,
-                    "marca": marca,
-                    "anno": anno,
-                    "posizione": posizione,
-                    "descrizione": descrizione,
-                    "descrizione_problemi": descrizione_problemi,
-                    "foto": foto_url
-                }
-                save_to_sheets("elettrodomestici", data_to_save)
-                st.success(f"✅ {appliance_name} salvato con successo!")
+                    
+                    data_to_save = {
+                        "appartamento": selected_apartment,
+                        "tipologia": appliance_name,
+                        "modello": modello,
+                        "marca": marca,
+                        "anno": anno,
+                        "posizione": posizione,
+                        "descrizione": descrizione,
+                        "descrizione_problemi": descrizione_problemi,
+                        "foto": foto_url
+                    }
+                    save_to_sheets("elettrodomestici", data_to_save)
+                    st.success(f"✅ {appliance_name} salvato con successo!")
     
     # Fine della funzione 
