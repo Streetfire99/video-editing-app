@@ -114,7 +114,12 @@ def get_spreadsheet_id():
         pass
     
     # Fallback to environment variable
-    return os.getenv('SPREADSHEET_ID')
+    env_spreadsheet_id = os.getenv('SPREADSHEET_ID')
+    if env_spreadsheet_id:
+        return env_spreadsheet_id
+    
+    # Default spreadsheet ID
+    return "1Jd0FpZKboNYsr2lX502yVFq2BBHqy8lZmiO1GOhNaY0"
 
 SPREADSHEET_ID = get_spreadsheet_id()
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
