@@ -24,28 +24,38 @@ def render_elettrodomestici_subpage(selected_apartment):
     # Carica tutti gli elettrodomestici dal foglio
     df = get_data("elettrodomestici")
     if df is None or df.empty:
-        df = pd.DataFrame(columns=["appartamento", "nome_elettrodomestico", "modello", "marca_serial", "anno", "posizione", "descrizione", "url_video"])
+        df = pd.DataFrame(columns=["appartamento", "tipologia", "modello", "marca", "anno", "posizione", "descrizione", "descrizione_problemi", "foto"])
     
-    # Filtra per appartamento selezionato
-    existing_appliances = df[df["appartamento"] == selected_apartment]
+    # Verifica se la colonna appartamento esiste
+    if "appartamento" not in df.columns:
+        st.warning("⚠️ Colonna 'appartamento' non trovata. Verificare la struttura del foglio Google Sheets.")
+        existing_appliances = pd.DataFrame(columns=["appartamento", "tipologia", "modello", "marca", "anno", "posizione", "descrizione", "descrizione_problemi", "foto"])
+    else:
+        # Filtra per appartamento selezionato
+        existing_appliances = df[df["appartamento"] == selected_apartment]
     
-    # Filtra le righe che hanno un nome_elettrodomestico valido (non vuoto)
-    existing_appliances = existing_appliances[
-        existing_appliances["nome_elettrodomestico"].notna() & 
-        (existing_appliances["nome_elettrodomestico"].str.strip() != "")
-    ]
+    # Verifica se la colonna tipologia esiste (nome_elettrodomestico nel foglio)
+    if "tipologia" not in existing_appliances.columns:
+        st.warning("⚠️ Colonna 'tipologia' non trovata. Verificare la struttura del foglio Google Sheets.")
+        existing_appliances = pd.DataFrame(columns=["appartamento", "tipologia", "modello", "marca", "anno", "posizione", "descrizione", "descrizione_problemi", "foto"])
+    else:
+        # Filtra le righe che hanno una tipologia valida (non vuota)
+        existing_appliances = existing_appliances[
+            existing_appliances["tipologia"].notna() & 
+            (existing_appliances["tipologia"].str.strip() != "")
+        ]
     
     # Mostra info sui dati esistenti
     if not existing_appliances.empty:
         st.info(f"📋 Trovati {len(existing_appliances)} elettrodomestici per {selected_apartment}")
-        existing_list = existing_appliances["nome_elettrodomestico"].dropna().tolist()
+        existing_list = existing_appliances["tipologia"].dropna().tolist()
         if existing_list:
             st.write(f"**Elettrodomestici esistenti:** {', '.join(existing_list)}")
     
     # Crea un dizionario per mappare nome -> dati esistenti
     existing_data_dict = {}
     for _, row in existing_appliances.iterrows():
-        appliance_name = row.get("nome_elettrodomestico", "")
+        appliance_name = row.get("tipologia", "")
         if appliance_name and appliance_name.strip():
             existing_data_dict[appliance_name] = row
     
@@ -65,10 +75,10 @@ def render_elettrodomestici_subpage(selected_apartment):
                     value=existing_data.get("modello", ""), 
                     key=f"modello_{appliance_name}_{selected_apartment}"
                 )
-                marca_serial = st.text_input(
-                    "Marca/Serial", 
-                    value=existing_data.get("marca_serial", ""), 
-                    key=f"marca_serial_{appliance_name}_{selected_apartment}"
+                marca = st.text_input(
+                    "Marca", 
+                    value=existing_data.get("marca", ""), 
+                    key=f"marca_{appliance_name}_{selected_apartment}"
                 )
                 anno = st.text_input(
                     "Anno", 
@@ -89,34 +99,45 @@ def render_elettrodomestici_subpage(selected_apartment):
                 key=f"descrizione_{appliance_name}_{selected_apartment}"
             )
             
-            # Gestione video
-            st.markdown("#### Video Tutorial")
-            existing_video_url = existing_data.get("url_video", "")
-            if existing_video_url:
-                st.markdown(f"**Video già presente:** [Guarda video]({existing_video_url})")
-                if existing_video_url.endswith(('.mp4', '.mov')):
-                    st.video(existing_video_url)
-            nuovo_video = st.file_uploader(
-                "Carica nuovo video (opzionale)", 
-                type=["mp4", "mov"], 
-                key=f"video_upload_{appliance_name}_{selected_apartment}"
+            descrizione_problemi = st.text_area(
+                "Descrizione Problemi", 
+                value=existing_data.get("descrizione_problemi", ""), 
+                key=f"descrizione_problemi_{appliance_name}_{selected_apartment}"
             )
-            if nuovo_video:
-                video_url = upload_file_to_drive(nuovo_video, selected_apartment, f"Tutorial {appliance_name}")
-                st.success(f"Video caricato per {appliance_name}!")
-                st.video(nuovo_video)
+            
+            # Gestione foto
+            st.markdown("#### Foto")
+            existing_foto = existing_data.get("foto", "")
+            if existing_foto:
+                st.markdown(f"**Foto già presente:** [Vedi foto]({existing_foto})")
+            nuovo_foto = st.file_uploader(
+                "Carica nuova foto (opzionale)", 
+                type=["jpg", "jpeg", "png"], 
+                key=f"foto_upload_{appliance_name}_{selected_apartment}"
+            )
+            if nuovo_foto:
+                st.success(f"Foto selezionata per {appliance_name}!")
+                st.image(nuovo_foto, caption=f"Foto {appliance_name}")
+            
+            # Gestione video non presente nel foglio, rimuoviamo
             
             # Pulsante per salvare questo elettrodomestico
             if st.button(f"💾 Salva {appliance_name}", key=f"save_{appliance_name}_{selected_apartment}"):
+                # Gestisce la foto (nuova o esistente)
+                foto_url = existing_data.get("foto", "")
+                if nuovo_foto:
+                    foto_url = upload_file_to_drive(nuovo_foto, selected_apartment, f"Foto {appliance_name}")
+                
                 data_to_save = {
                     "appartamento": selected_apartment,
-                    "nome_elettrodomestico": appliance_name,
+                    "tipologia": appliance_name,
                     "modello": modello,
-                    "marca_serial": marca_serial,
+                    "marca": marca,
                     "anno": anno,
                     "posizione": posizione,
                     "descrizione": descrizione,
-                    "url_video": existing_video_url
+                    "descrizione_problemi": descrizione_problemi,
+                    "foto": foto_url
                 }
                 save_to_sheets("elettrodomestici", data_to_save)
                 st.success(f"✅ {appliance_name} salvato con successo!")
