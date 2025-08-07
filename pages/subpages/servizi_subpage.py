@@ -26,35 +26,30 @@ def load_whisper_model():
     return model
 
 def create_audio_recorder(component_name):
-    """Crea un registratore audio con un nome di componente unico."""
-    import os
-    import numpy as np
-    from io import BytesIO
+    """Crea un registratore audio usando st.camera_input come alternativa a st_audiorec."""
+    st.markdown("#### 🎤 Registrazione Audio")
+    st.info("⚠️ Registrazione audio non disponibile su Streamlit Cloud. Usa l'upload di file audio.")
     
-    # Use the correct path to the st_audiorec component
-    build_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 
-                            ".venv311/lib/python3.11/site-packages/st_audiorec/frontend/build")
-    # specify directory and initialize st_audiorec object functionality with unique name
-    st_audiorec = components.declare_component(component_name, path=build_dir)
-
-    # Create an instance of the component: STREAMLIT AUDIO RECORDER
-    raw_audio_data = st_audiorec()  # raw_audio_data: stores all the data returned from the streamlit frontend
-    wav_bytes = None                # wav_bytes: contains the recorded audio in .WAV format after conversion
-
-    # the frontend returns raw audio data in the form of arraybuffer
-    # (this arraybuffer is derived from web-media API WAV-blob data)
-
-    if isinstance(raw_audio_data, dict):  # retrieve audio data
-        with st.spinner('retrieving audio-recording...'):
-            ind, raw_audio_data = zip(*raw_audio_data['arr'].items())
-            ind = np.array(ind, dtype=int)  # convert to np array
-            raw_audio_data = np.array(raw_audio_data)  # convert to np array
-            sorted_ints = raw_audio_data[ind]
-            stream = BytesIO(b"".join([int(v).to_bytes(1, "big") for v in sorted_ints]))
-            # wav_bytes contains audio data in byte format, ready to be processed further
-            wav_bytes = stream.read()
-
-    return wav_bytes
+    # Opzioni per audio: upload file o registrazione (se disponibile)
+    audio_option = st.radio(
+        "Scegli opzione audio:",
+        ["📁 Carica file audio", "🎤 Registra audio (non disponibile)"],
+        key=f"audio_option_{component_name}"
+    )
+    
+    if audio_option == "📁 Carica file audio":
+        audio_file = st.file_uploader(
+            "Carica file audio (MP3, WAV, M4A)",
+            type=["mp3", "wav", "m4a"],
+            key=f"audio_upload_{component_name}"
+        )
+        if audio_file:
+            st.audio(audio_file, format=f"audio/{audio_file.type}")
+            return audio_file
+    else:
+        st.warning("Registrazione audio non disponibile su Streamlit Cloud. Usa l'upload di file audio.")
+    
+    return None
 
 def process_audio_with_openai(transcription_text, fields):
     """Elabora la trascrizione con OpenAI per estrarre i dati strutturati."""

@@ -100,14 +100,31 @@ def render_elettrodomestici_subpage(selected_apartment):
         nuova_descrizione_problemi = st.text_area("Descrizione Problemi", key=f"nuova_descrizione_problemi_{selected_tipologia}")
         
         # Gestione foto per nuovo elettrodomestico
-        st.markdown("#### Foto")
-        nuovo_foto = st.file_uploader(
-            "Carica foto (opzionale)", 
-            type=["jpg", "jpeg", "png"], 
-            key=f"nuovo_foto_upload_{selected_tipologia}"
+        st.markdown("#### 📸 Foto")
+        
+        # Opzioni per foto: upload o scatta
+        foto_option = st.radio(
+            "Scegli opzione foto:",
+            ["📁 Carica foto", "📷 Scatta foto"],
+            key=f"nuovo_foto_option_{selected_tipologia}"
         )
-        if nuovo_foto:
-            st.image(nuovo_foto, caption=f"Foto {selected_tipologia}")
+        
+        if foto_option == "📁 Carica foto":
+            nuovo_foto = st.file_uploader(
+                "Carica foto (opzionale)", 
+                type=["jpg", "jpeg", "png"], 
+                key=f"nuovo_foto_upload_{selected_tipologia}"
+            )
+            if nuovo_foto:
+                st.image(nuovo_foto, caption=f"Foto {selected_tipologia}")
+        else:
+            # Scatta foto con webcam
+            nuovo_foto = st.camera_input(
+                f"Scatta foto per {selected_tipologia}",
+                key=f"nuovo_camera_{selected_tipologia}"
+            )
+            if nuovo_foto:
+                st.image(nuovo_foto, caption=f"Foto {selected_tipologia}")
         
         # Pulsante per salvare nuovo elettrodomestico
         if st.button(f"💾 Salva Nuovo {selected_tipologia}", key=f"save_new_{selected_tipologia}"):
@@ -140,63 +157,79 @@ def render_elettrodomestici_subpage(selected_apartment):
             
             with st.expander(f"🔧 {appliance_name}", expanded=True):
                 col1, col2 = st.columns(2)
-            
-            with col1:
-                modello = st.text_input(
-                    "Modello", 
-                    value=existing_data.get("modello", ""), 
-                    key=f"modello_{appliance_name}_{selected_apartment}"
+                
+                with col1:
+                    modello = st.text_input(
+                        "Modello", 
+                        value=existing_data.get("modello", ""), 
+                        key=f"modello_{appliance_name}_{selected_apartment}"
+                    )
+                    marca = st.text_input(
+                        "Marca", 
+                        value=existing_data.get("marca", ""), 
+                        key=f"marca_{appliance_name}_{selected_apartment}"
+                    )
+                    anno = st.text_input(
+                        "Anno", 
+                        value=existing_data.get("anno", ""), 
+                        key=f"anno_{appliance_name}_{selected_apartment}"
+                    )
+                
+                with col2:
+                    posizione = st.text_input(
+                        "Posizione", 
+                        value=existing_data.get("posizione", ""), 
+                        key=f"posizione_{appliance_name}_{selected_apartment}"
+                    )
+                
+                descrizione = st.text_area(
+                    "Descrizione", 
+                    value=existing_data.get("descrizione", ""), 
+                    key=f"descrizione_{appliance_name}_{selected_apartment}"
                 )
-                marca = st.text_input(
-                    "Marca", 
-                    value=existing_data.get("marca", ""), 
-                    key=f"marca_{appliance_name}_{selected_apartment}"
+                
+                descrizione_problemi = st.text_area(
+                    "Descrizione Problemi", 
+                    value=existing_data.get("descrizione_problemi", ""), 
+                    key=f"descrizione_problemi_{appliance_name}_{selected_apartment}"
                 )
-                anno = st.text_input(
-                    "Anno", 
-                    value=existing_data.get("anno", ""), 
-                    key=f"anno_{appliance_name}_{selected_apartment}"
+                
+                # Gestione foto
+                st.markdown("#### 📸 Foto")
+                existing_foto = existing_data.get("foto", "")
+                if existing_foto:
+                    st.markdown(f"**Foto già presente:** [Vedi foto]({existing_foto})")
+                
+                # Opzioni per foto: upload o scatta
+                foto_option = st.radio(
+                    "Scegli opzione foto:",
+                    ["📁 Carica foto", "📷 Scatta foto"],
+                    key=f"foto_option_{appliance_name}_{selected_apartment}"
                 )
-            
-            with col2:
-                posizione = st.text_input(
-                    "Posizione", 
-                    value=existing_data.get("posizione", ""), 
-                    key=f"posizione_{appliance_name}_{selected_apartment}"
-                )
-            
-            descrizione = st.text_area(
-                "Descrizione", 
-                value=existing_data.get("descrizione", ""), 
-                key=f"descrizione_{appliance_name}_{selected_apartment}"
-            )
-            
-            descrizione_problemi = st.text_area(
-                "Descrizione Problemi", 
-                value=existing_data.get("descrizione_problemi", ""), 
-                key=f"descrizione_problemi_{appliance_name}_{selected_apartment}"
-            )
-            
-            # Gestione foto
-            st.markdown("#### Foto")
-            existing_foto = existing_data.get("foto", "")
-            if existing_foto:
-                st.markdown(f"**Foto già presente:** [Vedi foto]({existing_foto})")
-            nuovo_foto = st.file_uploader(
-                "Carica nuova foto (opzionale)", 
-                type=["jpg", "jpeg", "png"], 
-                key=f"foto_upload_{appliance_name}_{selected_apartment}"
-            )
-            if nuovo_foto:
-                st.success(f"Foto selezionata per {appliance_name}!")
-                st.image(nuovo_foto, caption=f"Foto {appliance_name}")
-            
-            # Gestione video non presente nel foglio, rimuoviamo
-            
-            # Pulsante per salvare questo elettrodomestico
-            if st.button(f"💾 Salva {appliance_name}", key=f"save_{appliance_name}_{selected_apartment}"):
-                # Gestisce la foto (nuova o esistente)
-                foto_url = existing_data.get("foto", "")
+                
+                if foto_option == "📁 Carica foto":
+                    nuovo_foto = st.file_uploader(
+                        "Carica nuova foto (opzionale)", 
+                        type=["jpg", "jpeg", "png"], 
+                        key=f"foto_upload_{appliance_name}_{selected_apartment}"
+                    )
+                    if nuovo_foto:
+                        st.success(f"Foto selezionata per {appliance_name}!")
+                        st.image(nuovo_foto, caption=f"Foto {appliance_name}")
+                else:
+                    # Scatta foto con webcam
+                    nuovo_foto = st.camera_input(
+                        f"Scatta foto per {appliance_name}",
+                        key=f"camera_{appliance_name}_{selected_apartment}"
+                    )
+                    if nuovo_foto:
+                        st.success(f"Foto scattata per {appliance_name}!")
+                        st.image(nuovo_foto, caption=f"Foto {appliance_name}")
+                
+                # Pulsante per salvare questo elettrodomestico
+                if st.button(f"💾 Salva {appliance_name}", key=f"save_{appliance_name}_{selected_apartment}"):
+                    # Gestisce la foto (nuova o esistente)
+                    foto_url = existing_data.get("foto", "")
                 if nuovo_foto:
                     foto_url = upload_file_to_drive(nuovo_foto, selected_apartment, f"Foto {appliance_name}")
                 
