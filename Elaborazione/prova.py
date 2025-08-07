@@ -160,10 +160,8 @@ Example output:
                         text = text.rstrip().rstrip(ending).strip()
                         segment['text'] = text
                 
-                # Usa process_subtitle_text per coerenza
-                lines = process_subtitle_text(text)
-                # Ricombina in un singolo testo (le righe saranno separate da \n nel file SRT)
-                segment['text'] = lines[0] + (f"\n{lines[1]}" if lines[1] else "")
+                # Usa il testo direttamente senza processarlo
+                segment['text'] = text
             else:
                 print(f"❌ DEBUG: Segment {i} has no 'text' key: {segment}")
         except Exception as e:
