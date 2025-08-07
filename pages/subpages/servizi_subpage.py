@@ -269,9 +269,6 @@ def render_servizi_subpage(selected_apartment, existing_data=None):
     
     existing_data = st.session_state[f"servizi_data_{selected_apartment}"]
     
-    # Debug: mostra i dati caricati
-    st.write(f"DEBUG - Dati servizi per {selected_apartment}: {existing_data}")
-    
     # Carica la configurazione dei campi
     config_path = "field_configs/servizi.csv"
     fields = load_field_config(config_path)
