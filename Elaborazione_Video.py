@@ -4,7 +4,7 @@ import os
 
 # Configurazione della pagina
 st.set_page_config(
-    page_title="🎬 Editing Video - Home",
+    page_title="🎬 Elaborazione Video",
     page_icon="🎬",
     layout="wide"
 )
