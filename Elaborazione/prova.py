@@ -73,7 +73,7 @@ Your task is to optimize the following raw transcription of an instructional vid
 1. Keep the text in Italian, as it is the original language.
 2. Write COMPLETE sentences that describe exactly what is shown in the video.
 3. Each sentence should be self-contained and describe a single action clearly.
-4. Write sentences that are 8-15 words long - concise but complete.
+4. Write sentences that are 10-20 words long - natural and descriptive.
 5. NEVER truncate sentences with ellipsis (...) or cut them mid-sentence.
 6. Write natural, flowing sentences that make sense on their own.
 7. DO NOT add any prefix to the text - just write the Italian text as is.
@@ -93,6 +93,7 @@ CRITICAL QUALITY CHECKS - Before providing output, verify each sentence:
 5. Each sentence MUST make sense on its own
 6. Each sentence MUST describe a complete action
 7. If any sentence seems incomplete, rewrite it completely
+8. Each sentence MUST be a complete instruction that can stand alone
 
 Example output:
 [
@@ -196,59 +197,9 @@ def process_subtitle_text(text):
     return result
 
 def split_text(text, max_length=80, max_lines=3):
-    """Divide il testo per i sottotitoli - versione migliorata senza troncamenti"""
-    # Se il testo è già abbastanza corto, restituiscilo direttamente
-    if len(text) <= max_length:
-        return [text, ""]
-    
-    # Dividi il testo in parole
-    words = text.split()
-    lines = []
-    current_line = ""
-    
-    for word in words:
-        # Prova ad aggiungere la parola alla riga corrente
-        test_line = current_line + (" " + word) if current_line else word
-        
-        if len(test_line) <= max_length:
-            current_line = test_line
-        else:
-            # Se la riga corrente non è vuota, salvala e inizia una nuova
-            if current_line:
-                lines.append(current_line)
-            current_line = word
-    
-    # Aggiungi l'ultima riga se non è vuota
-    if current_line:
-        lines.append(current_line)
-    
-    # Assicurati di avere massimo 2 righe
-    if len(lines) > max_lines:
-        # Combina le righe in eccesso nella seconda riga
-        first_line = lines[0]
-        remaining_text = " ".join(lines[1:])
-        
-        # Se la seconda riga è ancora troppo lunga, dividila ulteriormente
-        if len(remaining_text) > max_length:
-            # Trova un punto di divisione naturale
-            words_remaining = remaining_text.split()
-            second_line = ""
-            for word in words_remaining:
-                test_line = second_line + (" " + word) if second_line else word
-                if len(test_line) <= max_length:
-                    second_line = test_line
-                else:
-                    break
-            
-            lines = [first_line, second_line]
-        else:
-            lines = [first_line, remaining_text]
-        
-    # Assicurati di avere sempre 2 righe
-    while len(lines) < max_lines:
-        lines.append("")
-    
-    return lines[:max_lines]
+    """Funzione semplificata che restituisce il testo completo senza tagli"""
+    # Restituisce il testo completo senza processarlo
+    return [text, ""]
 
 def distribute_subtitles(segments, texts):
     """Distribuisce i sottotitoli in modo uniforme"""
@@ -344,9 +295,7 @@ def create_srt_file(segments, output_file, language="IT"):
                 else:
                     prefix = "[EN] "
             
-            # Usa il testo completo senza limiti di lunghezza
-            # I sottotitoli verranno formattati automaticamente dal player video
-            
+            # Usa il testo completo senza processarlo
             srt.write(f"{i}\n{start} --> {end}\n{prefix}{text}\n\n")
 
 def read_srt_file(srt_file):
@@ -415,11 +364,8 @@ def create_ass_file(segments, output_file, language="IT", margin_v=85, video_wid
             else:
                 text = segment.get('text_en', segment['text'])
             
-            # Usa split_text direttamente
-            lines = split_text(text)
-            full_text = lines[0]
-            if lines[1]:
-                full_text += "\\N" + lines[1]
+            # Usa il testo completo senza processarlo
+            full_text = text
             
             ass.write(f"Dialogue: 0,{start},{end},Default,,100,100,0,,{full_text}\n")
 
@@ -502,20 +448,25 @@ def create_unified_srt_file(segments, output_file):
             
             # Testo italiano
             italian_text = segment['text']
-            italian_lines = split_text(italian_text)
             
             # Testo inglese
             english_text = segment.get('text_en', '')
-            english_lines = split_text(english_text) if english_text else ['', '']
             
             # Scrivi il formato unificato
             srt.write(f"{i}\n{start} --> {end}\n")
-            srt.write(f"[IT] {italian_lines[0]}\n")
-            if italian_lines[1]:
-                srt.write(f"{italian_lines[1]}\n")
-            srt.write(f"[EN] {english_lines[0]}\n")
-            if english_lines[1]:
-                srt.write(f"{english_lines[1]}\n")
+            
+            # Aggiungi prefisso IT solo se non presente
+            if italian_text.startswith('[IT] '):
+                srt.write(f"{italian_text}\n")
+            else:
+                srt.write(f"[IT] {italian_text}\n")
+            
+            # Aggiungi prefisso EN solo se non presente
+            if english_text.startswith('[EN] '):
+                srt.write(f"{english_text}\n")
+            else:
+                srt.write(f"[EN] {english_text}\n")
+            
             srt.write("\n")
 
 def translate_subtitles(segments, client, output_file, video_type=None):
@@ -569,7 +520,7 @@ CRITICAL QUALITY CHECKS - Before providing translation, verify each sentence:
             segment['text_en'] = text
             
             # Usa il testo direttamente senza process_subtitle_text (come nel test)
-            srt.write(f"{i}\n{start} --> {end}\n[EN] {text}\n\n")
+            srt.write(f"{i}\n{start} --> {end}\n{text}\n\n")
 
 def add_background_music(input_video, music_file, output_video):
     """Aggiunge musica di sottofondo"""
