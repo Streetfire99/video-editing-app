@@ -318,6 +318,9 @@ def add_tracking_entry(apartment, video_type, youtube_link, drive_link, italian_
     """Aggiunge una nuova entry al tracking"""
     import datetime
     
+    # Prima verifica e ripara il CSV se necessario
+    verify_tracking_csv()
+    
     tracking_data = load_tracking_csv()
     
     # Rimuovi entry esistenti per lo stesso appartamento e tipo
