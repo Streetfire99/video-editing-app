@@ -53,8 +53,8 @@ else:
             'Tipologia': entry['video_type'],
             'Drive': entry['drive_link'] if entry['drive_link'] else 'N/A',
             'YouTube': entry['youtube_link'] if entry['youtube_link'] else 'N/A',
-            'Transcript IT': entry.get('italian_transcript', '') if entry.get('italian_transcript') else 'N/A',
-            'Transcript EN': entry.get('english_transcript', '') if entry.get('english_transcript') else 'N/A'
+            'Manuale IT': entry.get('italian_manual', '') if entry.get('italian_manual') else 'N/A',
+            'Manuale EN': entry.get('english_manual', '') if entry.get('english_manual') else 'N/A'
         })
     
     # Mostra la tabella
@@ -82,8 +82,8 @@ else:
     # Applica le funzioni ai link
     df['Drive'] = df['Drive'].apply(make_clickable)
     df['YouTube'] = df['YouTube'].apply(make_clickable)
-    df['Transcript IT'] = df['Transcript IT'].apply(make_file_link)
-    df['Transcript EN'] = df['Transcript EN'].apply(make_file_link)
+    df['Manuale IT'] = df['Manuale IT'].apply(make_file_link)
+    df['Manuale EN'] = df['Manuale EN'].apply(make_file_link)
     
     # Mostra la tabella con HTML
     st.write(df.to_html(escape=False, index=False), unsafe_allow_html=True) 

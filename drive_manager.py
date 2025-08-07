@@ -314,7 +314,7 @@ def save_tracking_csv(tracking_data):
         st.error(f"❌ Errore nel salvataggio del CSV di tracking: {e}")
         return False
 
-def add_tracking_entry(apartment, video_type, youtube_link, drive_link, italian_transcript_path=None, english_transcript_path=None):
+def add_tracking_entry(apartment, video_type, youtube_link, drive_link, italian_manual_link=None, english_manual_link=None):
     """Aggiunge una nuova entry al tracking"""
     import datetime
     
@@ -330,8 +330,8 @@ def add_tracking_entry(apartment, video_type, youtube_link, drive_link, italian_
         'video_type': video_type,
         'youtube_link': youtube_link or '',
         'drive_link': drive_link or '',
-        'italian_transcript': italian_transcript_path or '',
-        'english_transcript': english_transcript_path or '',
+        'italian_manual': italian_manual_link or '',
+        'english_manual': english_manual_link or '',
         'date_created': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     }
     
@@ -349,7 +349,7 @@ def verify_tracking_csv():
         tracking_data = load_tracking_csv()
         
         # Verifica che tutti i record abbiano i campi necessari
-        required_fields = ['apartment', 'video_type', 'youtube_link', 'drive_link', 'italian_transcript', 'english_transcript', 'date_created']
+        required_fields = ['apartment', 'video_type', 'youtube_link', 'drive_link', 'italian_manual', 'english_manual', 'date_created']
         
         for entry in tracking_data:
             for field in required_fields:

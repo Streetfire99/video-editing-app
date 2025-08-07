@@ -889,26 +889,33 @@ elif current_phase == 'results':
                                     uploaded_count += 1
                                     
                                     # Upload manuali
-                                    upload_manual_to_drive(
+                                    manual_it_link = upload_manual_to_drive(
                                         manual_content=video['manuals']['it'],
                                         filename=f"{video['name']}_manuale_IT.txt",
                                         apartment_name=video['apartment'],
                                         video_type=video['video_type']
                                     )
                                     
-                                    upload_manual_to_drive(
+                                    manual_en_link = upload_manual_to_drive(
                                         manual_content=video['manuals']['en'],
                                         filename=f"{video['name']}_manuale_EN.txt",
                                         apartment_name=video['apartment'],
                                         video_type=video['video_type']
                                     )
                                     
+                                    if manual_it_link:
+                                        st.success(f"✅ Manuale IT caricato: {manual_it_link}")
+                                    if manual_en_link:
+                                        st.success(f"✅ Manuale EN caricato: {manual_en_link}")
+                                    
                                     # Salva nel tracking
                                     add_tracking_entry(
                                         apartment=video['apartment'],
                                         video_type=video['video_type'],
                                         youtube_link=None,
-                                        drive_link=drive_link
+                                        drive_link=drive_link,
+                                        italian_manual_link=manual_it_link,
+                                        english_manual_link=manual_en_link
                                     )
                             except Exception as e:
                                 st.error(f"❌ Errore upload {video['name']}: {str(e)}")
