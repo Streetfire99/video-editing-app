@@ -202,6 +202,10 @@ def render_field(field, existing_data, key_prefix="serv"):
     # Inizializza il valore nel session state se non esiste
     if key not in st.session_state:
         existing_value = existing_data.get(field_name, "")
+        
+        # Debug: mostra il valore originale
+        st.write(f"DEBUG - Campo: {field_name}, Valore originale: {existing_value}, Tipo: {type(existing_value)}")
+        
         if field_type == "boolean":
             # Gestione sicura dei valori boolean
             if isinstance(existing_value, bool):
@@ -209,7 +213,9 @@ def render_field(field, existing_data, key_prefix="serv"):
             elif existing_value == "" or existing_value is None:
                 st.session_state[key] = False
             else:
-                st.session_state[key] = str(existing_value).lower() in ['true', 'vero', 'si', 'yes', '1']
+                # Converti stringhe comuni a boolean
+                string_value = str(existing_value).lower().strip()
+                st.session_state[key] = string_value in ['true', 'vero', 'si', 'yes', '1', 't', 'v']
         elif field_type == "numero":
             # Gestione sicura dei valori numerici
             if existing_value == "" or existing_value is None:
