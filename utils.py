@@ -102,7 +102,21 @@ logger = setup_logger()
 load_dotenv()
 
 # Constants
-SPREADSHEET_ID = os.getenv('SPREADSHEET_ID')
+def get_spreadsheet_id():
+    """Get spreadsheet ID from secrets or environment variable"""
+    try:
+        # Try to get from Streamlit secrets first
+        if 'st' in globals():
+            spreadsheet_id = st.secrets.get('SPREADSHEET_ID')
+            if spreadsheet_id:
+                return spreadsheet_id
+    except:
+        pass
+    
+    # Fallback to environment variable
+    return os.getenv('SPREADSHEET_ID')
+
+SPREADSHEET_ID = get_spreadsheet_id()
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
 def init_google_services():
@@ -114,26 +128,37 @@ def init_google_services():
             return st.session_state.sheets_service, st.session_state.gspread_client
 
         logger.info("Initializing Google services...")
-        # Get the absolute path to the service account key file
-        # Assuming 'service_account_key.json' is in the same directory as utils.py or project root
-        # Let's try project root first as it was corrected before.
-        base_path = Path(__file__).resolve().parent.parent # Project root
-        service_account_path = base_path / 'service_account_key.json'
         
-        if not service_account_path.exists():
-            # Fallback to the same directory as utils.py if not in project root
-            logger.warning(f"Service account key not found at {service_account_path}, trying utils.py directory.")
-            service_account_path = Path(__file__).resolve().parent / 'service_account_key.json'
+        # Try to get credentials from Streamlit secrets first
+        try:
+            google_credentials = st.secrets.get('GOOGLE_SHEETS_CREDENTIALS')
+            if google_credentials:
+                logger.info("Using Google credentials from Streamlit secrets")
+                credentials_dict = json.loads(google_credentials)
+                credentials = service_account.Credentials.from_service_account_info(
+                    credentials_dict, scopes=SCOPES)
+            else:
+                # Fallback to service account key file
+                logger.info("No Google credentials in secrets, trying service account key file")
+                base_path = Path(__file__).resolve().parent.parent
+                service_account_path = base_path / 'service_account_key.json'
+                
+                if not service_account_path.exists():
+                    logger.warning(f"Service account key not found at {service_account_path}, trying utils.py directory.")
+                    service_account_path = Path(__file__).resolve().parent / 'service_account_key.json'
 
-        logger.debug(f"Attempting to load service account key from: {service_account_path}")
-        
-        if not os.path.exists(service_account_path):
-            logger.error(f"Service account key file not found at {service_account_path}")
-            st.error(f"Critical Error: service_account_key.json not found. Searched in {base_path} and {Path(__file__).resolve().parent}")
-            return None, None # Or raise an exception
+                logger.debug(f"Attempting to load service account key from: {service_account_path}")
+                
+                if not os.path.exists(service_account_path):
+                    logger.error(f"Service account key file not found at {service_account_path}")
+                    st.error(f"Critical Error: service_account_key.json not found and no secrets configured")
+                    return None, None
 
-        credentials = service_account.Credentials.from_service_account_file(
-            str(service_account_path), scopes=SCOPES)
+                credentials = service_account.Credentials.from_service_account_file(
+                    str(service_account_path), scopes=SCOPES)
+        except Exception as e:
+            logger.error(f"Error loading Google credentials: {str(e)}")
+            return None, None
         
         sheets_service = build('sheets', 'v4', credentials=credentials)
         gspread_client = gspread.authorize(credentials)
