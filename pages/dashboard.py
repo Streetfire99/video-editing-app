@@ -54,7 +54,12 @@ def main():
             logger.info("Displayed total properties metric")
         
         with col3:
-            active_contracts = len([c for c in contract_data if c.get("stato", "").lower() in ["pubblicato", "in progress"]])
+            if not contract_data.empty and "stato" in contract_data.columns:
+                active_contracts = len(contract_data[
+                    contract_data["stato"].str.lower().isin(["pubblicato", "in progress"])
+                ])
+            else:
+                active_contracts = 0
             st.metric("Active Contracts", active_contracts)
             logger.info("Displayed active contracts metric")
 
