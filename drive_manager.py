@@ -263,7 +263,7 @@ def save_tracking_csv(tracking_data):
         import csv
         from io import StringIO
         
-        fieldnames = ['apartment', 'video_type', 'youtube_link', 'drive_link', 'italian_transcript', 'english_transcript', 'date_created']
+        fieldnames = ['apartment', 'video_type', 'youtube_link', 'drive_link', 'italian_manual', 'english_manual', 'date_created']
         
         csv_buffer = StringIO()
         writer = csv.DictWriter(csv_buffer, fieldnames=fieldnames)
@@ -348,10 +348,17 @@ def verify_tracking_csv():
     try:
         tracking_data = load_tracking_csv()
         
-        # Verifica che tutti i record abbiano i campi necessari
-        required_fields = ['apartment', 'video_type', 'youtube_link', 'drive_link', 'italian_manual', 'english_manual', 'date_created']
-        
+        # Migrazione: converte i vecchi campi transcript in manual
         for entry in tracking_data:
+            # Se esistono i vecchi campi, migrali ai nuovi
+            if 'italian_transcript' in entry and 'italian_manual' not in entry:
+                entry['italian_manual'] = entry.pop('italian_transcript', '')
+            if 'english_transcript' in entry and 'english_manual' not in entry:
+                entry['english_manual'] = entry.pop('english_transcript', '')
+            
+            # Verifica che tutti i record abbiano i campi necessari
+            required_fields = ['apartment', 'video_type', 'youtube_link', 'drive_link', 'italian_manual', 'english_manual', 'date_created']
+            
             for field in required_fields:
                 if field not in entry:
                     entry[field] = ''
