@@ -31,28 +31,57 @@ def create_audio_recorder(component_name):
     import numpy as np
     from io import BytesIO
     
-    # Use the correct path to the st_audiorec component
-    build_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 
-                            ".venv311/lib/python3.11/site-packages/st_audiorec/frontend/build")
-    # specify directory and initialize st_audiorec object functionality with unique name
-    st_audiorec = components.declare_component(component_name, path=build_dir)
+    # Try to use the installed st_audiorec component
+    try:
+        import st_audiorec
+        # Use the component directly if available
+        raw_audio_data = st_audiorec.st_audiorec()
+    except ImportError:
+        # Fallback to manual component declaration
+        try:
+            # Try to find the component in the site-packages
+            import site
+            import glob
+            
+            # Search for st_audiorec in site-packages
+            site_packages = site.getsitepackages()
+            build_dir = None
+            
+            for site_pkg in site_packages:
+                potential_path = os.path.join(site_pkg, "st_audiorec", "frontend", "build")
+                if os.path.exists(potential_path):
+                    build_dir = potential_path
+                    break
+            
+            if build_dir is None:
+                # Try alternative path
+                build_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 
+                                        ".venv311/lib/python3.11/site-packages/st_audiorec/frontend/build")
+            
+            # specify directory and initialize st_audiorec object functionality with unique name
+            st_audiorec = components.declare_component(component_name, path=build_dir)
+            raw_audio_data = st_audiorec()
+        except Exception as e:
+            st.error(f"❌ Errore nel caricamento del componente audio: {e}")
+            st.info("🎤 Registrazione audio temporaneamente non disponibile")
+            return None
 
-    # Create an instance of the component: STREAMLIT AUDIO RECORDER
-    raw_audio_data = st_audiorec()  # raw_audio_data: stores all the data returned from the streamlit frontend
+    # Handle the audio data
     wav_bytes = None                # wav_bytes: contains the recorded audio in .WAV format after conversion
 
-    # the frontend returns raw audio data in the form of arraybuffer
-    # (this arraybuffer is derived from web-media API WAV-blob data)
+    if raw_audio_data is not None:
+        # the frontend returns raw audio data in the form of arraybuffer
+        # (this arraybuffer is derived from web-media API WAV-blob data)
 
-    if isinstance(raw_audio_data, dict):  # retrieve audio data
-        with st.spinner('retrieving audio-recording...'):
-            ind, raw_audio_data = zip(*raw_audio_data['arr'].items())
-            ind = np.array(ind, dtype=int)  # convert to np array
-            raw_audio_data = np.array(raw_audio_data)  # convert to np array
-            sorted_ints = raw_audio_data[ind]
-            stream = BytesIO(b"".join([int(v).to_bytes(1, "big") for v in sorted_ints]))
-            # wav_bytes contains audio data in byte format, ready to be processed further
-            wav_bytes = stream.read()
+        if isinstance(raw_audio_data, dict):  # retrieve audio data
+            with st.spinner('retrieving audio-recording...'):
+                ind, raw_audio_data = zip(*raw_audio_data['arr'].items())
+                ind = np.array(ind, dtype=int)  # convert to np array
+                raw_audio_data = np.array(raw_audio_data)  # convert to np array
+                sorted_ints = raw_audio_data[ind]
+                stream = BytesIO(b"".join([int(v).to_bytes(1, "big") for v in sorted_ints]))
+                # wav_bytes contains audio data in byte format, ready to be processed further
+                wav_bytes = stream.read()
 
     return wav_bytes
 
