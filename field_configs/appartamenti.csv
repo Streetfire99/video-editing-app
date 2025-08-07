@@ -1,0 +1,28 @@
+name,label,type,required,visible,dropdown
+stato,Stato,testo,True,True,True
+property_specific_task,Property Specific Task,testo,False,True,False
+camere,Camere,numero,True,True,False
+numero_ospiti,Numero Ospiti,numero,True,True,False
+metratura,Metratura (mq),numero,True,True,False
+locali,Locali,numero,True,True,False
+Scala,Scala,testo,False,True,False
+Piano,Piano,numero,False,True,False
+ascensore,Ascensore,testo,True,True,True
+accessibile,Accessibile,testo,False,True,False
+ostacoli,Ostacoli,testo,False,True,False
+divano_letto,Divano Letto,boolean,True,True,False
+tipologia_divano_letto,Tipologia Divano Letto,testo,False,True,False
+cantina,Cantina,boolean,True,True,False
+descrizione_cantina,Descrizione Cantina,testo,False,True,False
+balcone,Balcone,boolean,True,True,False
+descrizione_balcone,Descrizione Balcone,testo,False,True,False
+parcheggio,Parcheggio,testo,True,True,True
+descrizione_parcheggio,Descrizione Parcheggio,testo,False,True,False
+Zona,Zona,testo,True,True,True
+ical_link,Ical Link,testo,False,False,False
+Nome Appartamento,Nome Appartamento,testo,True,False,False
+Link KrossBooking,Link Krossbooking,testo,False,False,False
+Descrizione Annunci ITA Breve,Descrizione Annunci Ita Breve,testo,False,False,False
+Descrizione Annunci EN Breve,Descrizione Annunci En Breve,testo,False,False,False
+Descrizione Annunci ITA Medio,Descrizione Annunci Ita Medio,testo,False,False,False
+Descrizione Annunci EN Medio,Descrizione Annunci En Medio,testo,False,False,False

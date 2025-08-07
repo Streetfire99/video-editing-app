@@ -1,0 +1,14 @@
+name,label,type,required,visible,dropdown
+Nome proprietario,Nome Proprietario,testo,True,True,False
+Cognome proprietario,Cognome Proprietario,testo,True,True,False
+Tipo di persona,Tipo Di Persona,testo,True,True,False
+Stato residenza,Stato Residenza,testo,True,True,False
+indirizzo residenza,Indirizzo Residenza,testo,True,True,False
+città residenza,Città Residenza,testo,True,True,False
+provincia residenza,Provincia Residenza,testo,True,True,False
+cap_residenza,Cap Residenza,testo,True,True,False
+data_nascita,Data Nascita,testo,True,True,False
+luogo_nascita,Luogo Nascita,testo,True,True,False
+codice_fiscale,Codice Fiscale,testo,True,True,False
+persona,Persona,testo,True,True,False
+sentiment,Sentiment,testo,True,True,False

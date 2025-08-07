@@ -1,0 +1,30 @@
+name,label,type,required,visible,dropdown,special_config
+lat,Lat,testo,True,True,False,
+long,Long,testo,True,True,False,
+cap,Cap,testo,True,True,False,
+citofono,Citofono,testo,True,True,False,
+codice,Codice,testo,True,True,False,
+video,Video,video,True,True,False,Nessuna
+dispositivo_installato,Dispositivo Installato,boolean,True,True,False,
+shelly_id,Shelly Id,testo,True,True,False,
+chiavi_consegna_metodo,Chiavi Consegna Metodo,testo,True,True,False,
+chiavi_deposito,Chiavi Deposito,testo,True,True,False,
+chiavi_istruzioni,Chiavi Istruzioni,testo,True,True,False,
+ingresso_portone,Ingresso Portone,testo,True,True,False,
+ingresso_portone_immagine,Ingresso Portone Immagine,foto,True,True,False,Nessuna
+porta_blindata_immagine,Porta Blindata Immagine,foto,True,True,False,Nessuna
+istruzioni_speciali,Istruzioni Speciali,testo,True,True,False,
+note_cassonetti,Note Cassonetti,testo,True,True,False,
+note_parcheggio,Note Parcheggio,testo,True,True,False,
+Descrizione Accesso,Descrizione Accesso,testo,True,True,False,
+Manuali ITA,Manuali Ita,testo,True,True,False,
+Manuali EN,Manuali En,testo,True,True,False,
+Messaggio Open ITA,Messaggio Open Ita,testo,True,True,False,
+Messaggio Open EN,Messaggio Open En,testo,True,True,False,
+Messaggio Come arrivare da MPX/BGY ITA,Messaggio Come Arrivare Da Mpx/Bgy Ita,testo,True,True,False,
+Messaggio Come arrivare da MPX/BGY EN,Messaggio Come Arrivare Da Mpx/Bgy En,testo,True,True,False,
+Messaggio Duomo ITA,Messaggio Duomo Ita,testo,True,True,False,
+Messaggio Duomo EN,Messaggio Duomo En,testo,True,True,False,
+Messaggio Parcheggio ITA,Messaggio Parcheggio Ita,testo,True,True,False,
+Messaggio Parcheggio EN,Messaggio Parcheggio En,testo,True,True,False,
+Video spazzatura,Video Spazzatura,foto,True,True,False,Nessuna

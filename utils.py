@@ -420,7 +420,7 @@ def get_form_config(section_name):
         sheet_columns = list(sheet_data.columns)
         logger.info(f"Sheet columns for {section_name}: {sheet_columns}")
         
-        # 2. Leggi configurazione esistente dal CSV locale
+        # 2. Leggi configurazione esistente dal CSV locale (se esiste)
         config_file = f"field_configs/{section_name}.csv"
         existing_config = {}
         
@@ -444,6 +444,8 @@ def get_form_config(section_name):
                     logger.info(f"Loaded existing config for {section_name}: {list(existing_config.keys())}")
             except Exception as e:
                 logger.error(f"Error reading existing config: {str(e)}")
+        else:
+            logger.info(f"No existing config file found for {section_name}, will create new one")
         
         # 3. Crea la nuova configurazione
         config = {"fields": []}

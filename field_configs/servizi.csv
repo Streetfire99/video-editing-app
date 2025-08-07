@@ -1,0 +1,47 @@
+name,label,type,required,visible,dropdown
+parcheggio_per_disabili,Parcheggio Per Disabili,boolean,True,True,False
+ascensore,Ascensore,boolean,True,True,False
+asciugamani,Asciugamani,boolean,True,True,False
+bidet,Bidet,boolean,True,True,False
+phon,Phon,boolean,True,True,False
+shampoo,Shampoo,boolean,True,True,False
+vasca_doccia,Vasca Doccia,boolean,True,True,False
+cuscini_coperte_extra,Cuscini Coperte Extra,boolean,True,True,False
+check_in_contactless,Check In Contactless,boolean,True,True,False
+appendini,Appendini,boolean,True,True,False
+aria_condizionata,Aria Condizionata,boolean,True,True,False
+riscaldamento_autonomo,Riscaldamento Autonomo,boolean,True,True,False
+ferro_da_stiro,Ferro Da Stiro,boolean,True,True,False
+lavatrice,Lavatrice,boolean,True,True,False
+macchina_caffe_te,Macchina Caffe Te,boolean,True,True,False
+casa_a_un_livello,Casa A Un Livello,boolean,True,True,False
+wifi_alta_velocita,Wifi Alta Velocita,boolean,True,True,False
+cucina_completa,Cucina Completa,boolean,True,True,False
+forno,Forno,boolean,True,True,False
+forno_a_microonde,Forno A Microonde,boolean,True,True,False
+pentole_e_padelle,Pentole E Padelle,boolean,True,True,False
+piatti_e_stoviglie,Piatti E Stoviglie,boolean,True,True,False
+sala_da_pranzo,Sala Da Pranzo,boolean,True,True,False
+soggiorno,Soggiorno,boolean,True,True,False
+web_tv,Web Tv,boolean,True,True,False
+biancheria_da_letto,Biancheria Da Letto,boolean,True,True,False
+fornelli,Fornelli,boolean,True,True,False
+lavatrice_asciugatrice,Lavatrice Asciugatrice,boolean,True,True,False
+scuranti_stanza,Scuranti Stanza,boolean,True,True,False
+frigorifero,Frigorifero,boolean,True,True,False
+lavastoviglie,Lavastoviglie,boolean,True,True,False
+estintore,Estintore,boolean,True,True,False
+parcheggio_in_strada,Parcheggio In Strada,boolean,True,True,False
+rilevatore_monossido_di_carbonio,Rilevatore Monossido Di Carbonio,boolean,True,True,False
+postazione_laptop,Postazione Laptop,boolean,True,True,False
+accessibile_in_sedia_a_rotelle,Accessibile In Sedia A Rotelle,boolean,True,True,False
+bagno_privato,Bagno Privato,boolean,True,True,False
+balcone_terrazza,Balcone Terrazza,boolean,True,True,False
+asciugatrice,Asciugatrice,boolean,True,True,False
+rilevatore_di_fumo,Rilevatore Di Fumo,boolean,True,True,False
+giardino,Giardino,boolean,True,True,False
+occorrente_per_spiaggia,Occorrente Per Spiaggia,boolean,True,True,False
+vasca_da_bagno,Vasca Da Bagno,boolean,True,True,False
+cucinino,Cucinino,boolean,True,True,False
+parcheggio_gratuito,Parcheggio Gratuito,boolean,True,True,False
+tv_widescreen,Tv Widescreen,boolean,True,True,False

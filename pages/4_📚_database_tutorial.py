@@ -21,7 +21,7 @@ st.title("📚 Database Tutorial")
 col1, col2 = st.columns([1, 4])
 with col1:
     if st.button("🏠 Home"):
-        st.switch_page("Elaborazione_Video.py")
+        st.switch_page("app.py")
 
 # Carica appartamenti elaborati
 processed_apartments = get_processed_apartments()

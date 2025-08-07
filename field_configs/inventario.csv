@@ -1,0 +1,6 @@
+name,label,type,required,visible,dropdown
+stanza,Stanza,testo,True,True,False
+articolo,Articolo,testo,True,True,False
+quantita,Quantita,numero,True,True,False
+posizione,Posizione,testo,True,True,False
+data_aggiornamento,Data Aggiornamento,testo,True,True,False

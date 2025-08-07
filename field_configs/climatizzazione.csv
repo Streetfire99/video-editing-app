@@ -1,0 +1,10 @@
+name,label,type,required,visible,dropdown,special_config
+tipologia_sistema,Tipologia Sistema,testo,True,True,False,
+autonomo,Autonomo,testo,True,True,False,
+sorgente,Sorgente,testo,True,True,False,
+marca_sorgente,Marca Sorgente,testo,True,True,False,
+modello_sorgente,Modello Sorgente,testo,True,True,False,
+diffusore,Diffusore,testo,True,True,False,
+marca_diffusore,Marca Diffusore,testo,True,True,False,
+modello_diffusore,Modello Diffusore,testo,True,True,False,
+video YT,Video Yt,video,True,True,False,Nessuna

@@ -1,0 +1,30 @@
+name,label,type,required,visible,dropdown
+stato,Stato,testo,True,True,True
+tipologia_gestione,Tipologia Gestione,testo,True,True,True
+PM,PM,testo,True,True,True
+via_catastale,Via Catastale,testo,True,True,False
+cap,CAP,testo,True,True,False
+Città,Città,testo,True,True,False
+Provincia,Provincia,testo,True,True,False
+Regione,Regione,testo,True,True,False
+intestatario,Intestatario,testo,True,True,False
+iban,IBAN,testo,True,True,False
+bic,BIC,testo,True,True,False
+foglio,Foglio,testo,True,True,False
+mappa,Mappa,testo,True,True,False
+subalterno,Subalterno,testo,True,True,False
+url_planimetria,URL Planimetria,testo,True,True,False
+url_contratto,URL Contratto,testo,True,True,False
+cir,CIR,testo,True,False,False
+cin,CIN,testo,True,False,False
+inizio_collaborazione,Inizio Collaborazione,testo,True,True,False
+preavviso,Preavviso,numero,True,True,False
+scadenza,Scadenza,testo,True,True,False
+tipologia,Tipologia,testo,True,True,True
+percentuale,Percentuale,numero,True,True,False
+costo_pulizie_fino,Costo Pulizie Fino,numero,True,True,False
+costo_pulizie,Costo Pulizie,numero,True,True,False
+costi_software,Costi Software,numero,True,True,False
+costi_wifi,Costi WiFi,numero,True,True,False
+aspettative,Aspettative,numero,True,True,False
+medio_termine,Medio Termine,boolean,True,True,False

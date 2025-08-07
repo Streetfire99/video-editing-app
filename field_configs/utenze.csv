@@ -1,0 +1,12 @@
+name,label,type,required,visible,dropdown,special_config
+tipologia,Tipologia,testo,True,True,False,
+nome_utenza,Nome Utenza,testo,True,True,False,
+intestatario,Intestatario,testo,True,True,False,
+codice_pod_pdr,Codice Pod Pdr,testo,True,True,False,
+numero_cliente,Numero Cliente,numero,True,True,False,
+url_contratto,Url Contratto,testo,True,True,False,
+fornitore,Fornitore,testo,True,True,False,
+posizione_interruttore,Posizione Interruttore,testo,True,True,False,
+posizione_contatore,Posizione Contatore,testo,True,True,False,
+note,Note,testo,True,True,False,
+tutorial,Tutorial,video,True,True,False,Nessuna

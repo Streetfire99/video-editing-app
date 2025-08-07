@@ -1,0 +1,8 @@
+name,label,type,required,visible,dropdown,special_config
+nome_elettrodomestico,Nome Elettrodomestico,testo,True,True,False,
+modello,Modello,testo,True,True,False,
+marca_serial,Marca Serial,testo,True,True,False,
+anno,Anno,testo,True,True,False,
+posizione,Posizione,testo,True,True,False,
+descrizione,Descrizione,testo,True,True,False,
+url_video,Url Video,video,True,True,False,Nessuna

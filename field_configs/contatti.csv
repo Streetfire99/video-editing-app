@@ -1,0 +1,18 @@
+name,label,type,required,visible,dropdown
+Idraulico,Idraulico,testo,True,True,False
+Numero Idraulico,Numero Idraulico,testo,True,True,False
+Elettricista,Elettricista,testo,True,True,False
+Numero Elettricista,Numero Elettricista,testo,True,True,False
+Tuttofare,Tuttofare,testo,True,True,False
+Numero Tuttofare,Numero Tuttofare,testo,True,True,False
+Amministratore,Amministratore,testo,True,True,False
+Numero Amministratore,Numero Amministratore,testo,True,True,False
+Email Amministratore,Email Amministratore,testo,True,True,False
+Note amministratore,Note Amministratore,testo,True,True,False
+Custode,Custode,testo,True,True,False
+Numero Custode,Numero Custode,testo,True,True,False
+Note custode,Note Custode,testo,True,True,False
+Vicino 1,Vicino 1,testo,True,True,False
+Numero vicino 1,Numero Vicino 1,numero,True,True,False
+Vicino 2,Vicino 2,testo,True,True,False
+Numero vicino 2,Numero Vicino 2,numero,True,True,False

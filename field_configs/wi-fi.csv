@@ -1,0 +1,9 @@
+name,label,type,required,visible,dropdown
+brand,Brand,testo,True,True,False
+modello_router,Modello Router,testo,True,True,False
+nome_rete,Nome Rete,testo,True,True,False
+password,Password,testo,True,True,False
+posizione_router,Posizione Router,testo,True,True,False
+fornitore,Fornitore,testo,True,True,False
+url_contratto,Url Contratto,testo,True,True,False
+note,Note,testo,True,True,False
