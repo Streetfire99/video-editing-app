@@ -124,6 +124,7 @@ Example output:
     content = response.choices[0].message.content.strip()
     if content.startswith('```json'):
         content = content[7:]
+    # Rimuovi solo se effettivamente finisce con ```
     if content.endswith('```'):
         content = content[:-3]
     content = content.strip()
@@ -196,8 +197,7 @@ def process_subtitle_text(text):
     import re
     text = re.sub(r'\s+', ' ', text)
     
-    # Rimuovi punti, esclamazioni e domande finali
-    text = text.rstrip('.!?')
+    # Usa il testo completo senza rimuovere caratteri finali
     
     # Usa il testo completo senza processarlo
     return [text, ""]
@@ -519,8 +519,7 @@ CRITICAL QUALITY CHECKS - Before providing translation, verify each sentence:
             )
             text = translation.choices[0].message.content.strip()
             
-            # Rimuovi punti, esclamazioni e domande finali
-            text = text.rstrip('.!?')
+            # Usa il testo completo senza rimuovere caratteri finali
             
             # Aggiungi il testo inglese al segmento
             segment['text_en'] = text
