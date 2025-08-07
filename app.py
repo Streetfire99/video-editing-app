@@ -38,10 +38,7 @@ except ImportError as e:
 
 # Importa le funzioni per YouTube e Drive
 from youtube_manager import upload_to_youtube, check_youtube_setup, get_youtube_status
-from drive_manager import upload_video_to_drive, add_tracking_entry
-
-# Importa le funzioni per YouTube
-from youtube_manager import upload_to_youtube, check_youtube_setup, get_youtube_status
+from drive_manager import upload_video_to_drive, add_tracking_entry, upload_manual_to_drive
 
 # Importa le funzioni per la gestione dei dati
 from data_manager import (
@@ -50,9 +47,6 @@ from data_manager import (
     get_prompt_for_video_type,
     get_translation_prompt_for_video_type
 )
-
-# Importa le funzioni per Google Drive
-from drive_manager import upload_video_to_drive, add_tracking_entry
 
 
 
