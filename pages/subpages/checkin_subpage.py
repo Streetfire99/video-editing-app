@@ -29,22 +29,19 @@ def render_checkin_subpage(selected_apartment, existing_data=None):
     
     # Gestione chiavi
     st.markdown("### Gestione Chiavi")
-    col1, col2 = st.columns(2)
-    with col1:
-        chiavi_consegna_metodo = st.text_input("Chiavi - Metodo Consegna", value=existing_data.get("chiavi_consegna_metodo", ""), key=f"chiavi_consegna_{selected_apartment}")
-        chiavi_deposito = st.text_input("Chiavi - Deposito", value=existing_data.get("chiavi_deposito", ""), key=f"chiavi_deposito_{selected_apartment}")
-    
-    with col2:
-        chiavi_istruzioni = st.text_area("Chiavi - Istruzioni", value=existing_data.get("chiavi_istruzioni", ""), key=f"chiavi_istruzioni_{selected_apartment}")
+    chiavi_consegna_metodo = st.text_input("Chiavi - Metodo Consegna", value=existing_data.get("chiavi_consegna_metodo", ""), key=f"chiavi_consegna_{selected_apartment}")
+    chiavi_deposito = st.text_input("Chiavi - Deposito", value=existing_data.get("chiavi_deposito", ""), key=f"chiavi_deposito_{selected_apartment}")
+    chiavi_istruzioni = st.text_area("Chiavi - Istruzioni", value=existing_data.get("chiavi_istruzioni", ""), key=f"chiavi_istruzioni_{selected_apartment}")
     
     # Ingresso
     st.markdown("### Ingresso")
-    col1, col2 = st.columns(2)
-    with col1:
-        ingresso_portone = st.text_input("Ingresso Portone", value=existing_data.get("ingresso_portone", ""), key=f"ingresso_portone_{selected_apartment}")
+    ingresso_portone = st.text_input("Ingresso Portone", value=existing_data.get("ingresso_portone", ""), key=f"ingresso_portone_{selected_apartment}")
     
-    with col2:
-        # Gestione foto portone
+    # Foto
+    st.markdown("### Foto")
+    col1, col2 = st.columns(2)
+    
+    with col1:
         st.markdown("#### Foto Portone")
         portone_img_url = existing_data.get("ingresso_portone_immagine", "")
         if portone_img_url:
@@ -53,11 +50,7 @@ def render_checkin_subpage(selected_apartment, existing_data=None):
         if portone_img:
             portone_img_url = upload_file_to_drive(portone_img, selected_apartment, "Foto portone")
     
-    # Porta blindata
-    st.markdown("### Porta Blindata")
-    col1, col2 = st.columns(2)
-    with col1:
-        # Gestione foto porta blindata
+    with col2:
         st.markdown("#### Foto Porta Blindata")
         blindata_img_url = existing_data.get("porta_blindata_immagine", "")
         if blindata_img_url:
