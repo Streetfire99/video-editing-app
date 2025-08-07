@@ -203,9 +203,6 @@ def render_field(field, existing_data, key_prefix="serv"):
     if key not in st.session_state:
         existing_value = existing_data.get(field_name, "")
         
-        # Debug: mostra il valore originale
-        st.write(f"DEBUG - Campo: {field_name}, Valore originale: {existing_value}, Tipo: {type(existing_value)}")
-        
         if field_type == "boolean":
             # Gestione sicura dei valori boolean
             if isinstance(existing_value, bool):
@@ -271,6 +268,9 @@ def render_servizi_subpage(selected_apartment, existing_data=None):
         st.session_state[f"servizi_data_{selected_apartment}"] = get_apartment_data("servizi", selected_apartment)
     
     existing_data = st.session_state[f"servizi_data_{selected_apartment}"]
+    
+    # Debug: mostra i dati caricati
+    st.write(f"DEBUG - Dati servizi per {selected_apartment}: {existing_data}")
     
     # Carica la configurazione dei campi
     config_path = "field_configs/servizi.csv"

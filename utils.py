@@ -35,12 +35,12 @@ def get_cached_data(key, fetch_func, *args, **kwargs):
     if key in API_CACHE:
         cached_data, timestamp = API_CACHE[key]
         if current_time - timestamp < CACHE_DURATION:
-            logger.info(f"Using cached data for {key}")
+            # logger.info(f"Using cached data for {key}")
             return cached_data
     
     # Se non in cache o scaduta, recupera i dati
     try:
-        logger.info(f"Fetching fresh data for {key}")
+        # logger.info(f"Fetching fresh data for {key}")
         data = fetch_func(*args, **kwargs)
         API_CACHE[key] = (data, current_time)
         return data
@@ -232,14 +232,14 @@ def get_data(sheet_name):
     
     def fetch_sheet_data():
         try:
-            logger.info(f"Fetching data for sheet: {sheet_name}")
+            # logger.info(f"Fetching data for sheet: {sheet_name}")
             sheet = get_sheet(sheet_name)
             if sheet is None:
                 logger.error(f"Sheet {sheet_name} not found")
                 return None
             
             # Get all values from the sheet
-            logger.info(f"Getting all values from sheet: {sheet_name}")
+            # logger.info(f"Getting all values from sheet: {sheet_name}")
             all_values = sheet.get_all_values()
             
             if not all_values:
@@ -248,8 +248,8 @@ def get_data(sheet_name):
             
             # Convert to DataFrame
             df = pd.DataFrame(all_values[1:], columns=all_values[0])
-            logger.info(f"Headers found in {sheet_name}: {list(df.columns)}")
-            logger.info(f"Data shape: {df.shape}")
+            # logger.info(f"Headers found in {sheet_name}: {list(df.columns)}")
+            # logger.info(f"Data shape: {df.shape}")
             
             return df
             
