@@ -73,7 +73,7 @@ Your task is to optimize the following raw transcription of an instructional vid
 1. Keep the text in Italian, as it is the original language.
 2. Write COMPLETE sentences that describe exactly what is shown in the video.
 3. Each sentence should be self-contained and describe a single action clearly.
-4. Write sentences that are 8-12 words long - NOT too short, NOT too long.
+4. Write sentences that are 8-15 words long - concise but complete.
 5. NEVER truncate sentences with ellipsis (...) or cut them mid-sentence.
 6. Write natural, flowing sentences that make sense on their own.
 7. DO NOT add any prefix to the text - just write the Italian text as is.
@@ -84,6 +84,15 @@ Your task is to optimize the following raw transcription of an instructional vid
 
 Raw transcription:
 {raw_transcription}
+
+CRITICAL QUALITY CHECKS - Before providing output, verify each sentence:
+1. Each sentence MUST be grammatically complete
+2. NO sentences ending with "..." or ".." or "."
+3. NO sentences ending with "e" or "o" or "a" (incomplete words)
+4. NO sentences ending with "che" or "per" or "con" (incomplete phrases)
+5. Each sentence MUST make sense on its own
+6. Each sentence MUST describe a complete action
+7. If any sentence seems incomplete, rewrite it completely
 
 Example output:
 [
@@ -139,8 +148,19 @@ Example output:
     for i, segment in enumerate(optimized_segments):
         try:
             if 'text' in segment:
+                text = segment['text']
+                
+                # Controlli di qualità per frasi tagliate
+                incomplete_endings = ['...', '..', '.', 'e', 'o', 'a', 'che', 'per', 'con', 'di', 'da', 'in', 'su']
+                for ending in incomplete_endings:
+                    if text.rstrip().endswith(ending):
+                        print(f"⚠️ WARNING: Sentence {i} ends with incomplete word '{ending}': {text}")
+                        # Rimuovi l'ending incompleto
+                        text = text.rstrip().rstrip(ending).strip()
+                        segment['text'] = text
+                
                 # Usa process_subtitle_text per coerenza
-                lines = process_subtitle_text(segment['text'])
+                lines = process_subtitle_text(text)
                 # Ricombina in un singolo testo (le righe saranno separate da \n nel file SRT)
                 segment['text'] = lines[0] + (f"\n{lines[1]}" if lines[1] else "")
             else:
@@ -175,7 +195,7 @@ def process_subtitle_text(text):
     result = split_text(text, max_length=25, max_lines=2)
     return result
 
-def split_text(text, max_length=30, max_lines=2):
+def split_text(text, max_length=80, max_lines=3):
     """Divide il testo per i sottotitoli - versione migliorata senza troncamenti"""
     # Se il testo è già abbastanza corto, restituiscilo direttamente
     if len(text) <= max_length:
@@ -324,37 +344,8 @@ def create_srt_file(segments, output_file, language="IT"):
                 else:
                     prefix = "[EN] "
             
-            # CONTROLLO DIRETTO DEL TESTO - Forza massimo 2 righe
-            max_chars_per_line = 40  # Aumentato per evitare tagli eccessivi
-            
-            if len(text) > max_chars_per_line:
-                # Dividi in modo intelligente
-                words = text.split()
-                lines = []
-                current_line = ""
-                
-                for word in words:
-                    test_line = current_line + (" " + word) if current_line else word
-                    if len(test_line) <= max_chars_per_line:
-                        current_line = test_line
-                    else:
-                        if current_line:
-                            lines.append(current_line)
-                        current_line = word
-                
-                if current_line:
-                    lines.append(current_line)
-                
-                # Assicurati di avere massimo 2 righe
-                if len(lines) > 2:
-                    # Combina le righe in eccesso
-                    lines = [lines[0], " ".join(lines[1:])]
-                    # Tronca se ancora troppo lungo
-                    if len(lines[1]) > max_chars_per_line:
-                        lines[1] = lines[1][:max_chars_per_line-3] + "..."
-                
-                # Unisci le righe con \n
-                text = "\\N".join(lines)
+            # Usa il testo completo senza limiti di lunghezza
+            # I sottotitoli verranno formattati automaticamente dal player video
             
             srt.write(f"{i}\n{start} --> {end}\n{prefix}{text}\n\n")
 
@@ -537,12 +528,21 @@ def translate_subtitles(segments, client, output_file, video_type=None):
 Translate the following Italian text to English, ensuring:
 - The translation is clear, concise, and suitable for subtitles.
 - Use an imperative tone, avoiding questions or incomplete sentences.
-- Write COMPLETE sentences that are 8-12 words long.
+- Write COMPLETE sentences that are 8-15 words long.
 - NEVER truncate sentences with ellipsis (...) or cut them mid-sentence.
 - Write natural, flowing sentences that make sense on their own.
 - IMPORTANT: Always translate to English, never leave any Italian text.
 - DO NOT add any prefix to the translation.
 - The text will be automatically formatted for subtitles later - focus on content quality.
+
+CRITICAL QUALITY CHECKS - Before providing translation, verify each sentence:
+1. Each sentence MUST be grammatically complete in English
+2. NO sentences ending with "..." or ".." or "."
+3. NO sentences ending with "and" or "or" or "the" (incomplete words)
+4. NO sentences ending with "that" or "for" or "with" (incomplete phrases)
+5. Each sentence MUST make sense on its own
+6. Each sentence MUST describe a complete action
+7. If any sentence seems incomplete, rewrite it completely
 """
     
     with open(output_file, "w", encoding="utf-8") as srt:
