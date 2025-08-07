@@ -94,7 +94,7 @@ def cleanup_session_files():
 
 # Configurazione della pagina
 st.set_page_config(
-    page_title="Video Editor con Sottotitoli",
+    page_title="🎬 Elaborazione Tutorial",
     page_icon="🎬",
     layout="wide"
 )

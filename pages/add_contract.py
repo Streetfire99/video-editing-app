@@ -167,29 +167,29 @@ def render_section(section_name, fields):
         
         for i, proprietario in enumerate(st.session_state.proprietari):
             st.markdown(f"### Proprietario {i+1}")
-    for field in fields:
+            for field in fields:
                 if not field.get("visible", True):
                     continue
-        field_name = field["name"]
-        field_type = field.get("type", "testo")
-        field_label = field.get("label", field_name)
-        vals = unique_values.get(field_name, [])
+                field_name = field["name"]
+                field_type = field.get("type", "testo")
+                field_label = field.get("label", field_name)
+                vals = unique_values.get(field_name, [])
                 try:
                     if field_type == "testo":
-        if field.get("dropdown", False):
-            options = [v for v in vals if str(v).strip() != ""] + ["Altro..."]
-            selected = st.selectbox(
-                field_label,
-                options=options,
+                        if field.get("dropdown", False):
+                            options = [v for v in vals if str(v).strip() != ""] + ["Altro..."]
+                            selected = st.selectbox(
+                                field_label,
+                                options=options,
                                 key=f"{section_name}_{field_name}_{i}"
-            )
-            if selected == "Altro...":
-                value = st.text_input(
-                    f"Specifica {field_label}",
+                            )
+                            if selected == "Altro...":
+                                value = st.text_input(
+                                    f"Specifica {field_label}",
                                     key=f"{section_name}_{field_name}_{i}_other"
-                )
-            else:
-                value = selected
+                                )
+                            else:
+                                value = selected
                         else:
                             value = st.text_input(
                                 field_label,
@@ -265,12 +265,12 @@ def render_section(section_name, fields):
                             key=f"{section_name}_{field_name}"
                         )
                     st.session_state.contract_data[section_name][field_name] = value
-        else:
-            value = st.text_input(
-                field_label,
-                key=f"{section_name}_{field_name}"
-            )
-        st.session_state.contract_data[section_name][field_name] = value
+                else:
+                    value = st.text_input(
+                        field_label,
+                        key=f"{section_name}_{field_name}"
+                    )
+                    st.session_state.contract_data[section_name][field_name] = value
             except Exception as e:
                 logger.error(f"Error rendering field {field_name}: {str(e)}")
                 st.error(f"Errore nel rendering del campo {field_label}")
@@ -385,6 +385,14 @@ def main():
     """Add Contract page"""
     try:
         logger.info("Starting Add Contract page")
+        
+        # Configurazione della pagina
+        st.set_page_config(
+            page_title="📄 Add Contract",
+            page_icon="📄",
+            layout="wide"
+        )
+        
         st.title("📄 Nuovo Contratto")
 
         # --- BLOCCO REGISTRAZIONE E AI ---

@@ -65,4 +65,4 @@ else:
                 # Pulsante per andare alla pagina dei dettagli dell'appartamento
                 if st.button(f"📋 Gestisci", key=f"btn_{apartment}"):
                     st.session_state.selected_apartment = apartment
-                    st.switch_page("pages/___📋_Dettagli_Appartamento.py") 
+                    st.switch_page("pages/hidden/📋_Dettagli_Appartamento.py") 

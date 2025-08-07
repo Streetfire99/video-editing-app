@@ -112,6 +112,13 @@ def main():
     try:
         logger.info("Starting Settings page")
         
+        # Configurazione della pagina
+        st.set_page_config(
+            page_title="⚙️ Settings",
+            page_icon="⚙️",
+            layout="wide"
+        )
+        
         st.title("⚙️ Impostazioni")
         
         # Pulsante per ricaricare configurazioni dal Google Sheet

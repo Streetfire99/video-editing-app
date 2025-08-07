@@ -16,6 +16,13 @@ from pages.subpages.elettrodomestici_subpage import render_elettrodomestici_subp
 logger = logging.getLogger(__name__)
 
 def main():
+    # Configurazione della pagina
+    st.set_page_config(
+        page_title="🏠 Add Property",
+        page_icon="🏠",
+        layout="wide"
+    )
+    
     st.title("Aggiungi Proprietà")
     
     # Pulsante per pulire la cache API

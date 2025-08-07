@@ -13,7 +13,7 @@ def main():
     logger.info("Starting Dashboard page")
     try:
         st.set_page_config(
-            page_title="Dashboard",
+            page_title="📊 Dashboard",
             page_icon="📊",
             layout="wide"
         )
