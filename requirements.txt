@@ -7,4 +7,5 @@ gspread>=5.0.0
 pandas>=1.5.0
 google-auth>=2.0.0
 python-dotenv>=1.0.0
-whisper>=1.0.0 
+whisper>=1.0.0
+st_audiorec>=0.1.0 
