@@ -22,39 +22,39 @@ def render_utenze_subpage(selected_apartment, existing_data=None):
     st.markdown("### Informazioni Base")
     col1, col2 = st.columns(2)
     with col1:
-        fornitore_luce = st.text_input("Fornitore Luce", value=existing_data.get("fornitore_luce", ""), key="utenza_luce")
-        numero_contratto_luce = st.text_input("Numero Contratto Luce", value=existing_data.get("numero_contratto_luce", ""), key="utenza_contratto_luce")
-        pod_luce = st.text_input("POD Luce", value=existing_data.get("pod_luce", ""), key="utenza_pod_luce")
+        fornitore_luce = st.text_input("Fornitore Luce", value=existing_data.get("fornitore_luce", ""), key=f"utenza_luce_{selected_apartment}")
+        numero_contratto_luce = st.text_input("Numero Contratto Luce", value=existing_data.get("numero_contratto_luce", ""), key=f"utenza_contratto_luce_{selected_apartment}")
+        pod_luce = st.text_input("POD Luce", value=existing_data.get("pod_luce", ""), key=f"utenza_pod_luce_{selected_apartment}")
     
     with col2:
-        fornitore_gas = st.text_input("Fornitore Gas", value=existing_data.get("fornitore_gas", ""), key="utenza_gas")
-        numero_contratto_gas = st.text_input("Numero Contratto Gas", value=existing_data.get("numero_contratto_gas", ""), key="utenza_contratto_gas")
-        pdr_gas = st.text_input("PDR Gas", value=existing_data.get("pdr_gas", ""), key="utenza_pdr_gas")
+        fornitore_gas = st.text_input("Fornitore Gas", value=existing_data.get("fornitore_gas", ""), key=f"utenza_gas_{selected_apartment}")
+        numero_contratto_gas = st.text_input("Numero Contratto Gas", value=existing_data.get("numero_contratto_gas", ""), key=f"utenza_contratto_gas_{selected_apartment}")
+        pdr_gas = st.text_input("PDR Gas", value=existing_data.get("pdr_gas", ""), key=f"utenza_pdr_gas_{selected_apartment}")
     
     # Informazioni acqua
     st.markdown("### Informazioni Acqua")
     col1, col2 = st.columns(2)
     with col1:
-        fornitore_acqua = st.text_input("Fornitore Acqua", value=existing_data.get("fornitore_acqua", ""), key="utenza_acqua")
-        numero_contratto_acqua = st.text_input("Numero Contratto Acqua", value=existing_data.get("numero_contratto_acqua", ""), key="utenza_contratto_acqua")
+        fornitore_acqua = st.text_input("Fornitore Acqua", value=existing_data.get("fornitore_acqua", ""), key=f"utenza_acqua_{selected_apartment}")
+        numero_contratto_acqua = st.text_input("Numero Contratto Acqua", value=existing_data.get("numero_contratto_acqua", ""), key=f"utenza_contratto_acqua_{selected_apartment}")
     
     with col2:
-        numero_contatore_acqua = st.text_input("Numero Contatore Acqua", value=existing_data.get("numero_contatore_acqua", ""), key="utenza_contatore_acqua")
-        posizione_contatore_acqua = st.text_input("Posizione Contatore Acqua", value=existing_data.get("posizione_contatore_acqua", ""), key="utenza_posizione_acqua")
+        numero_contatore_acqua = st.text_input("Numero Contatore Acqua", value=existing_data.get("numero_contatore_acqua", ""), key=f"utenza_contatore_acqua_{selected_apartment}")
+        posizione_contatore_acqua = st.text_input("Posizione Contatore Acqua", value=existing_data.get("posizione_contatore_acqua", ""), key=f"utenza_posizione_acqua_{selected_apartment}")
     
     # Informazioni rifiuti
     st.markdown("### Informazioni Rifiuti")
     col1, col2 = st.columns(2)
     with col1:
-        fornitore_rifiuti = st.text_input("Fornitore Rifiuti", value=existing_data.get("fornitore_rifiuti", ""), key="utenza_rifiuti")
-        numero_contratto_rifiuti = st.text_input("Numero Contratto Rifiuti", value=existing_data.get("numero_contratto_rifiuti", ""), key="utenza_contratto_rifiuti")
+        fornitore_rifiuti = st.text_input("Fornitore Rifiuti", value=existing_data.get("fornitore_rifiuti", ""), key=f"utenza_rifiuti_{selected_apartment}")
+        numero_contratto_rifiuti = st.text_input("Numero Contratto Rifiuti", value=existing_data.get("numero_contratto_rifiuti", ""), key=f"utenza_contratto_rifiuti_{selected_apartment}")
     
     with col2:
-        giorno_raccolta = st.text_input("Giorno Raccolta", value=existing_data.get("giorno_raccolta", ""), key="utenza_giorno_raccolta")
-        tipo_raccolta = st.text_input("Tipo Raccolta", value=existing_data.get("tipo_raccolta", ""), key="utenza_tipo_raccolta")
+        giorno_raccolta = st.text_input("Giorno Raccolta", value=existing_data.get("giorno_raccolta", ""), key=f"utenza_giorno_raccolta_{selected_apartment}")
+        tipo_raccolta = st.text_input("Tipo Raccolta", value=existing_data.get("tipo_raccolta", ""), key=f"utenza_tipo_raccolta_{selected_apartment}")
     
     # Note
-    note = st.text_area("Note", value=existing_data.get("note", ""), key="utenza_note")
+    note = st.text_area("Note", value=existing_data.get("note", ""), key=f"utenza_note_{selected_apartment}")
     
     # Salvataggio
     if st.button("Salva configurazione Utenze"):
@@ -87,7 +87,7 @@ def render_utenze_subpage(selected_apartment, existing_data=None):
         nuovo_video = st.file_uploader(
             "Carica nuovo video tutorial (opzionale)", 
             type=["mp4", "mov"], 
-            key=f"utenza_video_upload_{'luce' if 'luce' in existing_data else 'gas'}"
+            key=f"utenza_video_upload_{'luce' if 'luce' in existing_data else 'gas'}_{selected_apartment}"
         )
         if nuovo_video:
             tutorial_url = upload_file_to_drive(nuovo_video, selected_apartment, f"Video tutorial utenza {'luce' if 'luce' in existing_data else 'gas'}")
@@ -97,7 +97,7 @@ def render_utenze_subpage(selected_apartment, existing_data=None):
             st.markdown("---")
             st.markdown("##### Oppure registra un video dal browser:")
             webrtc_ctx = webrtc_streamer(
-                key=f"utenza_video_record_{'luce' if 'luce' in existing_data else 'gas'}", 
+                key=f"utenza_video_record_{'luce' if 'luce' in existing_data else 'gas'}_{selected_apartment}", 
                 video_receiver_size=(640, 480),
                 sendback_audio=False
             )
@@ -134,7 +134,7 @@ def render_utenze_subpage(selected_apartment, existing_data=None):
         for i, utenza in enumerate(st.session_state.utenze_nuove):
             st.write(f"{i+1}. {utenza['tipologia']} - {utenza['nome_utenza']}")
             
-        if st.button("Salva tutte le utenze aggiunte", key="salva_utenze"):
+        if st.button("Salva tutte le utenze aggiunte", key=f"salva_utenze_{selected_apartment}"):
             for utenza in st.session_state.utenze_nuove:
                 data = utenza.copy()
                 data.pop("nuovo_video", None)

@@ -90,7 +90,7 @@ def render_climatizzazione_subpage(selected_apartment, existing_data=None):
     st.markdown("#### Gestione Sistemi di Climatizzazione")
     
     # Selezione tipologia (riscaldamento, condizionamento)
-    tipologia = st.selectbox("Tipologia", ["Riscaldamento", "Condizionamento"], key="clima_tipologia")
+    tipologia = st.selectbox("Tipologia", ["Riscaldamento", "Condizionamento"], key=f"clima_tipologia_{selected_apartment}")
     
     # Trova i dati esistenti per questa tipologia
     existing_data = {}
@@ -100,16 +100,16 @@ def render_climatizzazione_subpage(selected_apartment, existing_data=None):
             existing_data = match.iloc[0].to_dict()
     
     # Campi comuni per tutti i sistemi
-    nome_sistema = st.text_input("Nome Sistema", value=existing_data.get("sorgente", ""), key="clima_nome")
-    modello = st.text_input("Modello", value=existing_data.get("modello_sorgente", ""), key="clima_modello")
-    marca = st.text_input("Marca", value=existing_data.get("marca_sorgente", ""), key="clima_marca")
-    autonomo = st.checkbox("Sistema Autonomo", value=existing_data.get("autonomo", False), key="clima_autonomo")
+    nome_sistema = st.text_input("Nome Sistema", value=existing_data.get("sorgente", ""), key=f"clima_nome_{selected_apartment}")
+    modello = st.text_input("Modello", value=existing_data.get("modello_sorgente", ""), key=f"clima_modello_{selected_apartment}")
+    marca = st.text_input("Marca", value=existing_data.get("marca_sorgente", ""), key=f"clima_marca_{selected_apartment}")
+    autonomo = st.checkbox("Sistema Autonomo", value=existing_data.get("autonomo", False), key=f"clima_autonomo_{selected_apartment}")
     
     # Campi per il diffusore
     st.markdown("#### Diffusore")
-    diffusore = st.text_input("Tipo Diffusore", value=existing_data.get("diffusore", ""), key="clima_diffusore")
-    marca_diffusore = st.text_input("Marca Diffusore", value=existing_data.get("marca_diffusore", ""), key="clima_marca_diffusore")
-    modello_diffusore = st.text_input("Modello Diffusore", value=existing_data.get("modello_diffusore", ""), key="clima_modello_diffusore")
+    diffusore = st.text_input("Tipo Diffusore", value=existing_data.get("diffusore", ""), key=f"clima_diffusore_{selected_apartment}")
+    marca_diffusore = st.text_input("Marca Diffusore", value=existing_data.get("marca_diffusore", ""), key=f"clima_marca_diffusore_{selected_apartment}")
+    modello_diffusore = st.text_input("Modello Diffusore", value=existing_data.get("modello_diffusore", ""), key=f"clima_modello_diffusore_{selected_apartment}")
     
     # Video tutorial
     tutorial_url = existing_data.get("video YT", "")
@@ -118,7 +118,7 @@ def render_climatizzazione_subpage(selected_apartment, existing_data=None):
     nuovo_video = st.file_uploader(
         "Carica nuovo video tutorial (opzionale)", 
         type=["mp4", "mov"], 
-        key=f"clima_video_upload_{tipologia.lower()}"
+        key=f"clima_video_upload_{tipologia.lower()}_{selected_apartment}"
     )
     if nuovo_video:
         tutorial_url = upload_file_to_drive(nuovo_video, selected_apartment, f"Video tutorial {tipologia}")
@@ -128,7 +128,7 @@ def render_climatizzazione_subpage(selected_apartment, existing_data=None):
         st.markdown("---")
         st.markdown("##### Oppure registra un video dal browser:")
         webrtc_ctx = webrtc_streamer(
-            key=f"clima_video_record_{tipologia.lower()}", 
+            key=f"clima_video_record_{tipologia.lower()}_{selected_apartment}", 
             video_receiver_size=(640, 480),
             sendback_audio=False
         )
@@ -163,7 +163,7 @@ def render_climatizzazione_subpage(selected_apartment, existing_data=None):
         for i, sistema in enumerate(st.session_state.climatizzazione_nuova):
             st.write(f"{i+1}. {sistema['tipologia_sistema']} - {sistema['sorgente']}")
             
-        if st.button("Salva tutti i sistemi aggiunti", key="salva_climatizzazione"):
+        if st.button("Salva tutti i sistemi aggiunti", key=f"salva_climatizzazione_{selected_apartment}"):
             for sistema in st.session_state.climatizzazione_nuova:
                 data = sistema.copy()
                 data.pop("nuovo_video", None)

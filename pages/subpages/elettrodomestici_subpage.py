@@ -73,13 +73,13 @@ def render_elettrodomestici_subpage(selected_apartment):
         selected_tipologia = st.selectbox(
             "Seleziona Tipologia",
             options=all_tipologie + ["➕ Aggiungi nuova tipologia"],
-            key="new_appliance_type"
+            key=f"new_appliance_type_{selected_apartment}"
         )
     
     with col2:
         # Campo per nuova tipologia se selezionato
         if selected_tipologia == "➕ Aggiungi nuova tipologia":
-            new_tipologia = st.text_input("Nuova Tipologia", key="new_tipologia_input")
+            new_tipologia = st.text_input("Nuova Tipologia", key=f"new_tipologia_input_{selected_apartment}")
             if new_tipologia:
                 selected_tipologia = new_tipologia
     
