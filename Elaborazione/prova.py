@@ -94,6 +94,8 @@ CRITICAL QUALITY CHECKS - Before providing output, verify each sentence:
 6. Each sentence MUST describe a complete action
 7. If any sentence seems incomplete, rewrite it completely
 8. Each sentence MUST be a complete instruction that can stand alone
+9. NEVER cut words in the middle - each sentence must end with a complete word
+10. If a sentence seems too long, break it into multiple complete sentences instead of cutting it
 
 Example output:
 [
@@ -114,7 +116,8 @@ Example output:
         messages=[
             {"role": "user", "content": final_prompt.format(raw_transcription=raw_transcription)}
         ],
-        temperature=0.1
+        temperature=0.1,
+        max_tokens=4000  # Aumenta il limite di token per evitare tagli
     )
 
     # Clean the response content before parsing JSON
@@ -160,6 +163,12 @@ Example output:
                         text = text.rstrip().rstrip(ending).strip()
                         segment['text'] = text
                 
+                # Controllo per parole tagliate a metà
+                if text and not text.endswith(' ') and len(text.split()) > 0:
+                    last_word = text.split()[-1]
+                    if len(last_word) < 3:  # Se l'ultima parola è troppo corta, potrebbe essere tagliata
+                        print(f"⚠️ WARNING: Sentence {i} might have incomplete last word: '{text}'")
+                
                 # Usa il testo direttamente senza processarlo
                 segment['text'] = text
             else:
@@ -190,9 +199,8 @@ def process_subtitle_text(text):
     # Rimuovi punti, esclamazioni e domande finali
     text = text.rstrip('.!?')
     
-    # Usa split_text per garantire sempre 2 righe
-    result = split_text(text, max_length=25, max_lines=2)
-    return result
+    # Usa il testo completo senza processarlo
+    return [text, ""]
 
 def split_text(text, max_length=80, max_lines=3):
     """Funzione semplificata che restituisce il testo completo senza tagli"""
@@ -595,7 +603,7 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
         stream = ffmpeg.output(
             stream,
             output_video,
-            vf=f"subtitles={subtitle_file_it}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height},MarginL=50,MarginR=50',subtitles={subtitle_file_en}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height},MarginL=50,MarginR=50'",
+            vf=f"subtitles={subtitle_file_it}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height},MarginL=50,MarginR=50,WrapStyle=0',subtitles={subtitle_file_en}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height},MarginL=50,MarginR=50,WrapStyle=0'",
             vcodec='libx264',
             acodec='aac',
             preset='fast',  # Usa preset veloce per maggiore stabilità
@@ -665,37 +673,8 @@ def create_fixed_position_ass_file(segments, output_file, language="IT", margin_
             # Pulisci il testo da caratteri problematici
             text = text.replace("\n", "").replace("\r", "").strip()
             
-            # Gestione intelligente del testo lungo
-            max_chars_per_line = 25  # Ridotto per sicurezza
-            if len(text) > max_chars_per_line:
-                # Dividi in modo intelligente mantenendo le parole intere
-                words = text.split()
-                lines = []
-                current_line = ""
-                
-                for word in words:
-                    test_line = current_line + (" " + word) if current_line else word
-                    if len(test_line) <= max_chars_per_line:
-                        current_line = test_line
-                    else:
-                        if current_line:
-                            lines.append(current_line)
-                        current_line = word
-                
-                if current_line:
-                    lines.append(current_line)
-                
-                # Assicurati di avere massimo 2 righe
-                if len(lines) > 2:
-                    # Combina le righe in eccesso
-                    lines = [lines[0], " ".join(lines[1:])]
-                    # Tronca se ancora troppo lungo
-                    if len(lines[1]) > max_chars_per_line:
-                        lines[1] = lines[1][:max_chars_per_line-3] + "..."
-                
-                full_text = "\\N".join(lines)
-            else:
-                full_text = text
+            # Usa il testo completo senza limiti
+            full_text = text
             
             ass.write(f"Dialogue: 0,{start},{end},Default,,200,200,0,,{prefix}{full_text}\n")
 
