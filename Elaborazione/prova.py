@@ -64,8 +64,19 @@ def transcribe_audio(audio_file, client):
 def optimize_transcription(raw_transcription, client, custom_prompt=None, video_type=None, original_segments=None):
     """Ottimizza la trascrizione con descrizione visiva"""
     
-    # Prompt base per la tipologia di video
-    base_prompt = "You are a video subtitle editor specializing in instructional videos."
+    # Importa la funzione per ottenere il prompt specifico
+    try:
+        from data_manager import get_prompt_for_video_type
+    except ImportError:
+        # Fallback se non riesce a importare
+        def get_prompt_for_video_type(video_type):
+            return "You are a video subtitle editor specializing in instructional videos."
+    
+    # Ottieni il prompt specifico per la tipologia di video
+    if video_type:
+        base_prompt = get_prompt_for_video_type(video_type)
+    else:
+        base_prompt = "You are a video subtitle editor specializing in instructional videos."
     
     base_prompt += """
 Your task is to optimize the following raw transcription of an instructional video. The video shows a person performing the actions described in the audio. Follow these steps:
@@ -478,8 +489,19 @@ def create_unified_srt_file(segments, output_file):
 def translate_subtitles(segments, client, output_file, video_type=None):
     """Traduce i sottotitoli in inglese - identica al test che funzionava"""
     
-    # Prompt di traduzione per la tipologia di video
-    translation_prompt = "You are a translator specializing in instructional videos."
+    # Importa la funzione per ottenere il prompt di traduzione specifico
+    try:
+        from data_manager import get_translation_prompt_for_video_type
+    except ImportError:
+        # Fallback se non riesce a importare
+        def get_translation_prompt_for_video_type(video_type):
+            return "You are a translator specializing in instructional videos."
+    
+    # Ottieni il prompt di traduzione specifico per la tipologia di video
+    if video_type:
+        translation_prompt = get_translation_prompt_for_video_type(video_type)
+    else:
+        translation_prompt = "You are a translator specializing in instructional videos."
     
     translation_prompt += """
 Translate the following Italian text to English, ensuring:
