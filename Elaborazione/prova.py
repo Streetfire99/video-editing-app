@@ -155,14 +155,14 @@ Example output:
             if 'text' in segment:
                 text = segment['text']
                 
-                # Controlli di qualità per frasi tagliate
-                incomplete_endings = ['...', '..', '.', 'e', 'o', 'a', 'che', 'per', 'con', 'di', 'da', 'in', 'su']
-                for ending in incomplete_endings:
-                    if text.rstrip().endswith(ending):
-                        print(f"⚠️ WARNING: Sentence {i} ends with incomplete word '{ending}': {text}")
-                        # Rimuovi l'ending incompleto
-                        text = text.rstrip().rstrip(ending).strip()
-                        segment['text'] = text
+                # Controlli di qualità per frasi tagliate - RIMOSSO per evitare tagli
+                # incomplete_endings = ['...', '..', '.', 'e', 'o', 'a', 'che', 'per', 'con', 'di', 'da', 'in', 'su']
+                # for ending in incomplete_endings:
+                #     if text.rstrip().endswith(ending):
+                #         print(f"⚠️ WARNING: Sentence {i} ends with incomplete word '{ending}': {text}")
+                #         # Rimuovi l'ending incompleto
+                #         text = text.rstrip().rstrip(ending).strip()
+                #         segment['text'] = text
                 
                 # Controllo per parole tagliate a metà
                 if text and not text.endswith(' ') and len(text.split()) > 0:
