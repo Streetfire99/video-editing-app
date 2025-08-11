@@ -482,183 +482,204 @@ def main():
         st.title("📄 Nuovo Contratto")
 
         # --- BLOCCO REGISTRAZIONE E AI ---
-        st.subheader("🎤 Compilazione vocale automatica")
-        
-        # Controlla se l'API key è disponibile
-        openai_api_key = os.getenv("OPENAI_API_KEY")
-        if not openai_api_key:
-            st.warning("⚠️ Chiave OpenAI API non trovata nel file .env. La funzionalità di elaborazione vocale non sarà disponibile.")
-        else:
-            st.success("✅ OpenAI API disponibile - Registrazione vocale attiva!")
-            
-            # Mostra istruzioni chiare
-            st.info("""
-            **📋 Come registrare:**
-            1. 🎤 **Clicca l'icona del microfono** per iniziare la registrazione
-            2. 🗣️ **Parla chiaramente** descrivendo il contratto, proprietari e contatti
-            3. 🛑 **Clicca di nuovo** per fermare la registrazione
-            4. 🤖 **L'AI analizzerà** automaticamente e compilerà i campi
+        # Blocco per registrazione vocale
+        with st.expander("🎤 Registrazione Vocale e Elaborazione AI", expanded=True):
+            st.markdown("""
+            **Istruzioni:**
+            1. Clicca "🎙️ Start Recording" e parla chiaramente
+            2. Clicca "⏹️ Stop Recording" quando hai finito
+            3. **L'elaborazione AI partirà automaticamente!**
+            4. I campi del form si compileranno da soli
             """)
             
-            # Area di registrazione
-            col1, col2 = st.columns([2, 1])
+            # Inizializza session state se non esiste
+            if "recording" not in st.session_state:
+                st.session_state.recording = False
+            if "audio_transcribed" not in st.session_state:
+                st.session_state.audio_transcribed = False
+            if "audio_transcript" not in st.session_state:
+                st.session_state.audio_transcript = ""
+            if "extracted_fields" not in st.session_state:
+                st.session_state.extracted_fields = {}
+            if "audio_bytes" not in st.session_state:
+                st.session_state.audio_bytes = None
+            
+            # Controlli per la registrazione
+            col1, col2, col3 = st.columns([1, 1, 1])
             
             with col1:
-                st.markdown("### 🎤 Registrazione")
-                wav_audio_data = st_audiorec()
-                
-                if wav_audio_data is not None:
-                    st.audio(wav_audio_data, format='audio/wav')
-                    st.success("✅ Audio registrato con successo!")
-                    logger.info("Audio registrato con st-audiorec.")
-                    
-                    # Pulsante per processare l'audio
-                    if st.button("🚀 Processa Audio con AI", type="primary"):
-                        with st.spinner("🔄 Elaborazione in corso..."):
-                            try:
-                                # Usa un file temporaneo in una directory temporanea
-                                with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_file:
-                                    temp_filename = temp_file.name
-                                    temp_file.write(wav_audio_data)
-                                
-                                # Step 1: Trascrizione con Whisper
-                                st.info("📝 Trascrizione dell'audio in corso...")
-                                logger.info(f"Inizio trascrizione di {temp_filename}...")
-                                
-                                whisper_model = load_whisper_model()
-                                if whisper_model:
-                                    # Usa faster-whisper
-                                    segments, info = whisper_model.transcribe(temp_filename, language="it")
-                                    transcription_text = " ".join([segment.text for segment in segments])
-                                    logger.info(f"Trascrizione completata con faster-whisper: {transcription_text}")
-                                else:
-                                    # Fallback a trascrizione manuale
-                                    st.warning("⚠️ faster-whisper non disponibile, trascrizione manuale richiesta")
-                                    transcription_text = st.text_area(
-                                        "Trascrivi manualmente l'audio:",
-                                        height=150,
-                                        placeholder="Inserisci qui la trascrizione dell'audio..."
-                                    )
-                                    if not transcription_text.strip():
-                                        st.error("❌ Inserisci la trascrizione per continuare")
-                                        return
-                                    logger.info(f"Trascrizione manuale inserita: {transcription_text}")
-                                
-                                if transcription_text.strip():
-                                    st.session_state.audio_transcript = transcription_text
-                                    st.session_state.audio_transcribed = True
-                                    
-                                    st.success("✅ Trascrizione completata!")
-                                    st.markdown("**📝 Testo trascritto:**")
-                                    st.text_area("Trascrizione", value=transcription_text, height=150, disabled=True)
-                                    
-                                    # Step 2: Estrazione campi con OpenAI
-                                    st.info("🤖 Analisi AI e estrazione campi...")
-                                    
-                                    # Ottieni i nomi dei campi dalle configurazioni
-                                    field_names_for_extraction = []
-                                    for section in ["contratti", "proprietari", "contatti"]:
-                                        config = get_form_config(section)
-                                        if config and "fields" in config:
-                                            field_names_for_extraction.extend([f["name"] for f in config["fields"] if f.get("visible", True)])
-                                    
-                                    if field_names_for_extraction:
-                                        extracted_data = extract_fields_with_openai(transcription_text, field_names_for_extraction, openai_api_key)
-                                        
-                                        if extracted_data:
-                                            logger.info(f"Dati estratti: {extracted_data}")
-                                            st.session_state.audio_extracted = extracted_data
-                                            
-                                            st.success("✅ Analisi AI completata!")
-                                            st.markdown("**🔍 Dati estratti:**")
-                                            st.json(extracted_data)
-                                            
-                                            # Step 3: Popola i campi del form
-                                            st.info("📋 Compilazione automatica dei campi...")
-                                            
-                                            fields_populated = 0
-                                            for section in ["contratti", "proprietari", "contatti"]:
-                                                if section not in st.session_state.contract_data:
-                                                    st.session_state.contract_data[section] = {}
-                                                
-                                                config = get_form_config(section)
-                                                if config and "fields" in config:
-                                                    for field in config["fields"]:
-                                                        if field["name"] in extracted_data:
-                                                            value = extracted_data[field["name"]]
-                                                            if value != "Non specificato":
-                                                                if section == "proprietari":
-                                                                    # Per i proprietari, crea un nuovo proprietario con i dati estratti
-                                                                    if "proprietari" not in st.session_state:
-                                                                        st.session_state.proprietari = []
-                                                                    st.session_state.proprietari.append({field["name"]: value})
-                                                                else:
-                                                                    st.session_state.contract_data[section][field["name"]] = value
-                                                                fields_populated += 1
-                                                                logger.info(f"Campo popolato: {section}.{field['name']} = {value}")
-                                            
-                                            if fields_populated > 0:
-                                                st.success(f"🎉 {fields_populated} campi compilati automaticamente!")
-                                                st.info("💡 I campi sono ora pre-compilati nei tab sottostanti. Puoi modificarli se necessario.")
-                                                st.rerun()
-                                            else:
-                                                st.warning("⚠️ Nessun campo è stato compilato automaticamente. Controlla la trascrizione.")
-                                        else:
-                                            st.error("❌ Errore nell'estrazione dei dati con AI")
-                                    else:
-                                        st.error("❌ Nessun campo trovato nelle configurazioni")
-                                else:
-                                    st.error("❌ La trascrizione è vuota. Riprova a registrare l'audio.")
-                                    
-                            except Exception as e:
-                                logger.error(f"Errore durante l'elaborazione audio: {e}")
-                                st.error(f"❌ Errore durante l'elaborazione: {e}")
-                                st.session_state.audio_transcribed = False
-                            finally:
-                                # Pulisci il file temporaneo
-                                try:
-                                    if 'temp_filename' in locals():
-                                        os.unlink(temp_filename)
-                                except Exception as e:
-                                    logger.error(f"Errore durante la pulizia del file temporaneo: {e}")
-                else:
-                    st.info("🎤 Clicca l'icona del microfono per iniziare la registrazione")
+                if st.button("🎙️ Start Recording", type="primary"):
+                    st.session_state.recording = True
+                    st.session_state.audio_transcribed = False
+                    st.session_state.audio_transcript = ""
+                    st.session_state.extracted_fields = {}
+                    st.session_state.audio_bytes = None
+                    st.rerun()
             
             with col2:
-                st.markdown("### 📊 Stato Elaborazione")
+                if st.button("⏹️ Stop Recording", type="secondary"):
+                    st.session_state.recording = False
+                    # **QUI ATTIVA L'ELABORAZIONE AUTOMATICA**
+                    if st.session_state.audio_bytes and not st.session_state.audio_transcribed:
+                        st.session_state.process_audio = True
+                    st.rerun()
+            
+            with col3:
+                if st.button("🧹 Pulisci Sessione Audio", type="secondary"):
+                    st.session_state.recording = False
+                    st.session_state.audio_transcribed = False
+                    st.session_state.audio_transcript = ""
+                    st.session_state.extracted_fields = {}
+                    st.session_state.audio_bytes = None
+                    st.session_state.process_audio = False
+                    st.rerun()
+            
+            # Mostra stato della registrazione
+            if st.session_state.recording:
+                st.info("🎙️ **Registrazione in corso...** Parla ora e poi clicca '⏹️ Stop Recording'")
                 
-                # Mostra lo stato dell'elaborazione
-                if st.session_state.get("audio_transcribed", False):
-                    st.success("✅ Audio trascritto")
+                # Componente per registrazione audio
+                audio_bytes = st_audiorec()
+                
+                # Salva l'audio nella session state
+                if audio_bytes:
+                    st.session_state.audio_bytes = audio_bytes
+                    st.success("🎵 **Audio registrato!** Ora clicca '⏹️ Stop Recording' per elaborarlo automaticamente")
+            
+            # **ELABORAZIONE AUTOMATICA** quando si ferma la registrazione
+            elif st.session_state.get("process_audio") and st.session_state.audio_bytes and not st.session_state.audio_transcribed:
+                st.info("🤖 **Elaborazione AI automatica in corso...**")
+                
+                # Salva l'audio temporaneamente
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
+                    temp_file.write(st.session_state.audio_bytes)
+                    temp_filename = temp_file.name
+                
+                try:
+                    # Step 1: Trascrizione con Whisper
+                    st.info("📝 Trascrizione dell'audio in corso...")
+                    logger.info(f"Inizio trascrizione di {temp_filename}...")
                     
-                    if st.session_state.get("audio_extracted"):
-                        st.success("✅ Dati estratti")
-                        st.success("✅ Campi compilati")
+                    whisper_model = load_whisper_model()
+                    if whisper_model:
+                        # Usa faster-whisper
+                        segments, info = whisper_model.transcribe(temp_filename, language="it")
+                        transcription_text = " ".join([segment.text for segment in segments])
+                        logger.info(f"Trascrizione completata con faster-whisper: {transcription_text}")
                     else:
-                        st.info("⏳ In attesa di estrazione AI")
-                else:
-                    st.info("⏳ In attesa di registrazione")
-                
-                # Mostra statistiche
-                if st.session_state.get("audio_transcript"):
-                    st.markdown("**📊 Statistiche:**")
-                    transcript_length = len(st.session_state.audio_transcript)
-                    st.metric("Caratteri trascritti", transcript_length)
+                        # Fallback a trascrizione manuale
+                        st.warning("⚠️ faster-whisper non disponibile, trascrizione manuale richiesta")
+                        transcription_text = st.text_area(
+                            "Trascrivi manualmente l'audio:",
+                            height=150,
+                            placeholder="Inserisci qui la trascrizione dell'audio..."
+                        )
+                        if not transcription_text.strip():
+                            st.error("❌ Inserisci la trascrizione per continuare")
+                            return
+                        logger.info(f"Trascrizione manuale inserita: {transcription_text}")
                     
-                    if transcript_length > 100:
-                        st.success("✅ Trascrizione sufficiente per analisi AI")
-                    elif transcript_length > 50:
-                        st.warning("⚠️ Trascrizione breve, potrebbe non essere sufficiente")
+                    if transcription_text.strip():
+                        st.session_state.audio_transcript = transcription_text
+                        st.session_state.audio_transcribed = True
+                        
+                        st.success("✅ Trascrizione completata!")
+                        st.markdown("**📝 Testo trascritto:**")
+                        st.text_area("Trascrizione", value=transcription_text, height=150, disabled=True)
+                        
+                        # **STEP 2: Estrazione automatica dei campi con OpenAI**
+                        openai_api_key = os.getenv("OPENAI_API_KEY")
+                        if openai_api_key:
+                            st.info("🧠 Estrazione automatica dei campi in corso...")
+                            
+                            # Raccogli tutti i nomi dei campi dal form
+                            all_field_names = []
+                            form_config = {}
+                            for section in ["contratti", "proprietari", "contatti"]:
+                                config = get_form_config(section)
+                                if config and "fields" in config:
+                                    form_config[section] = config["fields"]
+                                    for field in config["fields"]:
+                                        if isinstance(field, dict) and 'name' in field:
+                                            all_field_names.append(field['name'])
+                            
+                            # Estrai i campi automaticamente
+                            extracted_data = extract_fields_with_openai(
+                                transcription_text, 
+                                all_field_names, 
+                                openai_api_key
+                            )
+                            
+                            if extracted_data:
+                                st.session_state.extracted_fields = extracted_data
+                                st.success(f"✅ Estrazione completata! {len(extracted_data)} campi estratti")
+                                
+                                # **STEP 3: Compilazione automatica del form**
+                                st.info("📝 Compilazione automatica del form...")
+                                
+                                # Popola i campi del form automaticamente
+                                fields_populated = 0
+                                for field_name, value in extracted_data.items():
+                                    if value and value != "Non specificato":
+                                        # Trova il campo nel form e popolalo
+                                        for section, fields in form_config.items():
+                                            for field in fields:
+                                                if isinstance(field, dict) and field.get('name') == field_name:
+                                                    # Popola il campo nella sessione
+                                                    if 'session_key' in field:
+                                                        st.session_state[field['session_key']] = value
+                                                        fields_populated += 1
+                                                        break
+                                
+                                st.success(f"🎯 **{fields_populated} campi compilati automaticamente!**")
+                                
+                                # Mostra i campi estratti
+                                st.markdown("**📋 Campi estratti e compilati:**")
+                                for field_name, value in extracted_data.items():
+                                    if value and value != "Non specificato":
+                                        st.info(f"**{field_name}:** {value}")
+                                
+                                # Resetta il flag di elaborazione
+                                st.session_state.process_audio = False
+                                st.rerun()  # Ricarica la pagina per mostrare i campi compilati
+                            else:
+                                st.warning("⚠️ Impossibile estrarre i campi automaticamente")
+                                st.session_state.process_audio = False
+                        else:
+                            st.warning("⚠️ Chiave API OpenAI non configurata per l'estrazione automatica")
+                            st.session_state.process_audio = False
+                        
                     else:
-                        st.error("❌ Trascrizione troppo breve")
+                        st.error("❌ Trascrizione fallita o vuota")
+                        st.session_state.process_audio = False
+                        
+                except Exception as e:
+                    st.error(f"❌ Errore durante l'elaborazione: {str(e)}")
+                    logger.error(f"Errore elaborazione audio: {traceback.format_exc()}")
+                    st.session_state.process_audio = False
+                finally:
+                    # Pulisci il file temporaneo
+                    if os.path.exists(temp_filename):
+                        os.unlink(temp_filename)
+            
+            # Mostra trascrizione se disponibile
+            elif st.session_state.audio_transcript:
+                st.success("✅ Audio già elaborato!")
+                st.markdown("**📝 Testo trascritto:**")
+                st.text_area("Trascrizione", value=st.session_state.audio_transcript, height=150, disabled=True)
                 
-                # Pulsante per pulire la sessione audio
-                if st.session_state.get("audio_transcript") or st.session_state.get("audio_extracted"):
-                    if st.button("🗑️ Pulisci Sessione Audio"):
-                        st.session_state.audio_transcript = None
-                        st.session_state.audio_transcribed = False
-                        st.session_state.audio_extracted = None
-                        st.rerun()
+                if st.session_state.extracted_fields:
+                    st.markdown("**📋 Campi estratti:**")
+                    for field_name, value in st.session_state.extracted_fields.items():
+                        if value and value != "Non specificato":
+                            st.info(f"**{field_name}:** {value}")
+            
+            # Mostra campi estratti se disponibili
+            if st.session_state.extracted_fields:
+                st.markdown("**🎯 Campi estratti e compilati automaticamente:**")
+                for field_name, value in st.session_state.extracted_fields.items():
+                    if value and value != "Non specificato":
+                        st.success(f"✅ **{field_name}:** {value}")
 
         # --- RESTO DEL MAIN ORIGINALE ---
         # Initialize session state
