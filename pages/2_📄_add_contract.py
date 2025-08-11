@@ -512,12 +512,13 @@ def main():
             if audio_bytes and not st.session_state.audio_transcribed:
                 st.session_state.audio_bytes = audio_bytes
                 st.success("🎵 **Audio registrato!** Ora clicca '🤖 Elabora Audio' per processarlo")
-                
-                # **BOTTONE PER ELABORAZIONE**
+            
+            # **BOTTONE PER ELABORAZIONE** - sempre visibile se c'è audio
+            if st.session_state.audio_bytes and not st.session_state.audio_transcribed:
+                st.markdown("---")
                 if st.button("🤖 Elabora Audio con AI", type="primary", use_container_width=True):
-                    if st.session_state.audio_bytes:
-                        st.session_state.processing_audio = True
-                        st.rerun()
+                    st.session_state.processing_audio = True
+                    st.rerun()
             
             # **ELABORAZIONE AI** quando si clicca il bottone
             elif st.session_state.get("processing_audio") and st.session_state.audio_bytes and not st.session_state.audio_transcribed:
