@@ -485,77 +485,35 @@ def main():
         # Blocco per registrazione vocale
         with st.expander("🎤 Registrazione Vocale e Elaborazione AI", expanded=True):
             st.markdown("""
-            **Istruzioni:**
-            1. Clicca "🎙️ Start Recording" e parla chiaramente
-            2. Clicca "⏹️ Stop Recording" quando hai finito
-            3. **L'elaborazione AI partirà automaticamente!**
-            4. I campi del form si compileranno da soli
+            **🎯 FLOW SEMPLIFICATO:**
+            1. **Clicca il microfono qui sotto** e parla
+            2. **Clicca "Stop" quando hai finito**
+            3. **L'elaborazione AI parte automaticamente!**
+            4. **I campi si compilano da soli**
             """)
             
             # Inizializza session state se non esiste
-            if "recording" not in st.session_state:
-                st.session_state.recording = False
             if "audio_transcribed" not in st.session_state:
                 st.session_state.audio_transcribed = False
             if "audio_transcript" not in st.session_state:
                 st.session_state.audio_transcript = ""
             if "extracted_fields" not in st.session_state:
                 st.session_state.extracted_fields = {}
-            if "audio_bytes" not in st.session_state:
-                st.session_state.audio_bytes = None
-            if "process_audio" not in st.session_state:
-                st.session_state.process_audio = False
+            if "processing_audio" not in st.session_state:
+                st.session_state.processing_audio = False
             
-            # Controlli per la registrazione
-            col1, col2, col3 = st.columns([1, 1, 1])
+            # **UN SOLO COMPONENTE DI REGISTRAZIONE**
+            st.markdown("**🎙️ Registra la tua voce qui:**")
+            audio_bytes = st_audiorec()
             
-            with col1:
-                if st.button("🎙️ Start Recording", type="primary", key="start_recording"):
-                    st.session_state.recording = True
-                    st.session_state.audio_transcribed = False
-                    st.session_state.audio_transcript = ""
-                    st.session_state.extracted_fields = {}
-                    st.session_state.audio_bytes = None
-                    st.session_state.process_audio = False
-                    # NON fare st.rerun() qui per evitare di tornare all'inizio
-            
-            with col2:
-                if st.button("⏹️ Stop Recording", type="secondary", key="stop_recording"):
-                    st.session_state.recording = False
-                    # **QUI ATTIVA L'ELABORAZIONE AUTOMATICA**
-                    if st.session_state.audio_bytes and not st.session_state.audio_transcribed:
-                        st.session_state.process_audio = True
-                    # NON fare st.rerun() qui per evitare di tornare all'inizio
-            
-            with col3:
-                if st.button("🧹 Pulisci Sessione Audio", type="secondary", key="clear_audio"):
-                    st.session_state.recording = False
-                    st.session_state.audio_transcribed = False
-                    st.session_state.audio_transcript = ""
-                    st.session_state.extracted_fields = {}
-                    st.session_state.audio_bytes = None
-                    st.session_state.process_audio = False
-                    # NON fare st.rerun() qui per evitare di tornare all'inizio
-            
-            # Mostra stato della registrazione
-            if st.session_state.recording:
-                st.info("🎙️ **Registrazione in corso...** Parla ora e poi clicca '⏹️ Stop Recording'")
-                
-                # Componente per registrazione audio
-                audio_bytes = st_audiorec()
-                
-                # Salva l'audio nella session state
-                if audio_bytes:
-                    st.session_state.audio_bytes = audio_bytes
-                    st.success("🎵 **Audio registrato!** Ora clicca '⏹️ Stop Recording' per elaborarlo automaticamente")
-            
-            # **ELABORAZIONE AUTOMATICA** quando si ferma la registrazione
-            elif st.session_state.get("process_audio") and st.session_state.audio_bytes and not st.session_state.audio_transcribed:
-                st.info("🤖 **Elaborazione AI automatica in corso...**")
+            # **ELABORAZIONE AUTOMATICA** quando si registra l'audio
+            if audio_bytes and not st.session_state.audio_transcribed and not st.session_state.processing_audio:
+                st.session_state.processing_audio = True
+                st.success("🎵 **Audio registrato! Elaborazione AI in corso...**")
                 
                 # Salva l'audio temporaneamente
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
-                    temp_file.write(st.session_state.audio_bytes)
+                    temp_file.write(audio_bytes)
                     temp_filename = temp_file.name
                 
                 try:
@@ -579,6 +537,7 @@ def main():
                         )
                         if not transcription_text.strip():
                             st.error("❌ Inserisci la trascrizione per continuare")
+                            st.session_state.processing_audio = False
                             return
                         logger.info(f"Trascrizione manuale inserita: {transcription_text}")
                     
@@ -643,23 +602,22 @@ def main():
                                         st.info(f"**{field_name}:** {value}")
                                 
                                 # Resetta il flag di elaborazione
-                                st.session_state.process_audio = False
-                                # NON fare st.rerun() qui per evitare di tornare all'inizio
+                                st.session_state.processing_audio = False
                             else:
                                 st.warning("⚠️ Impossibile estrarre i campi automaticamente")
-                                st.session_state.process_audio = False
+                                st.session_state.processing_audio = False
                         else:
                             st.warning("⚠️ Chiave API OpenAI non configurata per l'estrazione automatica")
-                            st.session_state.process_audio = False
+                            st.session_state.processing_audio = False
                         
                     else:
                         st.error("❌ Trascrizione fallita o vuota")
-                        st.session_state.process_audio = False
+                        st.session_state.processing_audio = False
                         
                 except Exception as e:
                     st.error(f"❌ Errore durante l'elaborazione: {str(e)}")
                     logger.error(f"Errore elaborazione audio: {traceback.format_exc()}")
-                    st.session_state.process_audio = False
+                    st.session_state.processing_audio = False
                 finally:
                     # Pulisci il file temporaneo
                     if os.path.exists(temp_filename):
@@ -683,6 +641,14 @@ def main():
                 for field_name, value in st.session_state.extracted_fields.items():
                     if value and value != "Non specificato":
                         st.success(f"✅ **{field_name}:** {value}")
+            
+            # Bottone per pulire tutto
+            if st.button("🧹 Pulisci Sessione Audio", type="secondary"):
+                st.session_state.audio_transcribed = False
+                st.session_state.audio_transcript = ""
+                st.session_state.extracted_fields = {}
+                st.session_state.processing_audio = False
+                st.rerun()
 
         # --- RESTO DEL MAIN ORIGINALE ---
         # Initialize session state
