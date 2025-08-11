@@ -39,7 +39,6 @@ def get_openai_client(api_key):
 
 def extract_audio_from_video(input_video, audio_file):
     """Estrae l'audio dal video"""
-    # Usa solo ffmpeg-python
     try:
         import ffmpeg
         stream = ffmpeg.input(input_video)
@@ -875,6 +874,20 @@ def create_dual_ass_with_custom_height(segments, output_file_it, output_file_en,
 
 def process_video(input_video, music_file, openai_api_key, output_dir=".", custom_prompt=None, video_type=None, italian_height=120, english_height=60):
     """Funzione principale per elaborare il video"""
+    
+    # Verifica che il file esista
+    if not os.path.exists(input_video):
+        raise Exception(f"File video non trovato: {input_video}")
+        
+    # Verifica dimensione file (max 500MB)
+    file_size = os.path.getsize(input_video) / (1024 * 1024)  # MB
+    if file_size > 500:
+        raise Exception(f"File troppo grande: {file_size:.1f}MB (max 500MB)")
+        
+    # Crea directory output se non esiste
+    os.makedirs(output_dir, exist_ok=True)
+    
+    print(f"🔧 DEBUG: process_video started - input: {input_video}, music: {music_file}, output_dir: {output_dir}, it_height: {italian_height}, en_height: {english_height}")
     print(f"🔧 DEBUG: process_video started - input: {input_video}, music: {music_file}, output_dir: {output_dir}, it_height: {italian_height}, en_height: {english_height}")
     
     # Configura file di output
