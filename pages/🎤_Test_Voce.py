@@ -210,65 +210,72 @@ with col1:
     # Area di registrazione
     st.markdown("### 🎤 Registrazione Vocale")
     
-    # Registrazione vocale - Soluzione universale
-    st.info("🎙️ **Registrazione vocale disponibile!**")
+    # 🎙️ REGISTRAZIONE DIRETTA + UPLOAD
+    st.info("🎙️ **Registrazione diretta dal microfono + Upload file**")
     
-    # Istruzioni chiare per registrazione
-    st.markdown("""
-    ### 📱 **Come registrare la tua voce:**
+    # --- WIDGET REGISTRAZIONE ---
+    try:
+        from audio_recorder_streamlit import audio_recorder
+        
+        st.markdown("### 🎤 **Registra direttamente:**")
+        rec_bytes = audio_recorder(
+            text="🎤 Clicca per REC/STOP",
+            recording_color="#e74c3c",
+            neutral_color="#2c3e50",
+            icon_size="2x",
+        )
+        
+        if rec_bytes:
+            st.success("✅ Audio registrato dal microfono!")
+            
+    except ImportError:
+        st.warning("⚠️ **audio-recorder-streamlit non disponibile** - Usa solo upload file")
+        rec_bytes = None
     
-    1. **📱 Con il telefono:**
-       - Usa l'app **"Registrazione Vocale"** (iOS) o **"Registratore"** (Android)
-       - Registra descrivendo il prodotto/oggetto
-       - Salva come **MP3** o **WAV**
-       - Carica qui sotto
-    
-    2. **💻 Con il computer:**
-       - **Mac**: GarageBand, QuickTime, o app Registrazione
-       - **Windows**: Registratore di suoni, Audacity
-       - **Linux**: Audacity, GNOME Sound Recorder
-       - Salva come **MP3**, **WAV**, o **M4A**
-       - Carica qui sotto
-    
-    3. **🌐 Online:**
-       - [Online Voice Recorder](https://online-voice-recorder.com/)
-       - [Vocaroo](https://vocaroo.com/)
-       - Registra e scarica come **MP3** o **WAV**
-    """)
-    
-    # Per ora, usiamo solo upload file
-    audio_bytes = None
-    
-    # Opzione 2: Upload file audio (sempre disponibile)
-    st.markdown("### 🎵 **Alternativa: Carica file audio**")
-    st.info("📱 Puoi registrare con il telefono e caricare il file, oppure usare qualsiasi app di registrazione")
-    
+    # --- FALLBACK: UPLOAD ---
+    st.markdown("### 📁 **Oppure carica un file audio:**")
     uploaded_file = st.file_uploader(
         "🎵 Carica file audio (MP3, WAV, M4A, OGG)",
         type=['mp3', 'wav', 'm4a', 'ogg'],
         help="Registra con il telefono e carica qui, oppure usa un file esistente"
     )
     
-    if uploaded_file:
+    # --- DECIDI LA SORGENTE ---
+    audio_bytes = None
+    src_name = None
+    if rec_bytes:
+        audio_bytes = rec_bytes           # bytes WAV (di solito 48kHz mono)
+        src_name = "recorded.wav"
+        st.success("🎤 **Fonte: Registrazione diretta**")
+    elif uploaded_file:
         audio_bytes = uploaded_file.read()
-        st.success(f"✅ File caricato: {uploaded_file.name}")
+        src_name = uploaded_file.name
+        st.success(f"📁 **Fonte: File caricato** - {uploaded_file.name}")
     
     # Se non c'è audio, mostra istruzioni
     if not audio_bytes:
         st.info("""
         **📋 Istruzioni per la registrazione:**
-        1. **Con telefono**: Usa l'app registrazione vocale e salva come MP3/WAV
-        2. **Con computer**: Usa qualsiasi app di registrazione (Audacity, GarageBand, etc.)
-        3. **Contenuto**: Descrivi un prodotto/oggetto (es: "Ho una lavatrice Samsung da 8kg, costa 400 euro")
-        4. **Carica**: Trascina il file qui sopra
+        1. **🎤 Registra direttamente** dal microfono (sopra)
+        2. **📱 Oppure usa il telefono** e carica il file
+        3. **💻 Oppure usa software desktop** (Audacity, GarageBand, etc.)
+        4. **🌐 Oppure servizi online** (Online Voice Recorder, Vocaroo)
         """)
+    
+    # Sezione rimossa - ora gestita sopra con registrazione diretta + upload
     
     # Processamento audio
     if audio_bytes:
-        st.success("✅ Audio registrato!")
+        st.success(f"✅ Audio acquisito: {src_name}")
+        
+        # Mostra anteprima audio
+        if src_name.endswith(".wav"):
+            st.audio(audio_bytes, format="audio/wav")
+        else:
+            st.audio(audio_bytes)
         
         # Salva audio temporaneo
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(src_name)[1] or ".wav") as tmp_file:
             tmp_file.write(audio_bytes)
             temp_audio_path = tmp_file.name
         
@@ -401,6 +408,7 @@ st.markdown("""
 
 ### 🔧 Tecnologie utilizzate:
 - **Streamlit** per l'interfaccia
+- **audio-recorder-streamlit** per registrazione diretta dal microfono
 - **faster-whisper** per trascrizione locale (CPU-friendly)
 - **imageio-ffmpeg** per conversione audio robusta
 - **OpenAI GPT** per analisi AI avanzata (opzionale)
@@ -419,14 +427,15 @@ with st.expander("🔧 Informazioni per Sviluppatori"):
     st.info("""
     **Per installare localmente:**
     ```bash
-    pip install faster-whisper imageio-ffmpeg openai
+    pip install audio-recorder-streamlit faster-whisper imageio-ffmpeg openai
     ```
     
     **Per Streamlit Cloud:**
-    - Aggiungi `faster-whisper imageio-ffmpeg` al requirements.txt
-    - L'app funzionerà sempre (trascrizione locale)
+    - Aggiungi `audio-recorder-streamlit faster-whisper imageio-ffmpeg` al requirements.txt
+    - L'app funzionerà sempre (registrazione + trascrizione locale)
     
     **Vantaggi della nuova soluzione:**
+    - 🎤 **Registrazione diretta** dal microfono del browser
     - 🎯 **Nessuna API esterna** per trascrizione
     - 🚀 **Più veloce** di OpenAI Whisper
     - 💰 **Gratis** per trascrizioni

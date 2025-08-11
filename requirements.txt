@@ -11,4 +11,4 @@ faster-whisper
 numpy
 imageio-ffmpeg
 geopy
-streamlit-webrtc 
+audio-recorder-streamlit 
