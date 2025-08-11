@@ -9,5 +9,5 @@ google-auth
 python-dotenv
 openai-whisper
 numpy
-geocoder
-streamlit-audio-recorder 
+streamlit-audio-capture
+geopy 
