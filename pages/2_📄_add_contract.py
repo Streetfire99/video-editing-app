@@ -10,7 +10,6 @@ import os
 import tempfile
 import base64
 import streamlit.components.v1 as components
-import whisper
 import logging
 import shutil
 
@@ -29,10 +28,16 @@ logger = logging.getLogger(__name__)
 
 @st.cache_resource
 def load_whisper_model():
-    logger.info("Caricamento del modello Whisper...")
-    model = whisper.load_model("base")
-    logger.info("Modello Whisper caricato.")
-    return model
+    """Carica il modello Whisper usando faster-whisper per compatibilità Streamlit Cloud"""
+    try:
+        from faster_whisper import WhisperModel
+        logger.info("Caricamento del modello Whisper con faster-whisper...")
+        model = WhisperModel("base", device="cpu", compute_type="int8")
+        logger.info("Modello Whisper caricato con faster-whisper.")
+        return model
+    except ImportError:
+        logger.error("faster-whisper non disponibile, fallback a trascrizione manuale")
+        return None
 
 def extract_fields_with_openai(transcript, field_names, openai_api_key):
     """Estrae i campi dalla trascrizione usando AI intelligente e contestuale"""
@@ -521,8 +526,23 @@ def main():
                                 logger.info(f"Inizio trascrizione di {temp_filename}...")
                                 
                                 whisper_model = load_whisper_model()
-                                result = whisper_model.transcribe(temp_filename, fp16=False)
-                                transcription_text = result["text"]
+                                if whisper_model:
+                                    # Usa faster-whisper
+                                    segments, info = whisper_model.transcribe(temp_filename, language="it")
+                                    transcription_text = " ".join([segment.text for segment in segments])
+                                    logger.info(f"Trascrizione completata con faster-whisper: {transcription_text}")
+                                else:
+                                    # Fallback a trascrizione manuale
+                                    st.warning("⚠️ faster-whisper non disponibile, trascrizione manuale richiesta")
+                                    transcription_text = st.text_area(
+                                        "Trascrivi manualmente l'audio:",
+                                        height=150,
+                                        placeholder="Inserisci qui la trascrizione dell'audio..."
+                                    )
+                                    if not transcription_text.strip():
+                                        st.error("❌ Inserisci la trascrizione per continuare")
+                                        return
+                                    logger.info(f"Trascrizione manuale inserita: {transcription_text}")
                                 
                                 if transcription_text.strip():
                                     st.session_state.audio_transcript = transcription_text
