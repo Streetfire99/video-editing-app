@@ -29,6 +29,12 @@ def get_video_info(input_video):
     """Ottiene informazioni sul video per gestire meglio i codec"""
     try:
         import ffmpeg
+        # Forza il percorso ffmpeg
+        ffmpeg_path = os.environ.get("FFMPEG_BINARY")
+        if ffmpeg_path:
+            ffmpeg.FFMPEG_BINARY = ffmpeg_path
+            print(f"🔧 DEBUG: Using ffmpeg from: {ffmpeg_path}")
+        
         probe = ffmpeg.probe(input_video)
         video_info = next(s for s in probe['streams'] if s['codec_type'] == 'video')
         audio_info = next((s for s in probe['streams'] if s['codec_type'] == 'audio'), None)
@@ -41,6 +47,7 @@ def get_video_info(input_video):
             'duration': float(probe.get('format', {}).get('duration', 0))
         }
     except Exception as e:
+        print(f"❌ DEBUG: Error in get_video_info: {e}")
         return None
 
 # === CONFIG ===
@@ -52,12 +59,19 @@ def extract_audio_from_video(input_video, audio_file):
     """Estrae l'audio dal video"""
     try:
         import ffmpeg
+        # Forza il percorso ffmpeg
+        ffmpeg_path = os.environ.get("FFMPEG_BINARY")
+        if ffmpeg_path:
+            ffmpeg.FFMPEG_BINARY = ffmpeg_path
+            print(f"🔧 DEBUG: Using ffmpeg from: {ffmpeg_path}")
+        
         stream = ffmpeg.input(input_video)
         stream = ffmpeg.output(stream, audio_file, vn=None, ac=1, ar=16000, acodec='pcm_s16le')
         ffmpeg.run(stream, overwrite_output=True, quiet=True)
     except ImportError as e:
         raise Exception("ffmpeg-python non è disponibile. Installa ffmpeg-python.")
     except Exception as e:
+        print(f"❌ DEBUG: Error in extract_audio: {e}")
         raise e
     return audio_file
 
