@@ -229,6 +229,26 @@ def load_tracking_csv():
                 csv_reader = csv.DictReader(StringIO(csv_content))
                 tracking_data = list(csv_reader)
                 
+                # Migrazione automatica: converte i vecchi nomi campi ai nuovi manual_link
+                for entry in tracking_data:
+                    # Migra i vecchi campi transcript ai nuovi manual_link
+                    if 'italian_transcript' in entry and 'italian_manual_link' not in entry:
+                        entry['italian_manual_link'] = entry.pop('italian_transcript', '')
+                    if 'english_transcript' in entry and 'english_manual_link' not in entry:
+                        entry['english_manual_link'] = entry.pop('english_transcript', '')
+                    
+                    # Migra i vecchi campi manual ai nuovi manual_link
+                    if 'italian_manual' in entry and 'italian_manual_link' not in entry:
+                        entry['italian_manual_link'] = entry.pop('italian_manual', '')
+                    if 'english_manual' in entry and 'english_manual_link' not in entry:
+                        entry['english_manual_link'] = entry.pop('english_manual', '')
+                    
+                    # Assicurati che tutti i campi necessari esistano
+                    required_fields = ['apartment', 'video_type', 'youtube_link', 'drive_link', 'italian_manual_link', 'english_manual_link', 'date_created']
+                    for field in required_fields:
+                        if field not in entry:
+                            entry[field] = ''
+                
                 return tracking_data
             else:
                 # File non esiste, restituisci lista vuota
@@ -351,15 +371,9 @@ def verify_tracking_csv():
     try:
         tracking_data = load_tracking_csv()
         
-        # Migrazione: converte i vecchi campi transcript in manual_link
+        # La migrazione viene fatta automaticamente in load_tracking_csv
+        # Qui verifichiamo solo che tutti i campi necessari esistano
         for entry in tracking_data:
-            # Se esistono i vecchi campi, migrali ai nuovi
-            if 'italian_transcript' in entry and 'italian_manual_link' not in entry:
-                entry['italian_manual_link'] = entry.pop('italian_transcript', '')
-            if 'english_transcript' in entry and 'english_manual_link' not in entry:
-                entry['english_manual_link'] = entry.pop('english_transcript', '')
-            
-            # Verifica che tutti i record abbiano i campi necessari
             required_fields = ['apartment', 'video_type', 'youtube_link', 'drive_link', 'italian_manual_link', 'english_manual_link', 'date_created']
             
             for field in required_fields:
