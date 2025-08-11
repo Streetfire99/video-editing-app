@@ -7,7 +7,7 @@ gspread
 pandas
 google-auth
 python-dotenv
-openai-whisper
+faster-whisper
 numpy
-streamlit-audio-recorder
+imageio-ffmpeg
 geopy 
