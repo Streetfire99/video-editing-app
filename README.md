@@ -1,43 +1,28 @@
-# Video Editing App
+# 🎬 Video Editing App
 
-Un'applicazione Streamlit per l'elaborazione automatica di video con sottotitoli in italiano e inglese.
+Applicazione Streamlit per elaborazione video e gestione appartamenti.
 
-## Funzionalità
+## 🚀 Deploy su Hugging Face Spaces
 
-- Caricamento e elaborazione di video
-- Trascrizione automatica dell'audio
-- Generazione di sottotitoli in italiano e inglese
-- Aggiunta di musica di sottofondo
-- Upload su YouTube
-- Gestione di appartamenti e tipologie video
+### Configurazione richiesta:
+- **Runtime**: Streamlit
+- **App file**: `app.py`
+- **Python version**: 3.13
 
-## Setup
+### Dipendenze:
+- Tutte le dipendenze sono in `requirements.txt`
+- Dipendenze di sistema in `packages.txt`
 
-1. Clona il repository
-2. Installa le dipendenze: `pip install -r requirements.txt`
-3. Configura le variabili d'ambiente (vedi sezione Configurazione)
-4. Esegui: `streamlit run app.py`
+### Note:
+- L'app richiede variabili d'ambiente per API keys
+- Configurazione Streamlit in `.streamlit/config.toml`
+- Upload file fino a 500MB supportato
 
-## Configurazione
-
-### Variabili d'ambiente necessarie:
-
-- `OPENAI_API_KEY`: Chiave API OpenAI per trascrizione e traduzione
-- `GOOGLE_SHEETS_CREDENTIALS`: Credenziali Google Sheets (JSON)
-- `YOUTUBE_CLIENT_SECRETS`: Credenziali YouTube API (JSON)
-
-### Per Streamlit Cloud:
-
-Configura le variabili d'ambiente nella sezione "Secrets" di Streamlit Cloud.
-
-## Struttura del progetto
-
-```
-├── app.py                 # App principale
-├── data_manager.py        # Gestione dati Google Sheets
-├── youtube_upload.py      # Upload YouTube
-├── Elaborazione/
-│   ├── prova.py          # Logica di elaborazione video
-│   └── audio.mp3         # Musica di sottofondo
-└── requirements.txt       # Dipendenze Python
-``` 
+## 📁 Struttura:
+- `app.py` - File principale dell'applicazione
+- `pages/` - Pagine dell'applicazione
+- `Elaborazione/` - Moduli di elaborazione video
+- `utils.py` - Funzioni di utilità
+- `data_manager.py` - Gestione dati
+- `drive_manager.py` - Gestione Google Drive
+- `youtube_manager.py` - Gestione YouTube 
