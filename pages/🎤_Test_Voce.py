@@ -149,11 +149,12 @@ def analyze_with_ai(transcription, prompt, openai_api_key=None):
         if "forno" in text or "oven" in text:
             features.append("Forno")
         
-        # Nome prodotto (prima parte della frase)
+        # Nome prodotto (prima parte della frase) - Capitalizza prima lettera
         words = transcription.split()
         name = " ".join(words[:3]) if len(words) >= 3 else transcription[:50]
+        name = name.strip().capitalize() if name.strip() else "Prodotto"
         
-        # Crea JSON semplice
+        # Crea JSON semplice con pulizia dati
         result = {
             "nome": name,
             "caratteristiche": ", ".join(features) if features else "Elettrodomestico generico",
@@ -166,9 +167,9 @@ def analyze_with_ai(transcription, prompt, openai_api_key=None):
         st.error(f"❌ Errore nell'analisi semplice: {e}")
         return None
 
-# Funzione per parsare JSON
+# Funzione per parsare JSON e pulire i dati
 def parse_ai_response(response):
-    """Parsa la risposta AI in formato JSON"""
+    """Parsa la risposta AI in formato JSON e pulisce i dati"""
     try:
         # Rimuovi eventuali markdown
         if "```json" in response:
@@ -178,7 +179,25 @@ def parse_ai_response(response):
         
         # Parsa JSON
         data = json.loads(response.strip())
-        return data
+        
+        # Pulisci i dati
+        cleaned_data = {}
+        for key, value in data.items():
+            if isinstance(value, str):
+                # Rimuovi spazi extra e capitalizza prima lettera
+                cleaned_value = value.strip()
+                if cleaned_value:
+                    cleaned_value = cleaned_value.capitalize()
+                    # Rimuovi caratteri problematici come []
+                    cleaned_value = cleaned_value.replace('[', '').replace(']', '')
+                else:
+                    cleaned_value = "Non specificato"
+                cleaned_data[key] = cleaned_value
+            else:
+                cleaned_data[key] = value
+        
+        return cleaned_data
+        
     except Exception as e:
         st.error(f"❌ Errore nel parsing JSON: {e}")
         st.code(response)
@@ -219,10 +238,12 @@ with col1:
         
         st.markdown("### 🎤 **Registra direttamente:**")
         rec_bytes = audio_recorder(
-            text="🎤 Clicca per REC/STOP",
+            text="🎤 Clicca per REC/STOP (durata illimitata)",
             recording_color="#e74c3c",
             neutral_color="#2c3e50",
             icon_size="2x",
+            pause_threshold=None,  # Rimuove limite automatico
+            silence_threshold=None,  # Rimuove rilevamento silenzio
         )
         
         if rec_bytes:
