@@ -40,9 +40,6 @@ def get_drive_service():
         # Crea il servizio Drive
         service = build('drive', 'v3', credentials=credentials)
         
-        # Debug: mostra l'account utilizzato
-        st.info(f"🔧 DEBUG: Account Drive utilizzato: {credentials.service_account_email}")
-        
         return service
         
     except Exception as e:
