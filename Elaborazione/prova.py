@@ -58,22 +58,39 @@ def get_openai_client(api_key):
 def extract_audio_from_video(input_video, audio_file):
     """Estrae l'audio dal video"""
     try:
-        import ffmpeg
-        # Forza il percorso ffmpeg
-        ffmpeg_path = os.environ.get("FFMPEG_BINARY")
-        if ffmpeg_path:
-            ffmpeg.FFMPEG_BINARY = ffmpeg_path
-            print(f"🔧 DEBUG: Using ffmpeg from: {ffmpeg_path}")
+        # Usa subprocess diretto con imageio-ffmpeg
+        import imageio_ffmpeg
+        import subprocess
         
-        stream = ffmpeg.input(input_video)
-        stream = ffmpeg.output(stream, audio_file, vn=None, ac=1, ar=16000, acodec='pcm_s16le')
-        ffmpeg.run(stream, overwrite_output=True, quiet=True)
-    except ImportError as e:
-        raise Exception("ffmpeg-python non è disponibile. Installa ffmpeg-python.")
+        ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
+        print(f"🔧 DEBUG: Using ffmpeg from: {ffmpeg_path}")
+        
+        # Comando ffmpeg per estrarre audio
+        cmd = [
+            ffmpeg_path,
+            '-i', input_video,
+            '-vn',  # No video
+            '-ac', '1',  # Mono
+            '-ar', '16000',  # 16kHz
+            '-acodec', 'pcm_s16le',  # WAV PCM
+            '-y',  # Overwrite
+            audio_file
+        ]
+        
+        print(f"🔧 DEBUG: Running command: {' '.join(cmd)}")
+        
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        
+        if result.returncode != 0:
+            print(f"❌ DEBUG: ffmpeg stderr: {result.stderr}")
+            raise Exception(f"ffmpeg error: {result.stderr}")
+            
+        print(f"✅ DEBUG: Audio extracted successfully to {audio_file}")
+        return audio_file
+        
     except Exception as e:
         print(f"❌ DEBUG: Error in extract_audio: {e}")
-        raise e
-    return audio_file
+        raise Exception(f"Errore estrazione audio: {e}")
 
 def transcribe_audio(audio_file, client):
     """Trascrive l'audio usando Whisper API"""
