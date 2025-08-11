@@ -503,36 +503,39 @@ def main():
                 st.session_state.extracted_fields = {}
             if "audio_bytes" not in st.session_state:
                 st.session_state.audio_bytes = None
+            if "process_audio" not in st.session_state:
+                st.session_state.process_audio = False
             
             # Controlli per la registrazione
             col1, col2, col3 = st.columns([1, 1, 1])
             
             with col1:
-                if st.button("🎙️ Start Recording", type="primary"):
+                if st.button("🎙️ Start Recording", type="primary", key="start_recording"):
                     st.session_state.recording = True
                     st.session_state.audio_transcribed = False
                     st.session_state.audio_transcript = ""
                     st.session_state.extracted_fields = {}
                     st.session_state.audio_bytes = None
-                    st.rerun()
+                    st.session_state.process_audio = False
+                    # NON fare st.rerun() qui per evitare di tornare all'inizio
             
             with col2:
-                if st.button("⏹️ Stop Recording", type="secondary"):
+                if st.button("⏹️ Stop Recording", type="secondary", key="stop_recording"):
                     st.session_state.recording = False
                     # **QUI ATTIVA L'ELABORAZIONE AUTOMATICA**
                     if st.session_state.audio_bytes and not st.session_state.audio_transcribed:
                         st.session_state.process_audio = True
-                    st.rerun()
+                    # NON fare st.rerun() qui per evitare di tornare all'inizio
             
             with col3:
-                if st.button("🧹 Pulisci Sessione Audio", type="secondary"):
+                if st.button("🧹 Pulisci Sessione Audio", type="secondary", key="clear_audio"):
                     st.session_state.recording = False
                     st.session_state.audio_transcribed = False
                     st.session_state.audio_transcript = ""
                     st.session_state.extracted_fields = {}
                     st.session_state.audio_bytes = None
                     st.session_state.process_audio = False
-                    st.rerun()
+                    # NON fare st.rerun() qui per evitare di tornare all'inizio
             
             # Mostra stato della registrazione
             if st.session_state.recording:
@@ -641,7 +644,7 @@ def main():
                                 
                                 # Resetta il flag di elaborazione
                                 st.session_state.process_audio = False
-                                st.rerun()  # Ricarica la pagina per mostrare i campi compilati
+                                # NON fare st.rerun() qui per evitare di tornare all'inizio
                             else:
                                 st.warning("⚠️ Impossibile estrarre i campi automaticamente")
                                 st.session_state.process_audio = False
@@ -685,11 +688,25 @@ def main():
         # Initialize session state
         if "contract_data" not in st.session_state:
             st.session_state.contract_data = {}
-        # Contract name input at the top
-        contract_name = st.text_input("Nome del Contratto/Appartamento", key="contract_name")
+        
+        # Contract name input at the top - più persistente
+        if "contract_name" not in st.session_state:
+            st.session_state.contract_name = ""
+        
+        contract_name = st.text_input(
+            "Nome del Contratto/Appartamento", 
+            value=st.session_state.contract_name,
+            key="contract_name_input"
+        )
+        
+        # Aggiorna la session state quando cambia
+        if contract_name != st.session_state.contract_name:
+            st.session_state.contract_name = contract_name
+        
         if not contract_name:
             st.warning("⚠️ Inserisci il nome del contratto/appartamento per continuare")
             return
+        
         # Store contract name in session state
         st.session_state.contract_data["contract_name"] = contract_name
         st.session_state.contract_data["apartment_name"] = contract_name
