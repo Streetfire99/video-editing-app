@@ -488,8 +488,8 @@ def main():
             **🎯 FLOW SEMPLIFICATO:**
             1. **Clicca il microfono qui sotto** e parla
             2. **Clicca "Stop" quando hai finito**
-            3. **L'elaborazione AI parte automaticamente!**
-            4. **I campi si compilano da soli**
+            3. **Clicca "🤖 Elabora Audio" per processare con AI**
+            4. **I campi si compilano automaticamente**
             """)
             
             # Inizializza session state se non esiste
@@ -501,19 +501,31 @@ def main():
                 st.session_state.extracted_fields = {}
             if "processing_audio" not in st.session_state:
                 st.session_state.processing_audio = False
+            if "audio_bytes" not in st.session_state:
+                st.session_state.audio_bytes = None
             
-            # **UN SOLO COMPONENTE DI REGISTRAZIONE**
+            # **COMPONENTE DI REGISTRAZIONE**
             st.markdown("**🎙️ Registra la tua voce qui:**")
             audio_bytes = st_audiorec()
             
-            # **ELABORAZIONE AUTOMATICA** quando si registra l'audio
-            if audio_bytes and not st.session_state.audio_transcribed and not st.session_state.processing_audio:
-                st.session_state.processing_audio = True
-                st.success("🎵 **Audio registrato! Elaborazione AI in corso...**")
+            # **SALVA L'AUDIO** quando viene registrato
+            if audio_bytes and not st.session_state.audio_transcribed:
+                st.session_state.audio_bytes = audio_bytes
+                st.success("🎵 **Audio registrato!** Ora clicca '🤖 Elabora Audio' per processarlo")
+                
+                # **BOTTONE PER ELABORAZIONE**
+                if st.button("🤖 Elabora Audio con AI", type="primary", use_container_width=True):
+                    if st.session_state.audio_bytes:
+                        st.session_state.processing_audio = True
+                        st.rerun()
+            
+            # **ELABORAZIONE AI** quando si clicca il bottone
+            elif st.session_state.get("processing_audio") and st.session_state.audio_bytes and not st.session_state.audio_transcribed:
+                st.info("🤖 **Elaborazione AI in corso...**")
                 
                 # Salva l'audio temporaneamente
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
-                    temp_file.write(audio_bytes)
+                    temp_file.write(st.session_state.audio_bytes)
                     temp_filename = temp_file.name
                 
                 try:
@@ -648,6 +660,7 @@ def main():
                 st.session_state.audio_transcript = ""
                 st.session_state.extracted_fields = {}
                 st.session_state.processing_audio = False
+                st.session_state.audio_bytes = None
                 st.rerun()
 
         # --- RESTO DEL MAIN ORIGINALE ---
