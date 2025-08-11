@@ -14,6 +14,17 @@ import glob
 import random
 from google.auth.transport.requests import Request
 
+# Configurazione ffmpeg robusta
+try:
+    import imageio_ffmpeg
+    ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
+    os.environ["FFMPEG_BINARY"] = ffmpeg_path
+    print(f"🔧 DEBUG: FFMPEG_BINARY set to: {ffmpeg_path}")
+except Exception as e:
+    print(f"⚠️ DEBUG: Could not set FFMPEG_BINARY: {e}")
+    # Fallback: usa ffmpeg dal PATH se disponibile
+    pass
+
 def get_video_info(input_video):
     """Ottiene informazioni sul video per gestire meglio i codec"""
     try:
