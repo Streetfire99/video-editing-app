@@ -351,16 +351,16 @@ def verify_tracking_csv():
     try:
         tracking_data = load_tracking_csv()
         
-        # Migrazione: converte i vecchi campi transcript in manual
+        # Migrazione: converte i vecchi campi transcript in manual_link
         for entry in tracking_data:
             # Se esistono i vecchi campi, migrali ai nuovi
-            if 'italian_transcript' in entry and 'italian_manual' not in entry:
-                entry['italian_manual'] = entry.pop('italian_transcript', '')
-            if 'english_transcript' in entry and 'english_manual' not in entry:
-                entry['english_manual'] = entry.pop('english_transcript', '')
+            if 'italian_transcript' in entry and 'italian_manual_link' not in entry:
+                entry['italian_manual_link'] = entry.pop('italian_transcript', '')
+            if 'english_transcript' in entry and 'english_manual_link' not in entry:
+                entry['english_manual_link'] = entry.pop('english_transcript', '')
             
             # Verifica che tutti i record abbiano i campi necessari
-            required_fields = ['apartment', 'video_type', 'youtube_link', 'drive_link', 'italian_manual', 'english_manual', 'date_created']
+            required_fields = ['apartment', 'video_type', 'youtube_link', 'drive_link', 'italian_manual_link', 'english_manual_link', 'date_created']
             
             for field in required_fields:
                 if field not in entry:
