@@ -983,22 +983,12 @@ def create_dual_ass_with_custom_height(segments, output_file_it, output_file_en,
     print("✅ File ASS duali creati con altezza personalizzabile")
 
 def process_video(input_video, music_file, openai_api_key, output_dir=".", custom_prompt=None, video_type=None, italian_height=120, english_height=60):
-    """Funzione principale per elaborare il video"""
+    """Processa un video completo: estrazione audio, trascrizione, sottotitoli, musica, output finale"""
     
-    # Verifica che il file esista
-    if not os.path.exists(input_video):
-        raise Exception(f"File video non trovato: {input_video}")
-        
-    # Verifica dimensione file (max 500MB)
-    file_size = os.path.getsize(input_video) / (1024 * 1024)  # MB
-    if file_size > 500:
-        raise Exception(f"File troppo grande: {file_size:.1f}MB (max 500MB)")
-        
-    # Crea directory output se non esiste
+    print(f"🔧 DEBUG: process_video started - input: {input_video}, music: {music_file}, output_dir: {output_dir}, it_height: {italian_height}, en_height: {english_height}")
+    
+    # Crea la directory di output se non esiste
     os.makedirs(output_dir, exist_ok=True)
-    
-    print(f"🔧 DEBUG: process_video started - input: {input_video}, music: {music_file}, output_dir: {output_dir}, it_height: {italian_height}, en_height: {english_height}")
-    print(f"🔧 DEBUG: process_video started - input: {input_video}, music: {music_file}, output_dir: {output_dir}, it_height: {italian_height}, en_height: {english_height}")
     
     # Configura file di output
     audio_file = os.path.join(output_dir, "audio.wav")
@@ -1129,96 +1119,105 @@ def process_video(input_video, music_file, openai_api_key, output_dir=".", custo
         }
 
 def generate_subtitles_only(input_video, openai_api_key, output_dir=".", custom_prompt=None, video_type=None):
-    """Genera solo i sottotitoli senza elaborare il video finale"""
+    """Genera solo i sottotitoli senza processare il video completo"""
+    
+    print(f"🔧 DEBUG: generate_subtitles_only - input: {input_video}, output_dir: {output_dir}")
+    
+    # Crea la directory di output se non esiste
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Configura file di output
+    audio_file = os.path.join(output_dir, "audio.wav")
+    subtitle_file_it = os.path.join(output_dir, "subtitles_it.srt")
+    subtitle_file_en = os.path.join(output_dir, "subtitles_en.srt")
+    
+    # Ottieni informazioni sul video
+    video_info = get_video_info(input_video)
+    if video_info:
+        print(f"🔧 DEBUG: Video info - codec: {video_info['video_codec']}, audio: {video_info['audio_codec']}, size: {video_info['width']}x{video_info['height']}")
+    
+    # Inizializza client OpenAI
+    client = get_openai_client(openai_api_key)
+    
     try:
-        # Inizializza il client OpenAI
-        client = get_openai_client(openai_api_key)
+        print("🔧 DEBUG: Starting video processing steps...")
         
-        # Crea directory di output se non esiste
-        os.makedirs(output_dir, exist_ok=True)
-        
-        # Estrai l'audio dal video
-        audio_file = os.path.join(output_dir, "temp_audio.wav")
+        # 1. Estrai l'audio dal video
+        print("🔧 DEBUG: Step 1 - Extracting audio...")
         extract_audio_from_video(input_video, audio_file)
+        print("🔧 DEBUG: Step 1 completed - Audio extracted")
         
-        # Trascrivi l'audio
+        # 2. Trascrivi l'audio
+        print("🔧 DEBUG: Step 2 - Transcribing audio...")
         transcript = transcribe_audio(audio_file, client)
+        print("🔧 DEBUG: Step 2 completed - Audio transcribed")
         
-        # Verifica se c'è audio nel video
+        # Controlla se c'è audio nel video
         if not transcript.segments:
+            print("🔧 DEBUG: No audio segments found")
             return {
-                'success': False,
-                'error': 'Nessun audio rilevato nel video',
-                'has_voice': False
+                "success": False,
+                "error": "Nessun audio rilevato nel video"
             }
         
-        # Ottimizza la trascrizione
-        try:
-            # Estrai il testo grezzo dai segmenti
-            raw_transcription = "\n".join([seg.text for seg in transcript.segments])
-            
-            optimized_segments = optimize_transcription(raw_transcription, client, custom_prompt, video_type, transcript.segments)
-        except Exception as e:
-            raise
+        print(f"🔧 DEBUG: Found {len(transcript.segments)} audio segments")
         
-        # Traduci i sottotitoli in inglese
-        srt_en_file = os.path.join(output_dir, "subtitles_en.srt")
-        translate_subtitles(optimized_segments, client, srt_en_file, video_type)
+        # 3. Ottimizza la trascrizione
+        print("🔧 DEBUG: Optimizing transcription...")
+        optimized_texts = optimize_transcription(raw_transcription, client, custom_prompt, video_type, transcript.segments)
+        print(f"🔧 DEBUG: optimize_transcription completed successfully with {len(optimized_texts)} texts")
         
-        # Crea file SRT italiano
-        srt_it_file = os.path.join(output_dir, "subtitles_it.srt")
-        create_srt_file(optimized_segments, srt_it_file, "IT")
+        # 4. Distribuisci i sottotitoli
+        print("🔧 DEBUG: Distributing subtitles...")
+        optimized_segments = distribute_subtitles(transcript.segments, optimized_texts)
+        print(f"🔧 DEBUG: distribute_subtitles completed with {len(optimized_segments)} segments")
         
-        # Leggi i sottotitoli inglesi dal file SRT
-        segments_en_raw = read_srt_file(srt_en_file)
+        # 5. Crea file SRT italiani
+        print("🔧 DEBUG: Creating Italian SRT file...")
+        create_srt_file(optimized_segments, subtitle_file_it, "IT")
         
-        # Converti nel formato corretto (come i segmenti italiani)
-        segments_en = []
-        for start_time, end_time, text in segments_en_raw:
-            segments_en.append({
-                'start': start_time,
-                'end': end_time,
-                'text': text.strip()
-            })
-        
-        # Pulisci il file audio temporaneo
-        if os.path.exists(audio_file):
-            os.remove(audio_file)
+        # 6. Traduci e crea file SRT inglesi
+        print("🔧 DEBUG: Translating subtitles...")
+        translate_subtitles(optimized_segments, client, subtitle_file_en, video_type)
         
         return {
-            'success': True,
-            'segments': optimized_segments,
-            'segments_en': segments_en,
-            'srt_it_file': srt_it_file,
-            'srt_en_file': srt_en_file,
-            'has_voice': True,
-            'input_video': input_video
+            "success": True,
+            "subtitles_it": subtitle_file_it,
+            "subtitles_en": subtitle_file_en,
+            "transcript": raw_transcription,
+            "segments": optimized_segments
         }
         
     except Exception as e:
+        print(f"❌ DEBUG: Error in generate_subtitles_only: {e}")
         return {
-            'success': False,
-            'error': str(e),
-            'has_voice': False
+            "success": False,
+            "error": str(e)
         }
 
 def finalize_video_processing(input_video, srt_it_file, srt_en_file, output_dir, italian_height=120, english_height=60):
-    """Completa l'elaborazione del video usando i sottotitoli già generati"""
+    """Finalizza il video aggiungendo sottotitoli e musica di sottofondo"""
+    
     try:
-        # Percorso del file musica
-        music_file = os.path.join("Elaborazione", "audio.mp3")
+        print(f"🔧 DEBUG: finalize_video_processing - input: {input_video}, it_srt: {srt_it_file}, en_srt: {srt_en_file}")
+        
+        # Crea la directory di output se non esiste
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Configura file di output
+        video_with_music = os.path.join(output_dir, "video_with_music.mp4")
+        final_output = os.path.join(output_dir, "final_video.mp4")
 
         # Aggiungi musica di sottofondo
-        video_with_music = os.path.join(output_dir, "video_with_music.mp4")
+        music_file = os.path.join("Elaborazione", "audio.mp3")
         add_background_music(input_video, music_file, video_with_music)
 
         # Aggiungi sottotitoli
-        final_video = os.path.join(output_dir, "final_video.mp4")
         add_subtitles_to_video(
             input_video=video_with_music,
             subtitle_file_it=srt_it_file,
             subtitle_file_en=srt_en_file,
-            output_video=final_video,
+            output_video=final_output,
             italian_height=italian_height,
             english_height=english_height
         )
@@ -1226,15 +1225,14 @@ def finalize_video_processing(input_video, srt_it_file, srt_en_file, output_dir,
         return {
             'success': True,
             'video_with_music': video_with_music,
-            'final_video': final_video,
+            'final_video': final_output,
             'has_voice': True
         }
         
     except Exception as e:
         return {
             'success': False,
-            'error': str(e),
-            'has_voice': False
+            'error': str(e)
         }
 
 # Funzione upload_to_youtube rimossa - ora usa youtube_manager.py

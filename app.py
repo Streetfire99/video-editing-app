@@ -829,7 +829,7 @@ elif current_phase == 'results':
                 col1, col2 = st.columns(2)
                 with col1:
                     st.write("**Manuale Italiano:**")
-                    st.text_area("", value=video['manuals']['it'], height=150, disabled=True)
+                    st.text_area("Manuale Italiano", value=video['manuals']['it'], height=150, disabled=True)
                     
                     st.download_button(
                         label="📥 Scarica Manuale IT",
@@ -841,7 +841,7 @@ elif current_phase == 'results':
                 
                 with col2:
                     st.write("**Manuale Inglese:**")
-                    st.text_area("", value=video['manuals']['en'], height=150, disabled=True)
+                    st.text_area("Manuale Inglese", value=video['manuals']['en'], height=150, disabled=True)
                     
                     st.download_button(
                         label="📥 Scarica Manuale EN",
