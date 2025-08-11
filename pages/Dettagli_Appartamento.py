@@ -18,7 +18,7 @@ st.set_page_config(
 if 'selected_apartment' not in st.session_state:
     st.error("❌ Nessun appartamento selezionato!")
     if st.button("🏠 Torna agli Appartamenti"):
-        st.switch_page("pages/4_📚_database_tutorial.py")
+        st.switch_page("pages/4_database_tutorial.py")
     st.stop()
 
 selected_apartment = st.session_state.selected_apartment
@@ -33,7 +33,7 @@ with col1:
         st.switch_page("app.py")
 with col2:
     if st.button("📋 Torna agli Appartamenti"):
-        st.switch_page("pages/4_📚_database_tutorial.py")
+        st.switch_page("pages/4_database_tutorial.py")
 
 # Carica i dati di tracking
 tracking_data = load_tracking_csv()
@@ -53,8 +53,8 @@ else:
             'Tipologia': entry['video_type'],
             'Drive': entry['drive_link'] if entry['drive_link'] else 'N/A',
             'YouTube': entry['youtube_link'] if entry['youtube_link'] else 'N/A',
-            'Manuale IT': entry.get('italian_manual', '') if entry.get('italian_manual') else 'N/A',
-            'Manuale EN': entry.get('english_manual', '') if entry.get('english_manual') else 'N/A'
+            'Manuale IT': entry.get('italian_manual_link', '') if entry.get('italian_manual_link') else 'N/A',
+            'Manuale EN': entry.get('english_manual_link', '') if entry.get('english_manual_link') else 'N/A'
         })
     
     # Mostra la tabella

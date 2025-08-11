@@ -263,7 +263,7 @@ def save_tracking_csv(tracking_data):
         import csv
         from io import StringIO
         
-        fieldnames = ['apartment', 'video_type', 'youtube_link', 'drive_link', 'italian_manual', 'english_manual', 'date_created']
+        fieldnames = ['apartment', 'video_type', 'youtube_link', 'drive_link', 'italian_manual_link', 'english_manual_link', 'date_created']
         
         csv_buffer = StringIO()
         writer = csv.DictWriter(csv_buffer, fieldnames=fieldnames)
@@ -333,8 +333,8 @@ def add_tracking_entry(apartment, video_type, youtube_link, drive_link, italian_
         'video_type': video_type,
         'youtube_link': youtube_link or '',
         'drive_link': drive_link or '',
-        'italian_manual': italian_manual_link or '',
-        'english_manual': english_manual_link or '',
+        'italian_manual_link': italian_manual_link or '',
+        'english_manual_link': english_manual_link or '',
         'date_created': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     }
     
