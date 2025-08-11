@@ -210,25 +210,92 @@ with col1:
     # Area di registrazione
     st.markdown("### 🎤 Registrazione Vocale")
     
-    # Opzione 1: Registrazione diretta (se disponibile)
-    try:
-        from streamlit_audio_recorder import audio_recorder
+    # Opzione 1: Registrazione diretta con HTML5 (sempre disponibile)
+    st.info("🎙️ **Registrazione diretta disponibile!**")
+    
+    # Componente HTML5 per registrazione
+    st.markdown("""
+    <div style="text-align: center; padding: 20px;">
+        <button id="recordButton" style="
+            background-color: #e74c3c; 
+            color: white; 
+            border: none; 
+            padding: 15px 30px; 
+            font-size: 18px; 
+            border-radius: 50px; 
+            cursor: pointer;
+            margin: 10px;
+        " onclick="toggleRecording()">
+            🎤 Inizia Registrazione
+        </button>
+        <div id="status" style="margin: 10px; font-weight: bold;"></div>
+        <audio id="audioPreview" controls style="margin: 10px; display: none;"></audio>
+    </div>
+    
+    <script>
+    let mediaRecorder;
+    let audioChunks = [];
+    let isRecording = false;
+    
+    async function toggleRecording() {
+        const button = document.getElementById('recordButton');
+        const status = document.getElementById('status');
+        const audioPreview = document.getElementById('audioPreview');
         
-        st.info("🎙️ **Registrazione diretta disponibile!**")
-        audio_bytes = audio_recorder(
-            text="🎤 Clicca per registrare",
-            recording_color="#e74c3c",
-            neutral_color="#2ecc71",
-            icon_name="microphone",
-            icon_size="2x"
-        )
-        
-        if audio_bytes:
-            st.success("✅ Audio registrato!")
-        
-    except ImportError:
-        st.warning("⚠️ **Registrazione diretta non disponibile** - Usa l'upload file")
-        audio_bytes = None
+        if (!isRecording) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+                
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    audioPreview.src = audioUrl;
+                    audioPreview.style.display = 'block';
+                    
+                    // Invia i dati a Streamlit
+                    const reader = new FileReader();
+                    reader.onload = function() {
+                        const base64data = reader.result.split(',')[1];
+                        // Usa Streamlit per inviare i dati
+                        window.parent.postMessage({
+                            type: 'audio_data',
+                            data: base64data
+                        }, '*');
+                    };
+                    reader.readAsDataURL(audioBlob);
+                };
+                
+                mediaRecorder.start();
+                isRecording = true;
+                button.textContent = '⏹️ Ferma Registrazione';
+                button.style.backgroundColor = '#27ae60';
+                status.textContent = '🔴 Registrando...';
+                status.style.color = '#e74c3c';
+                
+            } catch (error) {
+                status.textContent = '❌ Errore: ' + error.message;
+                status.style.color = '#e74c3c';
+            }
+        } else {
+            mediaRecorder.stop();
+            isRecording = false;
+            button.textContent = '🎤 Inizia Registrazione';
+            button.style.backgroundColor = '#e74c3c';
+            status.textContent = '✅ Registrazione completata!';
+            status.style.color = '#27ae60';
+        }
+    }
+    </script>
+    """, unsafe_allow_html=True)
+    
+    # Per ora, usiamo solo upload file
+    audio_bytes = None
     
     # Opzione 2: Upload file audio (sempre disponibile)
     st.markdown("### 🎵 **Alternativa: Carica file audio**")

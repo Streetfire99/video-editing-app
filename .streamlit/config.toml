@@ -1,12 +1,23 @@
 [server]
-# Configurazioni per Streamlit Cloud
-maxUploadSize = 200
+# Aumenta limite upload file (default: 200MB)
+maxUploadSize = 500
 enableXsrfProtection = false
 enableCORS = false
 
+# Configurazioni per file grandi
+maxMessageSize = 1000
+enableStaticServing = true
+
+[client]
+# Abilita upload di file più grandi
+showErrorDetails = true
+
 [browser]
-# Configurazioni browser
+# Ottimizzazioni per file grandi
 gatherUsageStats = false
+
+# Configurazioni per gestione memoria
+memoryMode = "greedy"
 
 [theme]
 # Tema personalizzato
@@ -15,7 +26,3 @@ backgroundColor = "#FFFFFF"
 secondaryBackgroundColor = "#F0F2F6"
 textColor = "#262730"
 font = "sans serif"
-
-[client]
-# Configurazioni client
-showErrorDetails = true
