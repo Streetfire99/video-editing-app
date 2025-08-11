@@ -486,8 +486,8 @@ def main():
         with st.expander("🎤 Registrazione Vocale e Elaborazione AI", expanded=True):
             st.markdown("""
             **🎯 FLOW SEMPLIFICATO:**
-            1. **Clicca il microfono qui sotto** e parla
-            2. **Clicca "Stop" quando hai finito**
+            1. **Clicca "Start Recording" qui sotto** e parla
+            2. **Clicca "Stop Recording" quando hai finito**
             3. **Clicca "🤖 Elabora Audio" per processare con AI**
             4. **I campi si compilano automaticamente**
             """)
@@ -508,14 +508,20 @@ def main():
             st.markdown("**🎙️ Registra la tua voce qui:**")
             audio_bytes = st_audiorec()
             
+            # **DEBUG: Mostra sempre lo stato dell'audio**
+            st.write(f"**🔍 Debug:** Audio bytes: {'Presenti' if audio_bytes else 'Non presenti'}")
+            st.write(f"**🔍 Debug:** Audio in sessione: {'Presenti' if st.session_state.audio_bytes else 'Non presenti'}")
+            st.write(f"**🔍 Debug:** Già trascritto: {st.session_state.audio_transcribed}")
+            
             # **SALVA L'AUDIO** quando viene registrato
-            if audio_bytes and not st.session_state.audio_transcribed:
+            if audio_bytes:
                 st.session_state.audio_bytes = audio_bytes
                 st.success("🎵 **Audio registrato!** Ora clicca '🤖 Elabora Audio' per processarlo")
             
             # **BOTTONE PER ELABORAZIONE** - sempre visibile se c'è audio
             if st.session_state.audio_bytes and not st.session_state.audio_transcribed:
                 st.markdown("---")
+                st.markdown("**🤖 Elaborazione AI:**")
                 if st.button("🤖 Elabora Audio con AI", type="primary", use_container_width=True):
                     st.session_state.processing_audio = True
                     st.rerun()
