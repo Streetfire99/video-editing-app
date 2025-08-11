@@ -10,4 +10,5 @@ python-dotenv
 faster-whisper
 numpy
 imageio-ffmpeg
-geopy 
+geopy
+streamlit-webrtc 

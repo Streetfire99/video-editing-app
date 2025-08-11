@@ -210,89 +210,31 @@ with col1:
     # Area di registrazione
     st.markdown("### 🎤 Registrazione Vocale")
     
-    # Opzione 1: Registrazione diretta con HTML5 (sempre disponibile)
-    st.info("🎙️ **Registrazione diretta disponibile!**")
+    # Registrazione vocale - Soluzione universale
+    st.info("🎙️ **Registrazione vocale disponibile!**")
     
-    # Componente HTML5 per registrazione
+    # Istruzioni chiare per registrazione
     st.markdown("""
-    <div style="text-align: center; padding: 20px;">
-        <button id="recordButton" style="
-            background-color: #e74c3c; 
-            color: white; 
-            border: none; 
-            padding: 15px 30px; 
-            font-size: 18px; 
-            border-radius: 50px; 
-            cursor: pointer;
-            margin: 10px;
-        " onclick="toggleRecording()">
-            🎤 Inizia Registrazione
-        </button>
-        <div id="status" style="margin: 10px; font-weight: bold;"></div>
-        <audio id="audioPreview" controls style="margin: 10px; display: none;"></audio>
-    </div>
+    ### 📱 **Come registrare la tua voce:**
     
-    <script>
-    let mediaRecorder;
-    let audioChunks = [];
-    let isRecording = false;
+    1. **📱 Con il telefono:**
+       - Usa l'app **"Registrazione Vocale"** (iOS) o **"Registratore"** (Android)
+       - Registra descrivendo il prodotto/oggetto
+       - Salva come **MP3** o **WAV**
+       - Carica qui sotto
     
-    async function toggleRecording() {
-        const button = document.getElementById('recordButton');
-        const status = document.getElementById('status');
-        const audioPreview = document.getElementById('audioPreview');
-        
-        if (!isRecording) {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
-                audioChunks = [];
-                
-                mediaRecorder.ondataavailable = (event) => {
-                    audioChunks.push(event.data);
-                };
-                
-                mediaRecorder.onstop = () => {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                    const audioUrl = URL.createObjectURL(audioBlob);
-                    audioPreview.src = audioUrl;
-                    audioPreview.style.display = 'block';
-                    
-                    // Invia i dati a Streamlit
-                    const reader = new FileReader();
-                    reader.onload = function() {
-                        const base64data = reader.result.split(',')[1];
-                        // Usa Streamlit per inviare i dati
-                        window.parent.postMessage({
-                            type: 'audio_data',
-                            data: base64data
-                        }, '*');
-                    };
-                    reader.readAsDataURL(audioBlob);
-                };
-                
-                mediaRecorder.start();
-                isRecording = true;
-                button.textContent = '⏹️ Ferma Registrazione';
-                button.style.backgroundColor = '#27ae60';
-                status.textContent = '🔴 Registrando...';
-                status.style.color = '#e74c3c';
-                
-            } catch (error) {
-                status.textContent = '❌ Errore: ' + error.message;
-                status.style.color = '#e74c3c';
-            }
-        } else {
-            mediaRecorder.stop();
-            isRecording = false;
-            button.textContent = '🎤 Inizia Registrazione';
-            button.style.backgroundColor = '#e74c3c';
-            status.textContent = '✅ Registrazione completata!';
-            status.style.color = '#27ae60';
-        }
-    }
-    </script>
-    """, unsafe_allow_html=True)
+    2. **💻 Con il computer:**
+       - **Mac**: GarageBand, QuickTime, o app Registrazione
+       - **Windows**: Registratore di suoni, Audacity
+       - **Linux**: Audacity, GNOME Sound Recorder
+       - Salva come **MP3**, **WAV**, o **M4A**
+       - Carica qui sotto
+    
+    3. **🌐 Online:**
+       - [Online Voice Recorder](https://online-voice-recorder.com/)
+       - [Vocaroo](https://vocaroo.com/)
+       - Registra e scarica come **MP3** o **WAV**
+    """)
     
     # Per ora, usiamo solo upload file
     audio_bytes = None
