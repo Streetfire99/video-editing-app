@@ -26,26 +26,50 @@ except Exception as e:
     pass
 
 def get_video_info(input_video):
-    """Ottiene informazioni sul video per gestire meglio i codec"""
+    """Ottiene informazioni sul video per gestire meglio i codec usando subprocess diretto"""
     try:
-        import ffmpeg
-        # Forza il percorso ffmpeg
-        ffmpeg_path = os.environ.get("FFMPEG_BINARY")
-        if ffmpeg_path:
-            ffmpeg.FFMPEG_BINARY = ffmpeg_path
-            print(f"🔧 DEBUG: Using ffmpeg from: {ffmpeg_path}")
+        # Usa subprocess diretto con imageio-ffmpeg
+        ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
         
-        probe = ffmpeg.probe(input_video)
-        video_info = next(s for s in probe['streams'] if s['codec_type'] == 'video')
-        audio_info = next((s for s in probe['streams'] if s['codec_type'] == 'audio'), None)
+        # Comando ffprobe per ottenere informazioni sul video
+        cmd = [
+            ffmpeg_path.replace('ffmpeg', 'ffprobe'),
+            '-v', 'quiet',
+            '-print_format', 'json',
+            '-show_format',
+            '-show_streams',
+            input_video
+        ]
         
-        return {
-            'video_codec': video_info.get('codec_name', 'unknown'),
-            'audio_codec': audio_info.get('codec_name', 'unknown') if audio_info else None,
-            'width': int(video_info.get('width', 0)),
-            'height': int(video_info.get('height', 0)),
-            'duration': float(probe.get('format', {}).get('duration', 0))
-        }
+        # Esegui il comando
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        
+        if result.returncode == 0:
+            # Parsa il JSON di output
+            probe_data = json.loads(result.stdout)
+            
+            # Trova il stream video
+            video_stream = next((s for s in probe_data['streams'] if s['codec_type'] == 'video'), None)
+            audio_stream = next((s for s in probe_data['streams'] if s['codec_type'] == 'audio'), None)
+            
+            if video_stream:
+                return {
+                    'video_codec': video_stream.get('codec_name', 'unknown'),
+                    'audio_codec': audio_stream.get('codec_name', 'unknown') if audio_stream else None,
+                    'width': int(video_stream.get('width', 0)),
+                    'height': int(video_stream.get('height', 0)),
+                    'duration': float(probe_data.get('format', {}).get('duration', 0))
+                }
+            else:
+                print(f"❌ DEBUG: No video stream found in {input_video}")
+                return None
+        else:
+            print(f"❌ DEBUG: ffprobe error: {result.stderr}")
+            return None
+            
+    except subprocess.CalledProcessError as e:
+        print(f"❌ DEBUG: Error in get_video_info subprocess: {e}")
+        return None
     except Exception as e:
         print(f"❌ DEBUG: Error in get_video_info: {e}")
         return None
@@ -59,9 +83,6 @@ def extract_audio_from_video(input_video, audio_file):
     """Estrae l'audio dal video"""
     try:
         # Usa subprocess diretto con imageio-ffmpeg
-        import imageio_ffmpeg
-        import subprocess
-        
         ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
         print(f"🔧 DEBUG: Using ffmpeg from: {ffmpeg_path}")
         
@@ -591,57 +612,69 @@ CRITICAL QUALITY CHECKS - Before providing translation, verify each sentence:
             srt.write(f"{i}\n{start} --> {end}\n{text}\n\n")
 
 def add_background_music(input_video, music_file, output_video):
-    """Aggiunge musica di sottofondo"""
-    # Usa solo ffmpeg-python
+    """Aggiunge musica di sottofondo usando subprocess diretto"""
     try:
-        import ffmpeg
-        
         # Verifica che i file esistano
         if not os.path.exists(input_video):
             raise FileNotFoundError(f"Video input non trovato: {input_video}")
         if not os.path.exists(music_file):
             raise FileNotFoundError(f"File musica non trovato: {music_file}")
         
-        input_stream = ffmpeg.input(input_video)
-        music_stream = ffmpeg.input(music_file)
+        # Usa subprocess diretto con imageio-ffmpeg
+        # Ottieni il percorso di ffmpeg
+        ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
         
-        # Usa un approccio più semplice e compatibile
-        stream = ffmpeg.output(
-            input_stream['v'],
-            ffmpeg.filter(music_stream['a'], 'volume', 0.3),  # Volume più basso
-            output_video,
-            shortest=None,
-            vcodec='libx264',
-            acodec='aac',
-            preset='fast',  # Preset più veloce
-            crf=20,  # Qualità leggermente più bassa per stabilità
-            pix_fmt='yuv420p'
-        )
-        ffmpeg.run(stream, overwrite_output=True, quiet=True)
-    except ImportError as e:
-        raise Exception("ffmpeg-python non è disponibile. Installa ffmpeg-python.")
-    except Exception as e:
-        # Prova un approccio alternativo senza musica se fallisce
+        # Comando per aggiungere musica di sottofondo
+        cmd = [
+            ffmpeg_path,
+            '-i', input_video,
+            '-i', music_file,
+            '-filter_complex', '[1:a]volume=0.3[a1];[0:a][a1]amix=inputs=2:duration=first',
+            '-c:v', 'libx264',
+            '-c:a', 'aac',
+            '-preset', 'fast',
+            '-crf', '20',
+            '-pix_fmt', 'yuv420p',
+            '-shortest',
+            '-y',  # Sovrascrivi output
+            output_video
+        ]
+        
+        # Esegui il comando
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        
+        if result.returncode == 0:
+            print(f"✅ Musica aggiunta con successo: {output_video}")
+        else:
+            print(f"⚠️ Warning: {result.stderr}")
+            
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Errore subprocess: {e}")
+        print(f"stderr: {e.stderr}")
+        # Fallback: copia solo il video senza musica
         try:
-            import ffmpeg
-            input_stream = ffmpeg.input(input_video)
-            stream = ffmpeg.output(
-                input_stream,
-                output_video,
-                vcodec='libx264',
-                acodec='aac',
-                preset='fast',
-                crf=20,
-                pix_fmt='yuv420p'
-            )
-            ffmpeg.run(stream, overwrite_output=True, quiet=True)
+            cmd_fallback = [
+                ffmpeg_path,
+                '-i', input_video,
+                '-c:v', 'libx264',
+                '-c:a', 'aac',
+                '-preset', 'fast',
+                '-crf', '20',
+                '-pix_fmt', 'yuv420p',
+                '-y',
+                output_video
+            ]
+            subprocess.run(cmd_fallback, capture_output=True, text=True, check=True)
+            print(f"✅ Fallback: video copiato senza musica: {output_video}")
         except Exception as e2:
-            raise e
+            raise Exception(f"Fallback fallito: {e2}")
+    except Exception as e:
+        raise Exception(f"Errore aggiunta musica: {e}")
 
 
 
 def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, output_video, italian_height=120, english_height=60):
-    """Aggiunge sottotitoli duali al video"""
+    """Aggiunge sottotitoli duali al video usando subprocess diretto"""
     
     # Verifica che i file SRT esistano
     if not os.path.exists(subtitle_file_it):
@@ -651,7 +684,9 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
         raise FileNotFoundError(f"File SRT inglese non trovato: {subtitle_file_en}")
     
     try:
-        import ffmpeg
+        # Usa subprocess diretto con imageio-ffmpeg
+        # Ottieni il percorso di ffmpeg
+        ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
         
         # Ottieni informazioni sul video per gestire meglio i codec
         video_info = get_video_info(input_video)
@@ -661,41 +696,49 @@ def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, outp
             os.remove(output_video)
         
         # METODO SEMPLIFICATO: Aggiungi entrambi i sottotitoli in un unico passaggio
-        stream = ffmpeg.input(input_video)
-        stream = ffmpeg.output(
-            stream,
-            output_video,
-            vf=f"subtitles={subtitle_file_it}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height},MarginL=50,MarginR=50,WrapStyle=0',subtitles={subtitle_file_en}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height},MarginL=50,MarginR=50,WrapStyle=0'",
-            vcodec='libx264',
-            acodec='aac',
-            preset='fast',  # Usa preset veloce per maggiore stabilità
-            crf=20,  # Qualità leggermente più bassa per stabilità
-            pix_fmt='yuv420p'
-        )
+        cmd = [
+            ffmpeg_path,
+            '-i', input_video,
+            '-vf', f"subtitles={subtitle_file_it}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height},MarginL=50,MarginR=50,WrapStyle=0',subtitles={subtitle_file_en}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height},MarginL=50,MarginR=50,WrapStyle=0'",
+            '-c:v', 'libx264',
+            '-c:a', 'aac',
+            '-preset', 'fast',  # Usa preset veloce per maggiore stabilità
+            '-crf', '20',  # Qualità leggermente più bassa per stabilità
+            '-pix_fmt', 'yuv420p',
+            '-y',  # Sovrascrivi output
+            output_video
+        ]
         
-        ffmpeg.run(stream, overwrite_output=True, quiet=True)
-
-
+        # Esegui il comando
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        
+        if result.returncode == 0:
+            print(f"✅ Sottotitoli aggiunti con successo: {output_video}")
+        else:
+            print(f"⚠️ Warning: {result.stderr}")
             
-    except ImportError as e:
-        raise Exception("ffmpeg-python non è disponibile. Installa ffmpeg-python.")
-    except Exception as e:
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Errore subprocess: {e}")
+        print(f"stderr: {e.stderr}")
         # Se il metodo principale fallisce, prova senza sottotitoli
         try:
-            import ffmpeg
-            stream = ffmpeg.input(input_video)
-            stream = ffmpeg.output(
-                stream,
-                output_video,
-                vcodec='libx264',
-                acodec='aac',
-                preset='fast',
-                crf=20,
-                pix_fmt='yuv420p'
-            )
-            ffmpeg.run(stream, overwrite_output=True, quiet=True)
+            cmd_fallback = [
+                ffmpeg_path,
+                '-i', input_video,
+                '-c:v', 'libx264',
+                '-c:a', 'aac',
+                '-preset', 'fast',
+                '-crf', '20',
+                '-pix_fmt', 'yuv420p',
+                '-y',
+                output_video
+            ]
+            subprocess.run(cmd_fallback, capture_output=True, text=True, check=True)
+            print(f"✅ Fallback: video copiato senza sottotitoli: {output_video}")
         except Exception as fallback_error:
-            raise e  # Rilancia l'errore originale
+            raise Exception(f"Fallback fallito: {fallback_error}")
+    except Exception as e:
+        raise Exception(f"Errore aggiunta sottotitoli: {e}")
 
 def create_fixed_position_ass_file(segments, output_file, language="IT", margin_v=85, video_width=478, video_height=850):
     """Crea file ASS con posizione fissa - SOLUZIONE MIGLIORATA"""
@@ -741,7 +784,7 @@ def create_fixed_position_ass_file(segments, output_file, language="IT", margin_
             ass.write(f"Dialogue: 0,{start},{end},Default,,200,200,0,,{prefix}{full_text}\n")
 
 def add_subtitles_with_fixed_position(input_video, subtitle_file_it, subtitle_file_en, output_video):
-    """Aggiunge sottotitoli con posizione fissa usando il filtro ass"""
+    """Aggiunge sottotitoli con posizione fissa usando il filtro ass con subprocess diretto"""
     print(f"🔧 DEBUG: add_subtitles_with_fixed_position - input: {input_video}, it_subs: {subtitle_file_it}, en_subs: {subtitle_file_en}, output: {output_video}")
     
     # Verifica che i file ASS esistano
@@ -754,7 +797,8 @@ def add_subtitles_with_fixed_position(input_video, subtitle_file_it, subtitle_fi
         raise FileNotFoundError(f"File ASS inglese non trovato: {subtitle_file_en}")
     
     try:
-        import ffmpeg
+        # Usa subprocess diretto con imageio-ffmpeg
+        ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
         
         # Ottieni informazioni sul video
         video_info = get_video_info(input_video)
@@ -767,57 +811,76 @@ def add_subtitles_with_fixed_position(input_video, subtitle_file_it, subtitle_fi
         if os.path.exists(output_video):
             os.remove(output_video)
         
-        stream = ffmpeg.input(input_video)
-        
         # Usa il filtro ass per controllo completo della posizione
-        stream = ffmpeg.output(
-            stream,
-            output_video,
-            vf=f"ass={subtitle_file_it},ass={subtitle_file_en}",
-            vcodec='libx264',
-            acodec='aac',
-            preset='medium',
-            crf=18,
-            pix_fmt='yuv420p'
-        )
+        cmd = [
+            ffmpeg_path,
+            '-i', input_video,
+            '-vf', f"ass={subtitle_file_it},ass={subtitle_file_en}",
+            '-c:v', 'libx264',
+            '-c:a', 'aac',
+            '-preset', 'medium',
+            '-crf', '18',
+            '-pix_fmt', 'yuv420p',
+            '-y',  # Sovrascrivi output
+            output_video
+        ]
         
-        ffmpeg.run(stream, overwrite_output=True)
-        print("🔧 DEBUG: Fixed position subtitles added successfully")
+        # Esegui il comando
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         
+        if result.returncode == 0:
+            print("🔧 DEBUG: Fixed position subtitles added successfully")
+        else:
+            print(f"⚠️ Warning: {result.stderr}")
+            
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Errore subprocess: {e}")
+        print(f"stderr: {e.stderr}")
+        raise Exception(f"Errore aggiunta sottotitoli con posizione fissa: {e}")
     except Exception as e:
         print(f"❌ DEBUG: Error in add_subtitles_with_fixed_position - {e}")
         raise e
 
 def add_subtitles_with_subtitles_filter(input_video, subtitle_file_it, subtitle_file_en, output_video, italian_height=120, english_height=60):
-    """Aggiunge sottotitoli usando il filtro subtitles (più stabile)"""
+    """Aggiunge sottotitoli usando il filtro subtitles (più stabile) con subprocess diretto"""
     print(f"🔧 DEBUG: add_subtitles_with_subtitles_filter - input: {input_video}, it_subs: {subtitle_file_it}, en_subs: {subtitle_file_en}, output: {output_video}")
     
     try:
-        import ffmpeg
+        # Usa subprocess diretto con imageio-ffmpeg
+        ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
         
         # Rimuovi il file di output se esiste già
         if os.path.exists(output_video):
             os.remove(output_video)
         
-        stream = ffmpeg.input(input_video)
-        
         # Usa il filtro subtitles con WrapStyle=0 per evitare wrapping
         vf = f"subtitles={subtitle_file_it}:force_style='FontSize=18,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height},MarginL=200,MarginR=200,WrapStyle=0',subtitles={subtitle_file_en}:force_style='FontSize=18,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height},MarginL=200,MarginR=200,WrapStyle=0'"
         
-        stream = ffmpeg.output(
-            stream,
-            output_video,
-            vf=vf,
-            vcodec='libx264',
-            acodec='aac',
-            preset='medium',
-            crf=18,
-            pix_fmt='yuv420p'
-        )
+        cmd = [
+            ffmpeg_path,
+            '-i', input_video,
+            '-vf', vf,
+            '-c:v', 'libx264',
+            '-c:a', 'aac',
+            '-preset', 'medium',
+            '-crf', '18',
+            '-pix_fmt', 'yuv420p',
+            '-y',  # Sovrascrivi output
+            output_video
+        ]
         
-        ffmpeg.run(stream, overwrite_output=True)
-        print("🔧 DEBUG: Subtitles filter subtitles added successfully")
+        # Esegui il comando
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         
+        if result.returncode == 0:
+            print("🔧 DEBUG: Subtitles filter subtitles added successfully")
+        else:
+            print(f"⚠️ Warning: {result.stderr}")
+            
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Errore subprocess: {e}")
+        print(f"stderr: {e.stderr}")
+        raise Exception(f"Errore aggiunta sottotitoli con filtro: {e}")
     except Exception as e:
         print(f"❌ DEBUG: Error in add_subtitles_with_subtitles_filter - {e}")
         raise e
@@ -1154,14 +1217,14 @@ def finalize_video_processing(input_video, srt_it_file, srt_en_file, output_dir,
             italian_height=italian_height,
             english_height=english_height
         )
-
+        
         return {
             'success': True,
             'video_with_music': video_with_music,
             'final_video': final_video,
             'has_voice': True
         }
-
+        
     except Exception as e:
         return {
             'success': False,

@@ -23,15 +23,15 @@ sys.path.append('Elaborazione')
 # Importa le funzioni da prova.py
 try:
     from prova import (
-        process_video, 
+    process_video, 
         generate_subtitles_only,
         finalize_video_processing,
-        get_openai_client, 
-        create_srt_file, 
-        add_subtitles_to_video,
-        format_timestamp,
-        split_text
-    )
+    get_openai_client, 
+    create_srt_file, 
+    add_subtitles_to_video,
+    format_timestamp,
+    split_text
+)
 except ImportError as e:
     st.error(f"❌ Errore importazione modulo prova: {e}")
     st.stop()
@@ -450,9 +450,9 @@ if current_phase == 'generate_edit':
     st.markdown("---")
     st.header("🎬 Generazione e Modifica Sottotitoli")
     
-    if not openai_api_key:
-        st.error("❌ Inserisci la tua OpenAI API Key")
-        st.stop()
+        if not openai_api_key:
+            st.error("❌ Inserisci la tua OpenAI API Key")
+            st.stop()
         
     # Controlla se i sottotitoli sono già stati generati
     videos_with_subtitles = []
@@ -523,7 +523,7 @@ if current_phase == 'generate_edit':
                             'it': manual_it or f"Manuale italiano per {video['name']}",
                             'en': manual_en or f"English manual for {video['name']}"
                         }
-                    except Exception as e:
+            except Exception as e:
                         st.error(f"❌ Errore generazione manuali per {video['name']}: {str(e)}")
                         video['manuals'] = {
                             'it': f"Manuale italiano per {video['name']}",
@@ -549,8 +549,8 @@ if current_phase == 'generate_edit':
     for i, video in enumerate(st.session_state.bulk_processing['videos']):
         with st.expander(f"🎬 {video['name']} - {video.get('video_type', 'N/A')}"):
             col1, col2 = st.columns(2)
-            
-            with col1:
+        
+        with col1:
                 st.write("**Sottotitoli Italiani:**")
                 if video['subtitles']['it']:
                     for j, segment in enumerate(video['subtitles']['it']):
@@ -564,8 +564,8 @@ if current_phase == 'generate_edit':
                         video['subtitles']['it'][j]['text'] = edited_text
                 else:
                     st.write("❌ Nessun sottotitolo generato")
-            
-            with col2:
+        
+        with col2:
                 st.write("**Sottotitoli Inglesi:**")
                 if video['subtitles']['en']:
                     for j, segment in enumerate(video['subtitles']['en']):
@@ -574,7 +574,7 @@ if current_phase == 'generate_edit':
                         else:
                             current_text = segment[2] if len(segment) > 2 else ''
                         
-                        edited_text = st.text_area(
+            edited_text = st.text_area(
                             f"EN {j+1}",
                             value=current_text,
                             key=f"en_{i}_{j}",
@@ -624,7 +624,7 @@ if current_phase == 'generate_edit':
     with col2:
         if st.button("🚀 Elabora Video", type="primary", use_container_width=True):
             st.session_state.bulk_processing['current_phase'] = 'process'
-            st.rerun()
+                st.rerun()
                 
 
 
@@ -694,14 +694,14 @@ elif current_phase == 'process':
                 output_dir=video['output_dir'],
                 italian_height=120,
                 english_height=60
-            )
-            
-            # Pulisci i file temporanei
+                )
+                
+                # Pulisci i file temporanei
             temp_srt_it.close()
             temp_srt_en.close()
-            os.unlink(temp_srt_it.name)
-            os.unlink(temp_srt_en.name)
-            
+                os.unlink(temp_srt_it.name)
+                os.unlink(temp_srt_en.name)
+                
             if result['success']:
                 video['processed_video'] = result
                 st.success(f"✅ {video['name']} - Video elaborato!")
@@ -710,7 +710,7 @@ elif current_phase == 'process':
                 st.error(f"❌ {video['name']} - Errore: {result.get('error', 'Errore sconosciuto')}")
                 st.write(f"🔧 DEBUG: Risultato fallito: {result}")
                 
-        except Exception as e:
+            except Exception as e:
             st.error(f"❌ {video['name']} - Errore: {str(e)}")
         
         # Aggiorna progress bar
@@ -724,7 +724,7 @@ elif current_phase == 'process':
         st.rerun()
 
 elif current_phase == 'results':
-    st.markdown("---")
+st.markdown("---")
     st.header("📊 Risultati Elaborazione")
     
     # Debug: mostra informazioni sui video
@@ -769,24 +769,24 @@ elif current_phase == 'results':
                             if st.button("☁️ Upload Drive", key=f"drive_{i}"):
                                 try:
                                     # Upload video su Drive
-                                    drive_link = upload_video_to_drive(
+            drive_link = upload_video_to_drive(
                                         video_path=final_video_path,
                                         apartment_name=video['apartment'],
                                         video_type=video['video_type']
-                                    )
-                                    
-                                    if drive_link:
+            )
+            
+            if drive_link:
                                         video['drive_links']['video'] = drive_link
                                         st.success(f"✅ Video caricato su Drive: {drive_link}")
-                                        
-                                        # Salva nel tracking
-                                        add_tracking_entry(
+                
+                # Salva nel tracking
+                add_tracking_entry(
                                             apartment=video['apartment'],
                                             video_type=video['video_type'],
                                             youtube_link=None,
                                             drive_link=drive_link
                                         )
-                                    else:
+            else:
                                         st.error("❌ Errore nel caricamento su Drive")
                                 except Exception as e:
                                     st.error(f"❌ Errore upload Drive: {str(e)}")
@@ -825,7 +825,7 @@ elif current_phase == 'results':
                 
                 # Manuali
                 col1, col2 = st.columns(2)
-                with col1:
+    with col1:
                     st.write("**Manuale Italiano:**")
                     st.text_area("", value=video['manuals']['it'], height=150, disabled=True)
                     
@@ -835,9 +835,9 @@ elif current_phase == 'results':
                         file_name=f"{video['name']}_manuale_IT.txt",
                         mime="text/plain",
                         key=f"download_it_{i}"
-                    )
-                
-                with col2:
+        )
+    
+    with col2:
                     st.write("**Manuale Inglese:**")
                     st.text_area("", value=video['manuals']['en'], height=150, disabled=True)
                     
@@ -857,8 +857,8 @@ elif current_phase == 'results':
             if st.button("📥 Scarica Tutto", type="primary"):
                 # Crea un file ZIP con tutti i video e manuali
                 import zipfile
-                import io
-                
+            import io
+            
                 zip_buffer = io.BytesIO()
                 with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
                     for video in st.session_state.bulk_processing['videos']:
@@ -961,7 +961,7 @@ elif current_phase == 'results':
                                         youtube_link=youtube_link,
                                         drive_link=video['drive_links']['video']
                                     )
-                            except Exception as e:
+        except Exception as e:
                                 st.error(f"❌ Errore upload YouTube {video['name']}: {str(e)}")
                 
                 if uploaded_count > 0:
