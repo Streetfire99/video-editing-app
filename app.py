@@ -758,13 +758,14 @@ elif current_phase == 'results':
                         col1, col2, col3 = st.columns(3)
                         
                         with col1:
-                            with open(final_video_path, "rb") as video_file:
-                                st.download_button(
-                                    label="📥 Scarica Video",
-                                    data=video_file.read(),
-                                    file_name=f"{video['name']}_elaborato.mp4",
-                                    mime="video/mp4"
-                                )
+                            # Download button che non interferisce con il file
+                            st.download_button(
+                                label="📥 Scarica Video",
+                                data=open(final_video_path, "rb"),
+                                file_name=f"{video['name']}_elaborato.mp4",
+                                mime="video/mp4",
+                                key=f"download_video_{i}"
+                            )
                         
                         with col2:
                             if st.button("☁️ Upload Drive", key=f"drive_{i}"):

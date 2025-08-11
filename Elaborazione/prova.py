@@ -144,16 +144,16 @@ def optimize_transcription(raw_transcription, client, custom_prompt=None, video_
 Your task is to optimize the following raw transcription of an instructional video. The video shows a person performing the actions described in the audio. Follow these steps:
 
 1. Keep the text in Italian, as it is the original language.
-2. Write COMPLETE sentences that describe exactly what is shown in the video.
+2. Write SHORT, CONCISE sentences that describe exactly what is shown in the video.
 3. Each sentence should be self-contained and describe a single action clearly.
-4. Write sentences that are 10-20 words long - natural and descriptive.
+4. Write sentences that are 5-12 words long - SHORT and to the point.
 5. NEVER truncate sentences with ellipsis (...) or cut them mid-sentence.
 6. Write natural, flowing sentences that make sense on their own.
 7. DO NOT add any prefix to the text - just write the Italian text as is.
 8. DO NOT add periods, exclamation marks, or question marks at the end of sentences.
-9. The text will be automatically formatted for subtitles later - focus on content quality.
+9. The text will be automatically formatted for subtitles later - focus on brevity and clarity.
 10. Provide the output as a JSON array of segments, where each segment has:
-    - text: subtitle text in Italian (complete, natural sentence)
+    - text: subtitle text in Italian (SHORT, complete sentence)
 
 Raw transcription:
 {raw_transcription}
@@ -168,13 +168,15 @@ CRITICAL QUALITY CHECKS - Before providing output, verify each sentence:
 7. If any sentence seems incomplete, rewrite it completely
 8. Each sentence MUST be a complete instruction that can stand alone
 9. NEVER cut words in the middle - each sentence must end with a complete word
-10. If a sentence seems too long, break it into multiple complete sentences instead of cutting it
+10. KEEP SENTENCES SHORT - prefer 5-12 words over longer sentences
+11. Use simple, direct language - avoid unnecessary words
+12. Focus on the action being performed, not descriptions
 
-Example output:
+Example output (SHORT sentences):
 [
-  {{"text": "Apri lo sportello della lavatrice"}},
-  {{"text": "Inserisci il bucato all'interno del cestello"}},
-  {{"text": "Aggiungi il detersivo nel cassetto superiore"}}
+  {{"text": "Apri lo sportello"}},
+  {{"text": "Inserisci il bucato"}},
+  {{"text": "Aggiungi il detersivo"}}
 ]
 """
 
@@ -569,12 +571,12 @@ def translate_subtitles(segments, client, output_file, video_type=None):
 Translate the following Italian text to English, ensuring:
 - The translation is clear, concise, and suitable for subtitles.
 - Use an imperative tone, avoiding questions or incomplete sentences.
-- Write COMPLETE sentences that are 8-15 words long.
+- Write SHORT sentences that are 5-12 words long - keep them brief.
 - NEVER truncate sentences with ellipsis (...) or cut them mid-sentence.
 - Write natural, flowing sentences that make sense on their own.
 - IMPORTANT: Always translate to English, never leave any Italian text.
 - DO NOT add any prefix to the translation.
-- The text will be automatically formatted for subtitles later - focus on content quality.
+- The text will be automatically formatted for subtitles later - focus on brevity.
 
 CRITICAL QUALITY CHECKS - Before providing translation, verify each sentence:
 1. Each sentence MUST be grammatically complete in English
@@ -584,6 +586,9 @@ CRITICAL QUALITY CHECKS - Before providing translation, verify each sentence:
 5. Each sentence MUST make sense on its own
 6. Each sentence MUST describe a complete action
 7. If any sentence seems incomplete, rewrite it completely
+8. KEEP SENTENCES SHORT - prefer 5-12 words over longer sentences
+9. Use simple, direct language - avoid unnecessary words
+10. Focus on the action being performed, not descriptions
 """
     
     with open(output_file, "w", encoding="utf-8") as srt:
