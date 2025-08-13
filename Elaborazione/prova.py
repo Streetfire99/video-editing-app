@@ -319,6 +319,14 @@ Example output (SHORT sentences):
         else:
             final_prompt = base_prompt
 
+        # Estrai il testo dai segmenti per il prompt
+        segments_text = []
+        for segment in transcript.segments:
+            if hasattr(segment, 'text') and segment.text.strip():
+                segments_text.append(segment.text.strip())
+        
+        raw_transcription = "\n".join(segments_text)
+        
         response = client.chat.completions.create(
             model="gpt-4",
             messages=[
