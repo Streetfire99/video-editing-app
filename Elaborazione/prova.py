@@ -30,7 +30,7 @@ def get_video_info(input_video):
     try:
         # Usa subprocess diretto con imageio-ffmpeg
         ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
-        
+
         # Comando ffprobe per ottenere informazioni sul video
         cmd = [
             ffmpeg_path.replace('ffmpeg', 'ffprobe'),
@@ -38,27 +38,27 @@ def get_video_info(input_video):
             '-print_format', 'json',
             '-show_format',
             '-show_streams',
-            input_video
+            input_video,
         ]
-        
+
         # Esegui il comando
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        
+
         if result.returncode == 0:
             # Parsa il JSON di output
             probe_data = json.loads(result.stdout)
-            
-            # Trova il stream video
-            video_stream = next((s for s in probe_data['streams'] if s['codec_type'] == 'video'), None)
-            audio_stream = next((s for s in probe_data['streams'] if s['codec_type'] == 'audio'), None)
-            
+
+            # Trova gli stream
+            video_stream = next((s for s in probe_data['streams'] if s.get('codec_type') == 'video'), None)
+            audio_stream = next((s for s in probe_data['streams'] if s.get('codec_type') == 'audio'), None)
+
             if video_stream:
                 return {
                     'video_codec': video_stream.get('codec_name', 'unknown'),
                     'audio_codec': audio_stream.get('codec_name', 'unknown') if audio_stream else None,
                     'width': int(video_stream.get('width', 0)),
                     'height': int(video_stream.get('height', 0)),
-                    'duration': float(probe_data.get('format', {}).get('duration', 0))
+                    'duration': float(probe_data.get('format', {}).get('duration', 0)),
                 }
             else:
                 print(f"❌ DEBUG: No video stream found in {input_video}")
@@ -66,7 +66,7 @@ def get_video_info(input_video):
         else:
             print(f"❌ DEBUG: ffprobe error: {result.stderr}")
             return None
-            
+
     except subprocess.CalledProcessError as e:
         print(f"❌ DEBUG: Error in get_video_info subprocess: {e}")
         return None
@@ -108,7 +108,7 @@ def extract_audio_from_video(input_video, audio_file):
             
         print(f"✅ DEBUG: Audio extracted successfully to {audio_file}")
         return audio_file
-        
+
     except Exception as e:
         print(f"❌ DEBUG: Error in extract_audio: {e}")
         raise Exception(f"Errore estrazione audio: {e}")
@@ -1162,8 +1162,16 @@ def generate_subtitles_only(input_video, openai_api_key, output_dir=".", custom_
         
         print(f"🔧 DEBUG: Found {len(transcript.segments)} audio segments")
         
-        # 3. Ottimizza la trascrizione
+        # 3. Prepara la trascrizione grezza e ottimizza
         print("🔧 DEBUG: Optimizing transcription...")
+        # Costruisci la trascrizione grezza dai segmenti Whisper
+        raw_transcription = "\n".join([seg.text for seg in transcript.segments])
+        if not raw_transcription.strip():
+            print("🔧 DEBUG: Raw transcription empty after transcription - returning early")
+            return {
+                "success": False,
+                "error": "Trascrizione vuota",
+            }
         optimized_texts = optimize_transcription(raw_transcription, client, custom_prompt, video_type, transcript.segments)
         print(f"🔧 DEBUG: optimize_transcription completed successfully with {len(optimized_texts)} texts")
         
@@ -1180,12 +1188,24 @@ def generate_subtitles_only(input_video, openai_api_key, output_dir=".", custom_
         print("🔧 DEBUG: Translating subtitles...")
         translate_subtitles(optimized_segments, client, subtitle_file_en, video_type)
         
+        # Prepara anche i segmenti inglesi separati per l'UI (comodità)
+        segments_en = [
+            {
+                'start': seg['start'],
+                'end': seg['end'],
+                'text': seg.get('text_en', '')
+            }
+            for seg in optimized_segments
+        ]
+        
         return {
             "success": True,
             "subtitles_it": subtitle_file_it,
             "subtitles_en": subtitle_file_en,
             "transcript": raw_transcription,
-            "segments": optimized_segments
+            "segments": optimized_segments,
+            "segments_en": segments_en,
+            "has_voice": True
         }
         
     except Exception as e:
