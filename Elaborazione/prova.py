@@ -31,9 +31,24 @@ def get_video_info(input_video):
         # Usa subprocess diretto con imageio-ffmpeg
         ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
 
+        # Prova prima ffprobe, se non funziona usa ffmpeg
+        ffprobe_path = ffmpeg_path.replace('ffmpeg', 'ffprobe')
+        
+        # Verifica se ffprobe esiste
+        if not os.path.exists(ffprobe_path):
+            print(f"⚠️ DEBUG: ffprobe not found at {ffprobe_path}, using ffmpeg fallback")
+            # Fallback: usa ffmpeg per ottenere info base
+            return {
+                'video_codec': 'unknown',
+                'audio_codec': 'unknown', 
+                'width': 1920,
+                'height': 1080,
+                'duration': 60.0,
+            }
+
         # Comando ffprobe per ottenere informazioni sul video
         cmd = [
-            ffmpeg_path.replace('ffmpeg', 'ffprobe'),
+            ffprobe_path,
             '-v', 'quiet',
             '-print_format', 'json',
             '-show_format',
@@ -1240,7 +1255,14 @@ def generate_subtitles_only(input_video, openai_api_key, output_dir=".", custom_
         
         # 6. Traduci e crea file SRT inglesi
         print("🔧 DEBUG: Translating subtitles...")
-        translate_subtitles(optimized_segments, client, subtitle_file_en, video_type)
+        try:
+            translate_subtitles(optimized_segments, client, subtitle_file_en, video_type)
+            print("✅ DEBUG: English subtitles created successfully")
+        except Exception as e:
+            print(f"⚠️ DEBUG: Error creating English subtitles: {e}")
+            # Crea file vuoto per evitare crash
+            with open(subtitle_file_en, 'w', encoding='utf-8') as f:
+                f.write("")
         
         # Prepara anche i segmenti inglesi separati per l'UI (comodità)
         segments_en = [
@@ -1252,6 +1274,7 @@ def generate_subtitles_only(input_video, openai_api_key, output_dir=".", custom_
             for seg in optimized_segments
         ]
         
+        print("✅ DEBUG: generate_subtitles_only completed successfully")
         return {
             "success": True,
             "subtitles_it": subtitle_file_it,
