@@ -1,4 +1,4 @@
-import openai
+from openai import OpenAI
 import subprocess
 import os
 import json
@@ -77,7 +77,7 @@ def get_video_info(input_video):
 # === CONFIG ===
 def get_openai_client(api_key):
     """Inizializza il client OpenAI"""
-    return openai.OpenAI(api_key=api_key)
+    return OpenAI(api_key=api_key)
 
 def extract_audio_from_video(input_video, audio_file):
     """Estrae l'audio dal video"""
@@ -1448,7 +1448,7 @@ def combine_instructions(existing_instructions, new_instructions):
                 print("❌ OPENAI_API_KEY non trovata nei secrets o nelle variabili d'ambiente")
                 return "Istruzioni non disponibili"
         
-        client = openai.OpenAI(api_key=openai_api_key)
+        client = OpenAI(api_key=openai_api_key)
         
         prompt = f"""Sei un assistente che combina e formatta istruzioni per elettrodomestici.
 Combina le istruzioni esistenti con le nuove istruzioni, creando una lista di step numerati.
