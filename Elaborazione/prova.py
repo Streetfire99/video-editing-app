@@ -115,13 +115,35 @@ def extract_audio_from_video(input_video, audio_file):
 
 def transcribe_audio(audio_file, client):
     """Trascrive l'audio usando Whisper API"""
-    with open(audio_file, "rb") as f:
-        transcript = client.audio.transcriptions.create(
-            model="whisper-1",
-            file=f,
-            response_format="verbose_json"
-        )
-    return transcript
+    try:
+        with open(audio_file, "rb") as f:
+            transcript = client.audio.transcriptions.create(
+                model="whisper-1",
+                file=f,
+                response_format="verbose_json"
+            )
+        
+        # Verifica che transcript sia valido
+        if not transcript:
+            print("❌ DEBUG: transcribe_audio returned None")
+            raise Exception("Trascrizione restituita vuota")
+        
+        # Verifica che transcript abbia l'attributo segments
+        if not hasattr(transcript, 'segments'):
+            print("❌ DEBUG: transcript has no 'segments' attribute")
+            raise Exception("Trascrizione senza attributo 'segments'")
+        
+        # Verifica che segments non sia vuoto
+        if not transcript.segments:
+            print("❌ DEBUG: transcript.segments is empty")
+            raise Exception("Trascrizione senza segmenti audio")
+        
+        print(f"✅ DEBUG: transcribe_audio successful - {len(transcript.segments)} segments")
+        return transcript
+        
+    except Exception as e:
+        print(f"❌ DEBUG: Error in transcribe_audio: {e}")
+        raise Exception(f"Errore trascrizione audio: {e}")
 
 def optimize_transcription(raw_transcription, client, custom_prompt=None, video_type=None, original_segments=None):
     """Ottimizza la trascrizione con descrizione visiva"""
@@ -1020,6 +1042,22 @@ def process_video(input_video, music_file, openai_api_key, output_dir=".", custo
         transcript = transcribe_audio(audio_file, client)
         print("🔧 DEBUG: Step 2 completed - Audio transcribed")
         
+        # Controlla se transcript è valido
+        if not transcript:
+            print("🔧 DEBUG: Transcript is None or empty")
+            return {
+                "success": False,
+                "error": "Trascrizione non valida"
+            }
+        
+        # Controlla se transcript ha l'attributo segments
+        if not hasattr(transcript, 'segments'):
+            print("🔧 DEBUG: Transcript has no 'segments' attribute")
+            return {
+                "success": False,
+                "error": "Trascrizione senza segmenti"
+            }
+        
         # Controlla se il video ha voce
         raw_transcription = "\n".join([seg.text for seg in transcript.segments])
         if not raw_transcription.strip():
@@ -1151,6 +1189,22 @@ def generate_subtitles_only(input_video, openai_api_key, output_dir=".", custom_
         print("🔧 DEBUG: Step 2 - Transcribing audio...")
         transcript = transcribe_audio(audio_file, client)
         print("🔧 DEBUG: Step 2 completed - Audio transcribed")
+        
+        # Controlla se transcript è valido
+        if not transcript:
+            print("🔧 DEBUG: Transcript is None or empty")
+            return {
+                "success": False,
+                "error": "Trascrizione non valida"
+            }
+        
+        # Controlla se transcript ha l'attributo segments
+        if not hasattr(transcript, 'segments'):
+            print("🔧 DEBUG: Transcript has no 'segments' attribute")
+            return {
+                "success": False,
+                "error": "Trascrizione senza segmenti"
+            }
         
         # Controlla se c'è audio nel video
         if not transcript.segments:
