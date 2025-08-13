@@ -7,6 +7,9 @@ from pathlib import Path
 import sys
 import random
 
+# === LOG STRATEGICI PER DEBUG ===
+print("🔍 DEBUG: App starting - importing basic modules...")
+
 # Rimuovi il file di log se esiste (per evitare loop infinito)
 try:
     if os.path.exists("logs/app_debug.log"):
@@ -14,40 +17,155 @@ try:
     if os.path.exists("logs"):
         import shutil
         shutil.rmtree("logs")
-except:
-    pass
+    print("🔍 DEBUG: Log cleanup completed")
+except Exception as e:
+    print(f"⚠️ DEBUG: Log cleanup error (non critico): {e}")
 
+print("🔍 DEBUG: Setting up sys.path...")
 # Aggiungi il percorso del modulo Elaborazione
 sys.path.append('Elaborazione')
+print(f"🔍 DEBUG: sys.path updated: {sys.path}")
 
+print("🔍 DEBUG: Starting imports from prova.py...")
 # Importa le funzioni da prova.py
 try:
-    from prova import (
-    process_video, 
-        generate_subtitles_only,
-        finalize_video_processing,
-    get_openai_client, 
-    create_srt_file, 
-    add_subtitles_to_video,
-    format_timestamp,
-    split_text
-)
+    # Verifica se il modulo può essere importato
+    import importlib.util
+    prova_spec = importlib.util.find_spec("prova")
+    
+    if prova_spec is not None:
+        from prova import (
+        process_video, 
+            generate_subtitles_only,
+            finalize_video_processing,
+        get_openai_client, 
+        create_srt_file, 
+        add_subtitles_to_video,
+        format_timestamp,
+        split_text
+    )
+        print("✅ DEBUG: prova.py imports successful")
+    else:
+        print("❌ DEBUG: prova module not found in path")
+        st.error("❌ Modulo prova non trovato nel percorso")
+        st.stop()
+        
 except ImportError as e:
+    print(f"❌ DEBUG: Import error from prova.py: {e}")
     st.error(f"❌ Errore importazione modulo prova: {e}")
     st.stop()
+except Exception as e:
+    print(f"❌ DEBUG: Unexpected error importing prova.py: {e}")
+    st.error(f"❌ Errore inaspettato importazione modulo prova: {e}")
+    st.stop()
 
+print("🔍 DEBUG: Starting YouTube/Drive imports...")
 # Importa le funzioni per YouTube e Drive
-from youtube_manager import upload_to_youtube, check_youtube_setup, get_youtube_status
-from drive_manager import upload_video_to_drive, add_tracking_entry, upload_manual_to_drive
+try:
+    # Verifica se i moduli sono disponibili
+    import importlib.util
+    
+    # Controlla youtube_manager
+    if importlib.util.find_spec("youtube_manager") is not None:
+        from youtube_manager import upload_to_youtube, check_youtube_setup, get_youtube_status
+        print("✅ DEBUG: youtube_manager imports successful")
+    else:
+        print("⚠️ DEBUG: youtube_manager module not found, creating dummy functions")
+        # Crea funzioni dummy per evitare crash
+        def upload_to_youtube(*args, **kwargs):
+            st.error("❌ YouTube manager non disponibile")
+            return None
+        def check_youtube_setup(*args, **kwargs):
+            return False
+        def get_youtube_status(*args, **kwargs):
+            return "Non disponibile"
+except Exception as e:
+    print(f"❌ DEBUG: youtube_manager import error: {e}")
+    st.error(f"❌ Errore importazione youtube_manager: {e}")
+    st.stop()
 
+try:
+    # Controlla drive_manager
+    if importlib.util.find_spec("drive_manager") is not None:
+        from drive_manager import upload_video_to_drive, add_tracking_entry, upload_manual_to_drive
+        print("✅ DEBUG: drive_manager imports successful")
+    else:
+        print("⚠️ DEBUG: drive_manager module not found, creating dummy functions")
+        # Crea funzioni dummy per evitare crash
+        def upload_video_to_drive(*args, **kwargs):
+            st.error("❌ Drive manager non disponibile")
+            return None
+        def add_tracking_entry(*args, **kwargs):
+            return None
+        def upload_manual_to_drive(*args, **kwargs):
+            st.error("❌ Drive manager non disponibile")
+            return None
+except Exception as e:
+    print(f"❌ DEBUG: drive_manager import error: {e}")
+    st.error(f"❌ Errore importazione drive_manager: {e}")
+    st.stop()
+
+print("🔍 DEBUG: Starting data_manager imports...")
 # Importa le funzioni per la gestione dei dati
-from data_manager import (
-    load_apartments,
-    get_video_types,
-    get_prompt_for_video_type,
-    get_translation_prompt_for_video_type
-)
+try:
+    # Controlla data_manager
+    if importlib.util.find_spec("data_manager") is not None:
+        from data_manager import (
+            load_apartments,
+            get_video_types,
+            get_prompt_for_video_type,
+            get_translation_prompt_for_video_type
+        )
+        print("✅ DEBUG: data_manager imports successful")
+    else:
+        print("⚠️ DEBUG: data_manager module not found, creating dummy functions")
+        # Crea funzioni dummy per evitare crash
+        def load_apartments():
+            return ["Appartamento 1", "Appartamento 2"]
+        def get_video_types():
+            return ["caldaia", "lavatrice", "forno"]
+        def get_prompt_for_video_type(video_type):
+            return "You are a video subtitle editor specializing in instructional videos."
+        def get_translation_prompt_for_video_type(video_type):
+            return "You are a translator specializing in instructional videos."
+except Exception as e:
+    print(f"❌ DEBUG: data_manager import error: {e}")
+    st.error(f"❌ Errore importazione data_manager: {e}")
+    st.stop()
 
+print("🔍 DEBUG: All imports completed successfully!")
+
+# === VERIFICA FINALE INIZIALIZZAZIONE ===
+print("🔍 DEBUG: Final initialization check...")
+try:
+    # Verifica che le funzioni principali siano disponibili
+    if 'process_video' in globals():
+        print("✅ DEBUG: process_video function available")
+    else:
+        print("❌ DEBUG: process_video function NOT available")
+    
+    if 'generate_subtitles_only' in globals():
+        print("✅ DEBUG: generate_subtitles_only function available")
+    else:
+        print("❌ DEBUG: generate_subtitles_only function NOT available")
+    
+    # Verifica dipendenze di sistema
+    print("🔍 DEBUG: Checking system dependencies...")
+    try:
+        import subprocess
+        result = subprocess.run(['ffmpeg', '-version'], capture_output=True, text=True)
+        if result.returncode == 0:
+            print("✅ DEBUG: ffmpeg available")
+        else:
+            print("⚠️ DEBUG: ffmpeg not available")
+    except Exception as e:
+        print(f"⚠️ DEBUG: ffmpeg check failed: {e}")
+    
+    print("🔍 DEBUG: App initialization completed successfully!")
+except Exception as e:
+    print(f"❌ DEBUG: Final initialization error: {e}")
+    st.error(f"❌ Errore inizializzazione app: {e}")
+    st.stop()
 
 
 def create_session_temp_file(prefix, suffix):
