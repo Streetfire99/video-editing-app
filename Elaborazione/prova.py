@@ -1,4 +1,4 @@
-from openai import OpenAI
+import openai
 import subprocess
 import os
 import json
@@ -13,391 +13,142 @@ import threading
 import glob
 import random
 from google.auth.transport.requests import Request
-import shutil
-from pathlib import Path
-import time
-from typing import Dict, List, Optional, Tuple, Any
-import logging
-
-# === CONFIGURAZIONE ROBUSTA PER STREAMLIT ===
-import os
-
-# Riduci carico memoria e thread per evitare OOM
-os.environ["OMP_NUM_THREADS"] = "1"
-os.environ["OPENBLAS_NUM_THREADS"] = "1"
-os.environ["MKL_NUM_THREADS"] = "1"
-
-# NOTA: faster-whisper potrebbe non essere disponibile su Python 3.13
-# per problemi di compatibilità con CTranslate2/PyTorch
-# Se fallisce, l'app userà OpenAI Whisper API come fallback
-#
-# IMPORTANTE: ffprobe è OBBLIGATORIO e deve essere disponibile nel PATH
-# (incluso con il pacchetto ffmpeg in packages.txt)
-
-# Configurazione ffmpeg robusta
-try:
-    import imageio_ffmpeg
-    ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
-    os.environ["FFMPEG_BINARY"] = ffmpeg_path
-    print(f"🔧 DEBUG: FFMPEG_BINARY set to: {ffmpeg_path}")
-    
-    # Verifica se ffprobe è disponibile
-    import shutil
-    ffprobe_path = shutil.which("ffprobe")
-    if ffprobe_path:
-        os.environ["FFPROBE_BINARY"] = ffprobe_path
-        print(f"🔧 DEBUG: FFPROBE_BINARY set to: {ffprobe_path}")
-    else:
-        print("⚠️ DEBUG: ffprobe not found in PATH")
-        
-except Exception as e:
-    print(f"⚠️ DEBUG: Could not set FFMPEG_BINARY: {e}")
-    # Fallback: usa ffmpeg dal PATH se disponibile
-    pass
 
 def get_video_info(input_video):
-    """Ottiene informazioni sul video per gestire meglio i codec usando subprocess diretto"""
+    """Ottiene informazioni sul video per gestire meglio i codec"""
     try:
-        import shutil
+        import ffmpeg
+        probe = ffmpeg.probe(input_video)
+        video_info = next(s for s in probe['streams'] if s['codec_type'] == 'video')
+        audio_info = next((s for s in probe['streams'] if s['codec_type'] == 'audio'), None)
         
-        # Forza i binari ffmpeg/ffprobe
-        ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
-        os.environ["FFMPEG_BINARY"] = ffmpeg_path
-        
-        # DEVE usare ffprobe di sistema (incluso con ffmpeg)
-        ffprobe_path = shutil.which("ffprobe")
-        if not ffprobe_path:
-            # Se ffprobe non è disponibile, è un errore critico
-            error_msg = "❌ CRITICAL: ffprobe non disponibile nel PATH. ffprobe è incluso con ffmpeg e deve essere disponibile."
-            print(error_msg)
-            raise RuntimeError(error_msg)
-        
-        os.environ["FFPROBE_BINARY"] = ffprobe_path
-        print(f"✅ DEBUG: Using system ffprobe: {ffprobe_path}")
-        
-        # Verifica che ffprobe sia eseguibile
-        if not os.access(ffprobe_path, os.X_OK):
-            error_msg = f"❌ CRITICAL: ffprobe non eseguibile: {ffprobe_path}"
-            print(error_msg)
-            raise RuntimeError(error_msg)
-        
-        # Debug: verifica versioni
-        try:
-            subprocess.run([ffmpeg_path, "-version"], capture_output=True, text=True, timeout=5)
-            print("✅ DEBUG: ffmpeg version check passed")
-        except Exception as e:
-            print(f"⚠️ DEBUG: ffmpeg version check failed: {e}")
-        
-        if ffprobe_path:
-            try:
-                subprocess.run([ffprobe_path, "-version"], capture_output=True, text=True, timeout=5)
-                print("✅ DEBUG: ffprobe version check passed")
-            except Exception as e:
-                print(f"⚠️ DEBUG: ffprobe version check failed: {e}")
-        
-        # ffprobe è obbligatorio, non ci sono fallback
-
-        # Comando ffprobe per ottenere informazioni sul video
-        cmd = [
-            ffprobe_path,
-            '-v', 'quiet',
-            '-print_format', 'json',
-            '-show_format',
-            '-show_streams',
-            input_video,
-        ]
-
-        # Esegui il comando con timeout
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-
-        if result.returncode == 0:
-            # Parsa il JSON di output
-            probe_data = json.loads(result.stdout)
-
-            # Trova gli stream
-            video_stream = next((s for s in probe_data['streams'] if s.get('codec_type') == 'video'), None)
-            audio_stream = next((s for s in probe_data['streams'] if s.get('codec_type') == 'audio'), None)
-
-            if video_stream:
-                info = {
-                    'video_codec': video_stream.get('codec_name', 'unknown'),
-                    'audio_codec': audio_stream.get('codec_name', 'unknown') if audio_stream else None,
-                    'width': int(video_stream.get('width', 0)),
-                    'height': int(video_stream.get('height', 0)),
-                    'duration': float(probe_data.get('format', {}).get('duration', 0)),
-                }
-                print(f"✅ DEBUG: Video info extracted successfully: {info}")
-                return info
-            else:
-                print(f"❌ DEBUG: No video stream found in {input_video}")
-                return None
-        else:
-            print(f"❌ DEBUG: ffprobe error: {result.stderr}")
-            raise RuntimeError(f"ffprobe fallito: {result.stderr}")
-
-    except subprocess.TimeoutExpired:
-        print("❌ DEBUG: ffprobe timeout")
-        raise RuntimeError("ffprobe timeout - video troppo grande o corrotto")
-    except subprocess.CalledProcessError as e:
-        print(f"❌ DEBUG: Error in get_video_info subprocess: {e}")
-        raise RuntimeError(f"ffprobe subprocess error: {e}")
+        return {
+            'video_codec': video_info.get('codec_name', 'unknown'),
+            'audio_codec': audio_info.get('codec_name', 'unknown') if audio_info else None,
+            'width': int(video_info.get('width', 0)),
+            'height': int(video_info.get('height', 0)),
+            'duration': float(probe.get('format', {}).get('duration', 0))
+        }
     except Exception as e:
-        print(f"❌ DEBUG: Error in get_video_info: {e}")
-        raise RuntimeError(f"Errore in get_video_info: {e}")
-
-
-# Funzione di fallback rimossa - ffprobe è obbligatorio
+        return None
 
 # === CONFIG ===
 def get_openai_client(api_key):
     """Inizializza il client OpenAI"""
-    return OpenAI(api_key=api_key)
+    return openai.OpenAI(api_key=api_key)
 
-def extract_audio_from_video(input_video, audio_file, timeout_seconds=300):
-    """Estrae l'audio dal video con timeout"""
+def extract_audio_from_video(input_video, audio_file):
+    """Estrae l'audio dal video"""
+    # Usa solo ffmpeg-python
     try:
-        # Usa subprocess diretto con imageio-ffmpeg
-        ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
-        print(f"🔧 DEBUG: Using ffmpeg from: {ffmpeg_path}")
-        
-        # Comando ffmpeg per estrarre audio
-        cmd = [
-            ffmpeg_path,
-            '-i', input_video,
-            '-vn',  # No video
-            '-ac', '1',  # Mono
-            '-ar', '16000',  # 16kHz
-            '-acodec', 'pcm_s16le',  # WAV PCM
-            '-y',  # Overwrite
-            audio_file
-        ]
-        
-        print(f"🔧 DEBUG: Running command: {' '.join(cmd)}")
-        
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_seconds)
-        
-        if result.returncode != 0:
-            print(f"❌ DEBUG: ffmpeg stderr: {result.stderr}")
-            raise Exception(f"ffmpeg error: {result.stderr}")
-            
-        print(f"✅ DEBUG: Audio extracted successfully to {audio_file}")
-        return audio_file
-
-    except subprocess.TimeoutExpired:
-        print(f"❌ DEBUG: Timeout durante l'estrazione audio ({timeout_seconds}s)")
-        raise Exception(f"Timeout durante l'estrazione audio ({timeout_seconds}s)")
+        import ffmpeg
+        stream = ffmpeg.input(input_video)
+        stream = ffmpeg.output(stream, audio_file, vn=None, ac=1, ar=16000, acodec='pcm_s16le')
+        ffmpeg.run(stream, overwrite_output=True, quiet=True)
+    except ImportError as e:
+        raise Exception("ffmpeg-python non è disponibile. Installa ffmpeg-python.")
     except Exception as e:
-        print(f"❌ DEBUG: Error in extract_audio: {e}")
-        raise Exception(f"Errore estrazione audio: {e}")
+        raise e
+    return audio_file
 
-def transcribe_audio(audio_file, client, timeout_seconds=180):
-    """Trascrive l'audio usando Whisper API con timeout"""
-    try:
-        start_time = time.time()
-        with open(audio_file, "rb") as f:
-            transcript = client.audio.transcriptions.create(
-                model="whisper-1",
-                file=f,
-                response_format="verbose_json"
-            )
-        
-        # Controlla timeout
-        if time.time() - start_time > timeout_seconds:
-            raise Exception("Timeout durante la trascrizione audio")
-        
-        # Verifica che transcript sia valido
-        if not transcript:
-            print("❌ DEBUG: transcribe_audio returned None")
-            raise Exception("Trascrizione restituita vuota")
-        
-        # Verifica che transcript abbia l'attributo segments
-        if not hasattr(transcript, 'segments'):
-            print("❌ DEBUG: transcript has no 'segments' attribute")
-            raise Exception("Trascrizione senza attributo 'segments'")
-        
-        # Verifica che segments non sia vuoto
-        if not transcript.segments:
-            print("❌ DEBUG: transcript.segments is empty")
-            raise Exception("Trascrizione senza segmenti audio")
-        
-        print(f"✅ DEBUG: transcribe_audio successful - {len(transcript.segments)} segments")
-        return transcript
-        
-    except Exception as e:
-        print(f"❌ DEBUG: Error in transcribe_audio: {e}")
-        raise Exception(f"Errore trascrizione audio: {e}")
+def transcribe_audio(audio_file, client):
+    """Trascrive l'audio usando Whisper API"""
+    with open(audio_file, "rb") as f:
+        transcript = client.audio.transcriptions.create(
+            model="whisper-1",
+            file=f,
+            response_format="verbose_json"
+        )
+    return transcript
 
-def optimize_transcription(transcript, max_segments=4, timeout_seconds=300, client=None, custom_prompt=None, video_type=None, original_segments=None):
-    """
-    Ottimizza la trascrizione con timeout per evitare crash
-    """
-    try:
-        # Timeout per l'elaborazione
-        start_time = time.time()
-        
-        if not transcript or not hasattr(transcript, 'segments') or not transcript.segments:
-            logger.warning("Transcript non valido per l'ottimizzazione")
-            return []
-        
-        # Estrai il testo dai segmenti
-        segments_text = []
-        for segment in transcript.segments:
-            if hasattr(segment, 'text') and segment.text.strip():
-                segments_text.append(segment.text.strip())
-        
-        if not segments_text:
-            logger.warning("Nessun testo trovato nei segmenti")
-            return []
-        
-        # Se non c'è client OpenAI, ritorna i segmenti originali
-        if not client:
-            logger.warning("Client OpenAI non disponibile, ritorno segmenti originali")
-            return [{"text": segment.text, "start": segment.start, "end": segment.end} for segment in transcript.segments]
-        
-        # Controlla timeout
-        if time.time() - start_time > timeout_seconds:
-            logger.error("Timeout durante l'ottimizzazione della trascrizione")
-            return [{"text": segment.text, "start": segment.start, "end": segment.end} for segment in transcript.segments[:max_segments]]
-        
-        # Importa la funzione per ottenere il prompt specifico
-        try:
-            from data_manager import get_prompt_for_video_type
-        except ImportError:
-            # Fallback se non riesce a importare
-            def get_prompt_for_video_type(video_type):
-                return "You are a video subtitle editor specializing in instructional videos."
-        
-        # Ottieni il prompt specifico per la tipologia di video
-        if video_type:
-            base_prompt = get_prompt_for_video_type(video_type)
-        else:
-            base_prompt = "You are a video subtitle editor specializing in instructional videos."
-        
-        base_prompt += """
+def optimize_transcription(raw_transcription, client, custom_prompt=None, video_type=None, original_segments=None):
+    """Ottimizza la trascrizione con descrizione visiva"""
+    
+    # Prompt base per la tipologia di video
+    base_prompt = "You are a video subtitle editor specializing in instructional videos."
+    
+    base_prompt += """
 Your task is to optimize the following raw transcription of an instructional video. The video shows a person performing the actions described in the audio. Follow these steps:
 
 1. Keep the text in Italian, as it is the original language.
-2. Write SHORT, CONCISE sentences that describe exactly what is shown in the video.
+2. Write COMPLETE sentences that describe exactly what is shown in the video.
 3. Each sentence should be self-contained and describe a single action clearly.
-4. Write sentences that are 5-12 words long - SHORT and to the point.
+4. Write sentences that are 8-12 words long - NOT too short, NOT too long.
 5. NEVER truncate sentences with ellipsis (...) or cut them mid-sentence.
 6. Write natural, flowing sentences that make sense on their own.
 7. DO NOT add any prefix to the text - just write the Italian text as is.
 8. DO NOT add periods, exclamation marks, or question marks at the end of sentences.
-9. The text will be automatically formatted for subtitles later - focus on brevity and clarity.
+9. The text will be automatically formatted for subtitles later - focus on content quality.
 10. Provide the output as a JSON array of segments, where each segment has:
-    - text: subtitle text in Italian (SHORT, complete sentence)
+    - text: subtitle text in Italian (complete, natural sentence)
 
 Raw transcription:
 {raw_transcription}
 
-CRITICAL QUALITY CHECKS - Before providing output, verify each sentence:
-1. Each sentence MUST be grammatically complete
-2. NO sentences ending with "..." or ".." or "."
-3. NO sentences ending with "e" or "o" or "a" (incomplete words)
-4. NO sentences ending with "che" or "per" or "con" (incomplete phrases)
-5. Each sentence MUST make sense on its own
-6. Each sentence MUST describe a complete action
-7. If any sentence seems incomplete, rewrite it completely
-8. Each sentence MUST be a complete instruction that can stand alone
-9. NEVER cut words in the middle - each sentence must end with a complete word
-10. KEEP SENTENCES SHORT - prefer 5-12 words over longer sentences
-11. Use simple, direct language - avoid unnecessary words
-12. Focus on the action being performed, not descriptions
-
-Example output (SHORT sentences):
+Example output:
 [
-  {{"text": "Apri lo sportello"}},
-  {{"text": "Inserisci il bucato"}},
-  {{"text": "Aggiungi il detersivo"}}
+  {{"text": "Apri lo sportello della lavatrice"}},
+  {{"text": "Inserisci il bucato all'interno del cestello"}},
+  {{"text": "Aggiungi il detersivo nel cassetto superiore"}}
 ]
 """
 
-        # Se c'è un prompt personalizzato, combinalo con quello base
-        if custom_prompt:
-            final_prompt = base_prompt + f"\n\nAdditional instructions:\n{custom_prompt}"
-        else:
-            final_prompt = base_prompt
+    # Se c'è un prompt personalizzato, combinalo con quello base
+    if custom_prompt:
+        final_prompt = base_prompt + f"\n\nAdditional instructions:\n{custom_prompt}"
+    else:
+        final_prompt = base_prompt
 
-        # Estrai il testo dai segmenti per il prompt
-        segments_text = []
-        for segment in transcript.segments:
-            if hasattr(segment, 'text') and segment.text.strip():
-                segments_text.append(segment.text.strip())
-        
-        raw_transcription = "\n".join(segments_text)
-        
-        response = client.chat.completions.create(
-            model="gpt-4",
-            messages=[
-                {"role": "user", "content": final_prompt.format(raw_transcription=raw_transcription)}
-            ],
-            temperature=0.1,
-            max_tokens=4000  # Aumenta il limite di token per evitare tagli
-        )
+    response = client.chat.completions.create(
+        model="gpt-4",
+        messages=[
+            {"role": "user", "content": final_prompt.format(raw_transcription=raw_transcription)}
+        ],
+        temperature=0.1
+    )
 
-        # Clean the response content before parsing JSON
-        content = response.choices[0].message.content.strip()
-        if content.startswith('```json'):
-            content = content[7:]
-        # Rimuovi solo se effettivamente finisce con ```
-        if content.endswith('```'):
-            content = content[:-3]
-        content = content.strip()
+    # Clean the response content before parsing JSON
+    content = response.choices[0].message.content.strip()
+    if content.startswith('```json'):
+        content = content[7:]
+    if content.endswith('```'):
+        content = content[:-3]
+    content = content.strip()
 
-        # Parse JSON response
+    # Parse JSON response
+    try:
+        optimized_texts = json.loads(content)
+    except json.JSONDecodeError as e:
+        print(f"Errore nel parsing della risposta JSON: {e}")
+        print("Risposta ricevuta:", content)
+        raise
+
+    # Validate segments
+    if not isinstance(optimized_texts, list):
+        raise ValueError("La risposta di OpenAI non è una lista di segmenti")
+
+    # Distribuisci i testi ottimizzati sui segmenti originali mantenendo i timestamp
+    if original_segments:
+        # Usa i segmenti originali per distribuire i testi ottimizzati
+        optimized_segments = distribute_subtitles(original_segments, optimized_texts)
+    else:
+        # Fallback: usa direttamente i testi ottimizzati
+        optimized_segments = optimized_texts
+    
+    # Post-processing: assicurati che ogni testo sia adatto per i sottotitoli
+    for i, segment in enumerate(optimized_segments):
         try:
-            optimized_texts = json.loads(content)
-        except json.JSONDecodeError as e:
-            print(f"Errore nel parsing della risposta JSON: {e}")
-            print("Risposta ricevuta:", content)
+            if 'text' in segment:
+                # Usa process_subtitle_text per coerenza
+                lines = process_subtitle_text(segment['text'])
+                # Ricombina in un singolo testo (le righe saranno separate da \n nel file SRT)
+                segment['text'] = lines[0] + (f"\n{lines[1]}" if lines[1] else "")
+            else:
+                print(f"❌ DEBUG: Segment {i} has no 'text' key: {segment}")
+        except Exception as e:
             raise
 
-        # Validate segments
-        if not isinstance(optimized_texts, list):
-            raise ValueError("La risposta di OpenAI non è una lista di segmenti")
-
-        # Distribuisci i testi ottimizzati sui segmenti originali mantenendo i timestamp
-        if original_segments:
-            # Usa i segmenti originali per distribuire i testi ottimizzati
-            optimized_segments = distribute_subtitles(original_segments, optimized_texts)
-        else:
-            # Fallback: usa direttamente i testi ottimizzati
-            optimized_segments = optimized_texts
-        
-        # Post-processing: assicurati che ogni testo sia adatto per i sottotitoli
-        for i, segment in enumerate(optimized_segments):
-            try:
-                if 'text' in segment:
-                    text = segment['text']
-                    
-                    # Controlli di qualità per frasi tagliate - RIMOSSO per evitare tagli
-                    # incomplete_endings = ['...', '..', '.', 'e', 'o', 'a', 'che', 'per', 'con', 'di', 'da', 'in', 'su']
-                    # for ending in incomplete_endings:
-                    #     if text.rstrip().endswith(ending):
-                    #         print(f"⚠️ WARNING: Sentence {i} ends with incomplete word '{ending}': {text}")
-                    #         # Rimuovi l'ending incompleto
-                    #         text = text.rstrip().rstrip(ending).strip()
-                    #         segment['text'] = text
-                    
-                    # Controllo per parole tagliate a metà
-                    if text and not text.endswith(' ') and len(text.split()) > 0:
-                        last_word = text.split()[-1]
-                        if len(last_word) < 3:  # Se l'ultima parola è troppo corta, potrebbe essere tagliata
-                            print(f"⚠️ WARNING: Sentence {i} might have incomplete last word: '{text}'")
-                    
-                    # Usa il testo direttamente senza processarlo
-                    segment['text'] = text
-                else:
-                    print(f"❌ DEBUG: Segment {i} has no 'text' key: {segment}")
-            except Exception as e:
-                raise
-
-        return optimized_segments
-
-    except Exception as e:
-        print(f"❌ DEBUG: Error in optimize_transcription: {e}")
-        raise e
+    return optimized_segments
 
 def format_timestamp(seconds):
     """Formatta i timestamp per SRT"""
@@ -417,15 +168,67 @@ def process_subtitle_text(text):
     import re
     text = re.sub(r'\s+', ' ', text)
     
-    # Usa il testo completo senza rimuovere caratteri finali
+    # Rimuovi punti, esclamazioni e domande finali
+    text = text.rstrip('.!?')
     
-    # Usa il testo completo senza processarlo
-    return [text, ""]
+    # Usa split_text per garantire sempre 2 righe
+    result = split_text(text, max_length=25, max_lines=2)
+    return result
 
-def split_text(text, max_length=80, max_lines=3):
-    """Funzione semplificata che restituisce il testo completo senza tagli"""
-    # Restituisce il testo completo senza processarlo
-    return [text, ""]
+def split_text(text, max_length=30, max_lines=2):
+    """Divide il testo per i sottotitoli - versione migliorata senza troncamenti"""
+    # Se il testo è già abbastanza corto, restituiscilo direttamente
+    if len(text) <= max_length:
+        return [text, ""]
+    
+    # Dividi il testo in parole
+    words = text.split()
+    lines = []
+    current_line = ""
+    
+    for word in words:
+        # Prova ad aggiungere la parola alla riga corrente
+        test_line = current_line + (" " + word) if current_line else word
+        
+        if len(test_line) <= max_length:
+            current_line = test_line
+        else:
+            # Se la riga corrente non è vuota, salvala e inizia una nuova
+            if current_line:
+                lines.append(current_line)
+            current_line = word
+    
+    # Aggiungi l'ultima riga se non è vuota
+    if current_line:
+        lines.append(current_line)
+    
+    # Assicurati di avere massimo 2 righe
+    if len(lines) > max_lines:
+        # Combina le righe in eccesso nella seconda riga
+        first_line = lines[0]
+        remaining_text = " ".join(lines[1:])
+        
+        # Se la seconda riga è ancora troppo lunga, dividila ulteriormente
+        if len(remaining_text) > max_length:
+            # Trova un punto di divisione naturale
+            words_remaining = remaining_text.split()
+            second_line = ""
+            for word in words_remaining:
+                test_line = second_line + (" " + word) if second_line else word
+                if len(test_line) <= max_length:
+                    second_line = test_line
+                else:
+                    break
+            
+            lines = [first_line, second_line]
+        else:
+            lines = [first_line, remaining_text]
+        
+    # Assicurati di avere sempre 2 righe
+    while len(lines) < max_lines:
+        lines.append("")
+    
+    return lines[:max_lines]
 
 def distribute_subtitles(segments, texts):
     """Distribuisce i sottotitoli in modo uniforme"""
@@ -508,20 +311,43 @@ def create_srt_file(segments, output_file, language="IT"):
             # Usa il testo appropriato in base alla lingua
             if language == "IT":
                 text = segment['text']
-                # Controlla se il prefisso è già presente
-                if text.startswith('[IT] '):
-                    prefix = ""
-                else:
-                    prefix = "[IT] "
+                prefix = "[IT] "
             else:
                 text = segment.get('text_en', segment['text'])  # Fallback al testo italiano se non c'è inglese
-                # Controlla se il prefisso è già presente
-                if text.startswith('[EN] '):
-                    prefix = ""
-                else:
-                    prefix = "[EN] "
+                prefix = "[EN] "
             
-            # Usa il testo completo senza processarlo
+            # CONTROLLO DIRETTO DEL TESTO - Forza massimo 2 righe
+            max_chars_per_line = 40  # Aumentato per evitare tagli eccessivi
+            
+            if len(text) > max_chars_per_line:
+                # Dividi in modo intelligente
+                words = text.split()
+                lines = []
+                current_line = ""
+                
+                for word in words:
+                    test_line = current_line + (" " + word) if current_line else word
+                    if len(test_line) <= max_chars_per_line:
+                        current_line = test_line
+                    else:
+                        if current_line:
+                            lines.append(current_line)
+                        current_line = word
+                
+                if current_line:
+                    lines.append(current_line)
+                
+                # Assicurati di avere massimo 2 righe
+                if len(lines) > 2:
+                    # Combina le righe in eccesso
+                    lines = [lines[0], " ".join(lines[1:])]
+                    # Tronca se ancora troppo lungo
+                    if len(lines[1]) > max_chars_per_line:
+                        lines[1] = lines[1][:max_chars_per_line-3] + "..."
+                
+                # Unisci le righe con \n
+                text = "\\N".join(lines)
+            
             srt.write(f"{i}\n{start} --> {end}\n{prefix}{text}\n\n")
 
 def read_srt_file(srt_file):
@@ -590,8 +416,11 @@ def create_ass_file(segments, output_file, language="IT", margin_v=85, video_wid
             else:
                 text = segment.get('text_en', segment['text'])
             
-            # Usa il testo completo senza processarlo
-            full_text = text
+            # Usa split_text direttamente
+            lines = split_text(text)
+            full_text = lines[0]
+            if lines[1]:
+                full_text += "\\N" + lines[1]
             
             ass.write(f"Dialogue: 0,{start},{end},Default,,100,100,0,,{full_text}\n")
 
@@ -674,112 +503,71 @@ def create_unified_srt_file(segments, output_file):
             
             # Testo italiano
             italian_text = segment['text']
+            italian_lines = split_text(italian_text)
             
             # Testo inglese
             english_text = segment.get('text_en', '')
+            english_lines = split_text(english_text) if english_text else ['', '']
             
             # Scrivi il formato unificato
             srt.write(f"{i}\n{start} --> {end}\n")
-            
-            # Aggiungi prefisso IT solo se non presente
-            if italian_text.startswith('[IT] '):
-                srt.write(f"{italian_text}\n")
-            else:
-                srt.write(f"[IT] {italian_text}\n")
-            
-            # Aggiungi prefisso EN solo se non presente
-            if english_text.startswith('[EN] '):
-                srt.write(f"{english_text}\n")
-            else:
-                srt.write(f"[EN] {english_text}\n")
-            
+            srt.write(f"[IT] {italian_lines[0]}\n")
+            if italian_lines[1]:
+                srt.write(f"{italian_lines[1]}\n")
+            srt.write(f"[EN] {english_lines[0]}\n")
+            if english_lines[1]:
+                srt.write(f"{english_lines[1]}\n")
             srt.write("\n")
 
-def translate_subtitles(segments, client, output_file, video_type=None, timeout_seconds=300):
-    """Traduce i sottotitoli in inglese con timeout"""
+def translate_subtitles(segments, client, output_file, video_type=None):
+    """Traduce i sottotitoli in inglese - identica al test che funzionava"""
     
-    # Importa la funzione per ottenere il prompt di traduzione specifico
-    try:
-        from data_manager import get_translation_prompt_for_video_type
-    except ImportError:
-        # Fallback se non riesce a importare
-        def get_translation_prompt_for_video_type(video_type):
-            return "You are a translator specializing in instructional videos."
-    
-    # Ottieni il prompt di traduzione specifico per la tipologia di video
-    if video_type:
-        translation_prompt = get_translation_prompt_for_video_type(video_type)
-    else:
-        translation_prompt = "You are a translator specializing in instructional videos."
+    # Prompt di traduzione per la tipologia di video
+    translation_prompt = "You are a translator specializing in instructional videos."
     
     translation_prompt += """
 Translate the following Italian text to English, ensuring:
 - The translation is clear, concise, and suitable for subtitles.
 - Use an imperative tone, avoiding questions or incomplete sentences.
-- Write SHORT sentences that are 5-12 words long - keep them brief.
+- Write COMPLETE sentences that are 8-12 words long.
 - NEVER truncate sentences with ellipsis (...) or cut them mid-sentence.
 - Write natural, flowing sentences that make sense on their own.
 - IMPORTANT: Always translate to English, never leave any Italian text.
 - DO NOT add any prefix to the translation.
-- The text will be automatically formatted for subtitles later - focus on brevity.
-
-CRITICAL QUALITY CHECKS - Before providing translation, verify each sentence:
-1. Each sentence MUST be grammatically complete in English
-2. NO sentences ending with "..." or ".." or "."
-3. NO sentences ending with "and" or "or" or "the" (incomplete words)
-4. NO sentences ending with "that" or "for" or "with" (incomplete phrases)
-5. Each sentence MUST make sense on its own
-6. Each sentence MUST describe a complete action
-7. If any sentence seems incomplete, rewrite it completely
-8. KEEP SENTENCES SHORT - prefer 5-12 words over longer sentences
-9. Use simple, direct language - avoid unnecessary words
-10. Focus on the action being performed, not descriptions
+- The text will be automatically formatted for subtitles later - focus on content quality.
 """
     
-    start_time = time.time()
     with open(output_file, "w", encoding="utf-8") as srt:
         for i, segment in enumerate(segments, start=1):
-            # Controlla timeout
-            if time.time() - start_time > timeout_seconds:
-                print(f"⚠️ DEBUG: Timeout durante la traduzione, completando con {i-1} segmenti")
-                break
-                
             start = format_timestamp(segment['start'])
             end = format_timestamp(segment['end'])
             
             # Usa il testo originale senza prefissi
             text_to_translate = segment['text']
             
-            try:
-                translation = client.chat.completions.create(
-                    model="gpt-4",
-                    messages=[
-                        {"role": "system", "content": translation_prompt},
-                        {"role": "user", "content": text_to_translate}
-                    ]
-                )
-                text = translation.choices[0].message.content.strip()
-                
-                # Usa il testo completo senza rimuovere caratteri finali
-                
-                # Aggiungi il testo inglese al segmento
-                segment['text_en'] = text
-                
-                # Usa il testo direttamente senza process_subtitle_text (come nel test)
-                srt.write(f"{i}\n{start} --> {end}\n{text}\n\n")
-            except Exception as e:
-                print(f"⚠️ DEBUG: Error translating segment {i}: {e}")
-                # Fallback: usa il testo italiano
-                srt.write(f"{i}\n{start} --> {end}\n{text_to_translate}\n\n")
+            translation = client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": translation_prompt},
+                    {"role": "user", "content": text_to_translate}
+                ]
+            )
+            text = translation.choices[0].message.content.strip()
+            
+            # Rimuovi punti, esclamazioni e domande finali
+            text = text.rstrip('.!?')
+            
+            # Aggiungi il testo inglese al segmento
+            segment['text_en'] = text
+            
+            # Usa il testo direttamente senza process_subtitle_text (come nel test)
+            srt.write(f"{i}\n{start} --> {end}\n[EN] {text}\n\n")
 
 def add_background_music(input_video, music_file, output_video):
-    """Aggiunge musica di sottofondo - OTTIMIZZATA PER STREAMLIT CLOUD"""
-    print(f"🔧 DEBUG: add_background_music - input: {input_video}, music: {music_file}, output: {output_video}")
-    
+    """Aggiunge musica di sottofondo"""
+    # Usa solo ffmpeg-python
     try:
-        print("🔧 DEBUG: Importing ffmpeg for background music...")
         import ffmpeg
-        print("🔧 DEBUG: ffmpeg imported successfully for background music")
         
         # Verifica che i file esistano
         if not os.path.exists(input_video):
@@ -788,137 +576,98 @@ def add_background_music(input_video, music_file, output_video):
             raise FileNotFoundError(f"File musica non trovato: {music_file}")
         
         input_stream = ffmpeg.input(input_video)
-        music_stream = ffmpeg.input(music_file, stream_loop=-1)
+        music_stream = ffmpeg.input(music_file)
         
-        # OTTIMIZZAZIONI PER STREAMLIT CLOUD:
-        # - preset 'fast' per velocità
-        # - crf 25 per qualità bilanciata
-        # - threads=1 per limitare uso CPU
-        # - volume 0.3 per musica più sottile
+        # Usa un approccio più semplice e compatibile
         stream = ffmpeg.output(
             input_stream['v'],
-            ffmpeg.filter(music_stream['a'], 'volume', 0.3),
+            ffmpeg.filter(music_stream['a'], 'volume', 0.3),  # Volume più basso
             output_video,
             shortest=None,
             vcodec='libx264',
             acodec='aac',
-            preset='fast',      # OTTIMIZZATO: 'fast' invece di 'medium'
-            crf=25,            # OTTIMIZZATO: crf più alto per velocità
-            pix_fmt='yuv420p',
-            threads=1          # OTTIMIZZATO: limita thread per Streamlit Cloud
+            preset='fast',  # Preset più veloce
+            crf=20,  # Qualità leggermente più bassa per stabilità
+            pix_fmt='yuv420p'
         )
-        
-        print("🔧 DEBUG: Running ffmpeg.run for background music (optimized)...")
-        ffmpeg.run(stream, overwrite_output=True, quiet=True)  # OTTIMIZZATO: quiet=True
-        print("🔧 DEBUG: Background music added successfully with optimized settings")
-        
+        ffmpeg.run(stream, overwrite_output=True, quiet=True)
     except ImportError as e:
-        print(f"❌ DEBUG: ImportError in add_background_music - {e}")
         raise Exception("ffmpeg-python non è disponibile. Installa ffmpeg-python.")
     except Exception as e:
-        print(f"❌ DEBUG: Unexpected error in add_background_music - {e}")
-        raise e
+        # Prova un approccio alternativo senza musica se fallisce
+        try:
+            import ffmpeg
+            input_stream = ffmpeg.input(input_video)
+            stream = ffmpeg.output(
+                input_stream,
+                output_video,
+                vcodec='libx264',
+                acodec='aac',
+                preset='fast',
+                crf=20,
+                pix_fmt='yuv420p'
+            )
+            ffmpeg.run(stream, overwrite_output=True, quiet=True)
+        except Exception as e2:
+            raise e
+
+
 
 def add_subtitles_to_video(input_video, subtitle_file_it, subtitle_file_en, output_video, italian_height=120, english_height=60):
-    """Aggiunge sottotitoli duali al video - OTTIMIZZATA PER STREAMLIT CLOUD"""
-    print(f"🔧 DEBUG: add_subtitles_to_video - input: {input_video}, it_subs: {subtitle_file_it}, en_subs: {subtitle_file_en}, output: {output_video}")
+    """Aggiunge sottotitoli duali al video"""
     
     # Verifica che i file SRT esistano
     if not os.path.exists(subtitle_file_it):
-        print(f"❌ DEBUG: Italian SRT file NOT found: {subtitle_file_it}")
         raise FileNotFoundError(f"File SRT italiano non trovato: {subtitle_file_it}")
-    else:
-        print(f"✅ DEBUG: Italian SRT file exists: {os.path.getsize(subtitle_file_it)} bytes")
     
     if not os.path.exists(subtitle_file_en):
-        print(f"❌ DEBUG: English SRT file NOT found: {subtitle_file_en}")
         raise FileNotFoundError(f"File SRT inglese non trovato: {subtitle_file_en}")
-    else:
-        print(f"✅ DEBUG: English SRT file exists: {os.path.getsize(subtitle_file_en)} bytes")
     
     try:
-        print("🔧 DEBUG: Importing ffmpeg for subtitles...")
         import ffmpeg
-        print("🔧 DEBUG: ffmpeg imported successfully for subtitles")
         
         # Ottieni informazioni sul video per gestire meglio i codec
         video_info = get_video_info(input_video)
-        print(f"🔧 DEBUG: Video codec detected: {video_info['video_codec'] if video_info else 'unknown'}")
         
         # Rimuovi il file di output se esiste già
         if os.path.exists(output_video):
             os.remove(output_video)
-            print("🔧 DEBUG: Removed existing output file")
         
+        # METODO SEMPLIFICATO: Aggiungi entrambi i sottotitoli in un unico passaggio
         stream = ffmpeg.input(input_video)
-        
-        # Ottieni le dimensioni del video per debug
-        video_width = 478
-        video_height = 850
-        if video_info and 'width' in video_info and 'height' in video_info:
-            video_width = video_info['width']
-            video_height = video_info['height']
-            print(f"🔧 DEBUG: Video dimensions: {video_width}x{video_height}")
-        else:
-            print(f"🔧 DEBUG: Using default dimensions: {video_width}x{video_height}")
-        
-        # METODO OTTIMIZZATO PER STREAMLIT CLOUD:
-        # Usa preset 'fast' e crf più alto per velocità
-        print("🔧 DEBUG: Adding both subtitles in single pass (optimized for Streamlit Cloud)...")
-        
-        # Aggiungi entrambi i sottotitoli in un unico passaggio con ottimizzazioni
         stream = ffmpeg.output(
             stream,
             output_video,
             vf=f"subtitles={subtitle_file_it}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height},MarginL=50,MarginR=50',subtitles={subtitle_file_en}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height},MarginL=50,MarginR=50'",
             vcodec='libx264',
             acodec='aac',
-            preset='fast',  # OTTIMIZZATO: usa 'fast' invece di 'medium'
-            crf=25,         # OTTIMIZZATO: crf più alto per velocità
-            pix_fmt='yuv420p',
-            threads=1       # OTTIMIZZATO: limita thread per Streamlit Cloud
+            preset='fast',  # Usa preset veloce per maggiore stabilità
+            crf=20,  # Qualità leggermente più bassa per stabilità
+            pix_fmt='yuv420p'
         )
         
-        print("🔧 DEBUG: Running ffmpeg with optimized settings...")
-        ffmpeg.run(stream, overwrite_output=True, quiet=True)  # OTTIMIZZATO: quiet=True per meno output
-        
-        print("🔧 DEBUG: Both subtitles added successfully with optimized settings")
-        
+        ffmpeg.run(stream, overwrite_output=True, quiet=True)
+
+
+            
     except ImportError as e:
-        print(f"❌ DEBUG: ImportError in add_subtitles_to_video - {e}")
         raise Exception("ffmpeg-python non è disponibile. Installa ffmpeg-python.")
     except Exception as e:
-        print(f"❌ DEBUG: Unexpected error in add_subtitles_to_video - {e}")
-        # Fallback per video problematici
-        print("🔧 DEBUG: Trying fallback method for problematic video...")
+        # Se il metodo principale fallisce, prova senza sottotitoli
         try:
             import ffmpeg
-            # Metodo alternativo: prima converti il video, poi aggiungi i sottotitoli
             stream = ffmpeg.input(input_video)
-            stream = ffmpeg.output(stream, "temp_converted.mp4", vcodec='libx264', acodec='aac', preset='fast', crf=25, threads=1)
-            ffmpeg.run(stream, overwrite_output=True, quiet=True)
-    
-            # Ora aggiungi i sottotitoli al video convertito
-            stream = ffmpeg.input("temp_converted.mp4")
             stream = ffmpeg.output(
                 stream,
                 output_video,
-                vf=f"subtitles={subtitle_file_it}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height},MarginL=50,MarginR=50',subtitles={subtitle_file_en}:force_style='FontSize=12,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height},MarginL=50,MarginR=50'",
                 vcodec='libx264',
                 acodec='aac',
                 preset='fast',
-                crf=25,
-                pix_fmt='yuv420p',
-                threads=1
+                crf=20,
+                pix_fmt='yuv420p'
             )
             ffmpeg.run(stream, overwrite_output=True, quiet=True)
-            
-            # Rimuovi i file temporanei
-            if os.path.exists("temp_converted.mp4"):
-                os.remove("temp_converted.mp4")
-            print("🔧 DEBUG: Fallback method completed successfully")
         except Exception as fallback_error:
-            print(f"❌ DEBUG: Fallback method also failed - {fallback_error}")
             raise e  # Rilancia l'errore originale
 
 def create_fixed_position_ass_file(segments, output_file, language="IT", margin_v=85, video_width=478, video_height=850):
@@ -959,13 +708,42 @@ def create_fixed_position_ass_file(segments, output_file, language="IT", margin_
             # Pulisci il testo da caratteri problematici
             text = text.replace("\n", "").replace("\r", "").strip()
             
-            # Usa il testo completo senza limiti
-            full_text = text
+            # Gestione intelligente del testo lungo
+            max_chars_per_line = 25  # Ridotto per sicurezza
+            if len(text) > max_chars_per_line:
+                # Dividi in modo intelligente mantenendo le parole intere
+                words = text.split()
+                lines = []
+                current_line = ""
+                
+                for word in words:
+                    test_line = current_line + (" " + word) if current_line else word
+                    if len(test_line) <= max_chars_per_line:
+                        current_line = test_line
+                    else:
+                        if current_line:
+                            lines.append(current_line)
+                        current_line = word
+                
+                if current_line:
+                    lines.append(current_line)
+                
+                # Assicurati di avere massimo 2 righe
+                if len(lines) > 2:
+                    # Combina le righe in eccesso
+                    lines = [lines[0], " ".join(lines[1:])]
+                    # Tronca se ancora troppo lungo
+                    if len(lines[1]) > max_chars_per_line:
+                        lines[1] = lines[1][:max_chars_per_line-3] + "..."
+                
+                full_text = "\\N".join(lines)
+            else:
+                full_text = text
             
             ass.write(f"Dialogue: 0,{start},{end},Default,,200,200,0,,{prefix}{full_text}\n")
 
 def add_subtitles_with_fixed_position(input_video, subtitle_file_it, subtitle_file_en, output_video):
-    """Aggiunge sottotitoli con posizione fissa usando il filtro ass con subprocess diretto"""
+    """Aggiunge sottotitoli con posizione fissa usando il filtro ass"""
     print(f"🔧 DEBUG: add_subtitles_with_fixed_position - input: {input_video}, it_subs: {subtitle_file_it}, en_subs: {subtitle_file_en}, output: {output_video}")
     
     # Verifica che i file ASS esistano
@@ -978,8 +756,7 @@ def add_subtitles_with_fixed_position(input_video, subtitle_file_it, subtitle_fi
         raise FileNotFoundError(f"File ASS inglese non trovato: {subtitle_file_en}")
     
     try:
-        # Usa subprocess diretto con imageio-ffmpeg
-        ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
+        import ffmpeg
         
         # Ottieni informazioni sul video
         video_info = get_video_info(input_video)
@@ -992,76 +769,57 @@ def add_subtitles_with_fixed_position(input_video, subtitle_file_it, subtitle_fi
         if os.path.exists(output_video):
             os.remove(output_video)
         
+        stream = ffmpeg.input(input_video)
+        
         # Usa il filtro ass per controllo completo della posizione
-        cmd = [
-            ffmpeg_path,
-            '-i', input_video,
-            '-vf', f"ass={subtitle_file_it},ass={subtitle_file_en}",
-            '-c:v', 'libx264',
-            '-c:a', 'aac',
-            '-preset', 'medium',
-            '-crf', '18',
-            '-pix_fmt', 'yuv420p',
-            '-y',  # Sovrascrivi output
-            output_video
-        ]
+        stream = ffmpeg.output(
+            stream,
+            output_video,
+            vf=f"ass={subtitle_file_it},ass={subtitle_file_en}",
+            vcodec='libx264',
+            acodec='aac',
+            preset='medium',
+            crf=18,
+            pix_fmt='yuv420p'
+        )
         
-        # Esegui il comando
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        ffmpeg.run(stream, overwrite_output=True)
+        print("🔧 DEBUG: Fixed position subtitles added successfully")
         
-        if result.returncode == 0:
-            print("🔧 DEBUG: Fixed position subtitles added successfully")
-        else:
-            print(f"⚠️ Warning: {result.stderr}")
-            
-    except subprocess.CalledProcessError as e:
-        print(f"❌ Errore subprocess: {e}")
-        print(f"stderr: {e.stderr}")
-        raise Exception(f"Errore aggiunta sottotitoli con posizione fissa: {e}")
     except Exception as e:
         print(f"❌ DEBUG: Error in add_subtitles_with_fixed_position - {e}")
         raise e
 
 def add_subtitles_with_subtitles_filter(input_video, subtitle_file_it, subtitle_file_en, output_video, italian_height=120, english_height=60):
-    """Aggiunge sottotitoli usando il filtro subtitles (più stabile) con subprocess diretto"""
+    """Aggiunge sottotitoli usando il filtro subtitles (più stabile)"""
     print(f"🔧 DEBUG: add_subtitles_with_subtitles_filter - input: {input_video}, it_subs: {subtitle_file_it}, en_subs: {subtitle_file_en}, output: {output_video}")
     
     try:
-        # Usa subprocess diretto con imageio-ffmpeg
-        ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
+        import ffmpeg
         
         # Rimuovi il file di output se esiste già
         if os.path.exists(output_video):
             os.remove(output_video)
         
+        stream = ffmpeg.input(input_video)
+        
         # Usa il filtro subtitles con WrapStyle=0 per evitare wrapping
         vf = f"subtitles={subtitle_file_it}:force_style='FontSize=18,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={italian_height},MarginL=200,MarginR=200,WrapStyle=0',subtitles={subtitle_file_en}:force_style='FontSize=18,PrimaryColour=&HFFFFFF&,OutlineColour=&H000000&,BackColour=&H00FFFFFF&,BorderStyle=1,Alignment=2,MarginV={english_height},MarginL=200,MarginR=200,WrapStyle=0'"
         
-        cmd = [
-            ffmpeg_path,
-            '-i', input_video,
-            '-vf', vf,
-            '-c:v', 'libx264',
-            '-c:a', 'aac',
-            '-preset', 'medium',
-            '-crf', '18',
-            '-pix_fmt', 'yuv420p',
-            '-y',  # Sovrascrivi output
-            output_video
-        ]
+        stream = ffmpeg.output(
+            stream,
+            output_video,
+            vf=vf,
+            vcodec='libx264',
+            acodec='aac',
+            preset='medium',
+            crf=18,
+            pix_fmt='yuv420p'
+        )
         
-        # Esegui il comando
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        ffmpeg.run(stream, overwrite_output=True)
+        print("🔧 DEBUG: Subtitles filter subtitles added successfully")
         
-        if result.returncode == 0:
-            print("🔧 DEBUG: Subtitles filter subtitles added successfully")
-        else:
-            print(f"⚠️ Warning: {result.stderr}")
-            
-    except subprocess.CalledProcessError as e:
-        print(f"❌ Errore subprocess: {e}")
-        print(f"stderr: {e.stderr}")
-        raise Exception(f"Errore aggiunta sottotitoli con filtro: {e}")
     except Exception as e:
         print(f"❌ DEBUG: Error in add_subtitles_with_subtitles_filter - {e}")
         raise e
@@ -1159,12 +917,8 @@ def create_dual_ass_with_custom_height(segments, output_file_it, output_file_en,
     print("✅ File ASS duali creati con altezza personalizzabile")
 
 def process_video(input_video, music_file, openai_api_key, output_dir=".", custom_prompt=None, video_type=None, italian_height=120, english_height=60):
-    """Processa un video completo: estrazione audio, trascrizione, sottotitoli, musica, output finale - OTTIMIZZATA PER STREAMLIT CLOUD"""
-    
+    """Funzione principale per elaborare il video"""
     print(f"🔧 DEBUG: process_video started - input: {input_video}, music: {music_file}, output_dir: {output_dir}, it_height: {italian_height}, en_height: {english_height}")
-    
-    # Crea la directory di output se non esiste
-    os.makedirs(output_dir, exist_ok=True)
     
     # Configura file di output
     audio_file = os.path.join(output_dir, "audio.wav")
@@ -1188,29 +942,13 @@ def process_video(input_video, music_file, openai_api_key, output_dir=".", custo
         
         # 1. Estrai l'audio dal video
         print("🔧 DEBUG: Step 1 - Extracting audio...")
-        extract_audio_from_video(input_video, audio_file, timeout_seconds=300)
+        extract_audio_from_video(input_video, audio_file)
         print("🔧 DEBUG: Step 1 completed - Audio extracted")
         
         # 2. Trascrivi l'audio
         print("🔧 DEBUG: Step 2 - Transcribing audio...")
-        transcript = transcribe_audio(audio_file, client, timeout_seconds=180)
+        transcript = transcribe_audio(audio_file, client)
         print("🔧 DEBUG: Step 2 completed - Audio transcribed")
-        
-        # Controlla se transcript è valido
-        if not transcript:
-            print("🔧 DEBUG: Transcript is None or empty")
-            return {
-                "success": False,
-                "error": "Trascrizione non valida"
-            }
-        
-        # Controlla se transcript ha l'attributo segments
-        if not hasattr(transcript, 'segments'):
-            print("🔧 DEBUG: Transcript has no 'segments' attribute")
-            return {
-                "success": False,
-                "error": "Trascrizione senza segmenti"
-            }
         
         # Controlla se il video ha voce
         raw_transcription = "\n".join([seg.text for seg in transcript.segments])
@@ -1222,7 +960,7 @@ def process_video(input_video, music_file, openai_api_key, output_dir=".", custo
         else:
             # 3. Ottimizza la trascrizione
             print("🔧 DEBUG: Step 3 - Optimizing transcription...")
-            distributed_segments = optimize_transcription(transcript, max_segments=4, timeout_seconds=300, client=client, custom_prompt=custom_prompt, video_type=video_type, original_segments=transcript.segments)
+            distributed_segments = optimize_transcription(raw_transcription, client, custom_prompt, video_type, transcript.segments)
             print("🔧 DEBUG: Step 3 completed - Transcription optimized and distributed")
             
             # 5. Crea file SRT italiani
@@ -1237,7 +975,7 @@ def process_video(input_video, music_file, openai_api_key, output_dir=".", custo
             
             # 6. Traduci e crea file SRT inglesi
             print("🔧 DEBUG: Step 6 - Creating English SRT file...")
-            translate_subtitles(distributed_segments, client, subtitle_file_en, video_type, timeout_seconds=300)
+            translate_subtitles(distributed_segments, client, subtitle_file_en, video_type)
             print(f"🔧 DEBUG: Step 6 completed - English SRT created at {subtitle_file_en}")
             # Verifica che il file sia stato creato
             if os.path.exists(subtitle_file_en):
@@ -1258,9 +996,9 @@ def process_video(input_video, music_file, openai_api_key, output_dir=".", custo
                 import ffmpeg
                 print("🔧 DEBUG: ffmpeg imported successfully for video copy")
                 stream = ffmpeg.input(input_video)
-                stream = ffmpeg.output(stream, video_with_music, vcodec='libx264', acodec='aac', preset='fast', crf=25, threads=1)
+                stream = ffmpeg.output(stream, video_with_music, vcodec='libx264', acodec='aac', preset='medium', crf=23)
                 print("🔧 DEBUG: Running ffmpeg.run for video copy...")
-                ffmpeg.run(stream, overwrite_output=True, quiet=True)
+                ffmpeg.run(stream, overwrite_output=True)
                 print("🔧 DEBUG: Video copy completed successfully")
             except ImportError as e:
                 print(f"❌ DEBUG: ImportError in video copy - {e}")
@@ -1281,8 +1019,8 @@ def process_video(input_video, music_file, openai_api_key, output_dir=".", custo
             try:
                 import ffmpeg
                 stream = ffmpeg.input(video_with_music)
-                stream = ffmpeg.output(stream, final_output, vcodec='libx264', acodec='aac', preset='fast', crf=25, threads=1)
-                ffmpeg.run(stream, overwrite_output=True, quiet=True)
+                stream = ffmpeg.output(stream, final_output, vcodec='libx264', acodec='aac', preset='medium', crf=23)
+                ffmpeg.run(stream, overwrite_output=True)
                 print("🔧 DEBUG: Video copied without subtitles")
             except Exception as e:
                 print(f"❌ DEBUG: Error copying video without subtitles - {e}")
@@ -1311,185 +1049,108 @@ def process_video(input_video, music_file, openai_api_key, output_dir=".", custo
         }
 
 def generate_subtitles_only(input_video, openai_api_key, output_dir=".", custom_prompt=None, video_type=None):
-    """Genera solo i sottotitoli senza processare il video completo"""
-    
-    print(f"🔧 DEBUG: generate_subtitles_only - input: {input_video}, output_dir: {output_dir}")
-    
-    # Crea la directory di output se non esiste
-    os.makedirs(output_dir, exist_ok=True)
-    
-    # Configura file di output
-    audio_file = os.path.join(output_dir, "audio.wav")
-    subtitle_file_it = os.path.join(output_dir, "subtitles_it.srt")
-    subtitle_file_en = os.path.join(output_dir, "subtitles_en.srt")
-    
-    # Ottieni informazioni sul video
-    video_info = get_video_info(input_video)
-    if video_info:
-        print(f"🔧 DEBUG: Video info - codec: {video_info['video_codec']}, audio: {video_info['audio_codec']}, size: {video_info['width']}x{video_info['height']}")
-    
-    # Inizializza client OpenAI
-    client = get_openai_client(openai_api_key)
-    
+    """Genera solo i sottotitoli senza elaborare il video finale"""
     try:
-        print("🔧 DEBUG: Starting video processing steps...")
+        # Inizializza il client OpenAI
+        client = get_openai_client(openai_api_key)
         
-        # 1. Estrai l'audio dal video
-        print("🔧 DEBUG: Step 1 - Extracting audio...")
+        # Crea directory di output se non esiste
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Estrai l'audio dal video
+        audio_file = os.path.join(output_dir, "temp_audio.wav")
         extract_audio_from_video(input_video, audio_file)
-        print("🔧 DEBUG: Step 1 completed - Audio extracted")
         
-        # 2. Trascrivi l'audio
-        print("🔧 DEBUG: Step 2 - Transcribing audio...")
+        # Trascrivi l'audio
         transcript = transcribe_audio(audio_file, client)
-        print("🔧 DEBUG: Step 2 completed - Audio transcribed")
         
-        # Controlla se transcript è valido
-        if not transcript:
-            print("🔧 DEBUG: Transcript is None or empty")
-            return {
-                "success": False,
-                "error": "Trascrizione non valida"
-            }
-        
-        # Controlla se transcript ha l'attributo segments
-        if not hasattr(transcript, 'segments'):
-            print("🔧 DEBUG: Transcript has no 'segments' attribute")
-            return {
-                "success": False,
-                "error": "Trascrizione senza segmenti"
-            }
-        
-        # Controlla se c'è audio nel video
+        # Verifica se c'è audio nel video
         if not transcript.segments:
-            print("🔧 DEBUG: No audio segments found")
             return {
-                "success": False,
-                "error": "Nessun audio rilevato nel video"
+                'success': False,
+                'error': 'Nessun audio rilevato nel video',
+                'has_voice': False
             }
         
-        print(f"🔧 DEBUG: Found {len(transcript.segments)} audio segments")
-        
-        # 3. Prepara la trascrizione grezza e ottimizza
-        print("🔧 DEBUG: Optimizing transcription...")
-        # Costruisci la trascrizione grezza dai segmenti Whisper
-        raw_transcription = "\n".join([seg.text for seg in transcript.segments])
-        if not raw_transcription.strip():
-            print("🔧 DEBUG: Raw transcription empty after transcription - returning early")
-            return {
-                "success": False,
-                "error": "Trascrizione vuota",
-            }
-        optimized_texts = optimize_transcription(transcript, max_segments=4, timeout_seconds=300, client=client, custom_prompt=custom_prompt, video_type=video_type, original_segments=transcript.segments)
-        print(f"🔧 DEBUG: optimize_transcription completed successfully with {len(optimized_texts)} texts")
-        
-        # 4. Distribuisci i sottotitoli
-        print("🔧 DEBUG: Distributing subtitles...")
-        optimized_segments = distribute_subtitles(transcript.segments, optimized_texts)
-        print(f"🔧 DEBUG: distribute_subtitles completed with {len(optimized_segments)} segments")
-        
-        # 5. Crea file SRT italiani
-        print("🔧 DEBUG: Creating Italian SRT file...")
+        # Ottimizza la trascrizione
         try:
-            create_srt_file(optimized_segments, subtitle_file_it, "IT")
-            print("✅ DEBUG: Italian SRT file created successfully")
+            # Estrai il testo grezzo dai segmenti
+            raw_transcription = "\n".join([seg.text for seg in transcript.segments])
+            
+            optimized_segments = optimize_transcription(raw_transcription, client, custom_prompt, video_type, transcript.segments)
         except Exception as e:
-            print(f"⚠️ DEBUG: Error creating Italian SRT file: {e}")
-            # Crea file di fallback
-            with open(subtitle_file_it, 'w', encoding='utf-8') as f:
-                f.write("1\n00:00:00,000 --> 00:00:05,000\nSottotitoli non disponibili\n\n")
+            raise
         
-        # 6. Traduci e crea file SRT inglesi
-        print("🔧 DEBUG: Translating subtitles...")
-        try:
-            translate_subtitles(optimized_segments, client, subtitle_file_en, video_type, timeout_seconds=300)
-            print("✅ DEBUG: English subtitles created successfully")
-        except Exception as e:
-            print(f"⚠️ DEBUG: Error creating English subtitles: {e}")
-            # Crea file vuoto per evitare crash
-            with open(subtitle_file_en, 'w', encoding='utf-8') as f:
-                f.write("")
+        # Traduci i sottotitoli in inglese
+        srt_en_file = os.path.join(output_dir, "subtitles_en.srt")
+        translate_subtitles(optimized_segments, client, srt_en_file, video_type)
         
-        # Prepara anche i segmenti inglesi separati per l'UI (comodità)
-        segments_en = [
-            {
-                'start': seg['start'],
-                'end': seg['end'],
-                'text': seg.get('text_en', '')
-            }
-            for seg in optimized_segments
-        ]
+        # Crea file SRT italiano
+        srt_it_file = os.path.join(output_dir, "subtitles_it.srt")
+        create_srt_file(optimized_segments, srt_it_file, "IT")
         
-        print("✅ DEBUG: generate_subtitles_only completed successfully")
+        # Leggi i sottotitoli inglesi dal file SRT
+        segments_en_raw = read_srt_file(srt_en_file)
+        
+        # Converti nel formato corretto (come i segmenti italiani)
+        segments_en = []
+        for start_time, end_time, text in segments_en_raw:
+            segments_en.append({
+                'start': start_time,
+                'end': end_time,
+                'text': text.strip()
+            })
+        
+        # Pulisci il file audio temporaneo
+        if os.path.exists(audio_file):
+            os.remove(audio_file)
+        
         return {
-            "success": True,
-            "subtitles_it": subtitle_file_it,
-            "subtitles_en": subtitle_file_en,
-            "transcript": raw_transcription,
-            "segments": optimized_segments,
-            "segments_en": segments_en,
-            "has_voice": True
+            'success': True,
+            'segments': optimized_segments,
+            'segments_en': segments_en,
+            'srt_it_file': srt_it_file,
+            'srt_en_file': srt_en_file,
+            'has_voice': True,
+            'input_video': input_video
         }
         
     except Exception as e:
-        print(f"❌ DEBUG: Error in generate_subtitles_only: {e}")
         return {
-            "success": False,
-            "error": str(e)
+            'success': False,
+            'error': str(e),
+            'has_voice': False
         }
 
 def finalize_video_processing(input_video, srt_it_file, srt_en_file, output_dir, italian_height=120, english_height=60):
-    """Completa l'elaborazione del video usando i sottotitoli già generati - OTTIMIZZATA PER STREAMLIT CLOUD"""
-    print(f"🔧 DEBUG: finalize_video_processing - input: {input_video}, it_srt: {srt_it_file}, en_srt: {srt_en_file}")
-    
+    """Completa l'elaborazione del video usando i sottotitoli già generati"""
     try:
         # Percorso del file musica
         music_file = os.path.join("Elaborazione", "audio.mp3")
-        
-        # Verifica che il file musica esista
-        if not os.path.exists(music_file):
-            print(f"⚠️ DEBUG: Music file not found: {music_file}, proceeding without music")
-            music_file = None
-        
-        # Aggiungi musica di sottofondo (se disponibile)
-        if music_file:
-            print("🔧 DEBUG: Adding background music...")
-            video_with_music = os.path.join(output_dir, "video_with_music.mp4")
-            add_background_music(input_video, music_file, video_with_music)
-            video_to_process = video_with_music
-        else:
-            print("🔧 DEBUG: No music file, using original video")
-            video_to_process = input_video
-        
+
+        # Aggiungi musica di sottofondo
+        video_with_music = os.path.join(output_dir, "video_with_music.mp4")
+        add_background_music(input_video, music_file, video_with_music)
+
         # Aggiungi sottotitoli
-        print("🔧 DEBUG: Adding subtitles...")
         final_video = os.path.join(output_dir, "final_video.mp4")
         add_subtitles_to_video(
-            input_video=video_to_process,
+            input_video=video_with_music,
             subtitle_file_it=srt_it_file,
             subtitle_file_en=srt_en_file,
             output_video=final_video,
             italian_height=italian_height,
             english_height=english_height
         )
-        
-        # Cleanup file temporanei
-        if music_file and os.path.exists(video_with_music):
-            try:
-                os.remove(video_with_music)
-                print("🔧 DEBUG: Cleaned up temporary music video file")
-            except Exception as e:
-                print(f"⚠️ DEBUG: Could not clean up temporary file: {e}")
-        
+
         return {
             'success': True,
-            'video_with_music': video_to_process if music_file else None,
+            'video_with_music': video_with_music,
             'final_video': final_video,
             'has_voice': True
         }
-        
+
     except Exception as e:
-        print(f"❌ DEBUG: Error in finalize_video_processing - {e}")
         return {
             'success': False,
             'error': str(e),
@@ -1635,7 +1296,7 @@ def combine_instructions(existing_instructions, new_instructions):
                 print("❌ OPENAI_API_KEY non trovata nei secrets o nelle variabili d'ambiente")
                 return "Istruzioni non disponibili"
         
-        client = OpenAI(api_key=openai_api_key)
+        client = openai.OpenAI(api_key=openai_api_key)
         
         prompt = f"""Sei un assistente che combina e formatta istruzioni per elettrodomestici.
 Combina le istruzioni esistenti con le nuove istruzioni, creando una lista di step numerati.
