@@ -1,14 +1,23 @@
+# Streamlit e dipendenze base
 streamlit>=1.35.0,<1.37.0
 openai>=1.0.0
+
+# Google API per YouTube e Drive
 google-api-python-client>=2.0.0
 google-auth-oauthlib>=0.4.6
 gspread>=5.0.0
-pandas>=2.2.3          # 👈 supporto 3.13
 google-auth>=2.0.0
 python-dotenv>=1.0.0
-faster-whisper>=0.10.0 # 👈 TENTATIVO: può fallire su 3.13
-numpy>=2.1             # 👈 supporto 3.13
-imageio-ffmpeg>=0.4.9
+
+# Elaborazione video e audio
 ffmpeg-python>=0.2.0
+imageio-ffmpeg>=0.4.9
+faster-whisper>=0.10.0
+
+# Data processing
+numpy>=2.1
+pandas>=2.2.3
+
+# Utility
 geopy>=2.0.0
 audio-recorder-streamlit>=0.0.10 
