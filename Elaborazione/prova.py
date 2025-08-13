@@ -37,14 +37,50 @@ def get_video_info(input_video):
         # Verifica se ffprobe esiste
         if not os.path.exists(ffprobe_path):
             print(f"⚠️ DEBUG: ffprobe not found at {ffprobe_path}, using ffmpeg fallback")
-            # Fallback: usa ffmpeg per ottenere info base
-            return {
-                'video_codec': 'unknown',
-                'audio_codec': 'unknown', 
-                'width': 1920,
-                'height': 1080,
-                'duration': 60.0,
-            }
+            # Fallback: usa ffmpeg per ottenere info reali del video
+            try:
+                cmd = [
+                    ffmpeg_path,
+                    '-i', input_video,
+                    '-f', 'null',
+                    '-'
+                ]
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+                
+                # Estrai info dal stderr di ffmpeg
+                stderr_output = result.stderr
+                
+                # Cerca dimensioni video
+                import re
+                size_match = re.search(r'(\d{2,4})x(\d{2,4})', stderr_output)
+                width = int(size_match.group(1)) if size_match else 1920
+                height = int(size_match.group(2)) if size_match else 1080
+                
+                # Cerca durata
+                duration_match = re.search(r'Duration: (\d{2}):(\d{2}):(\d{2})', stderr_output)
+                if duration_match:
+                    hours, minutes, seconds = map(int, duration_match.groups())
+                    duration = hours * 3600 + minutes * 60 + seconds
+                else:
+                    duration = 60.0
+                
+                print(f"✅ DEBUG: ffmpeg fallback successful - size: {width}x{height}, duration: {duration}s")
+                return {
+                    'video_codec': 'unknown',
+                    'audio_codec': 'unknown', 
+                    'width': width,
+                    'height': height,
+                    'duration': duration,
+                }
+            except Exception as e:
+                print(f"⚠️ DEBUG: ffmpeg fallback failed: {e}, using default values")
+                return {
+                    'video_codec': 'unknown',
+                    'audio_codec': 'unknown', 
+                    'width': 1920,
+                    'height': 1080,
+                    'duration': 60.0,
+                }
 
         # Comando ffprobe per ottenere informazioni sul video
         cmd = [
@@ -1251,7 +1287,14 @@ def generate_subtitles_only(input_video, openai_api_key, output_dir=".", custom_
         
         # 5. Crea file SRT italiani
         print("🔧 DEBUG: Creating Italian SRT file...")
-        create_srt_file(optimized_segments, subtitle_file_it, "IT")
+        try:
+            create_srt_file(optimized_segments, subtitle_file_it, "IT")
+            print("✅ DEBUG: Italian SRT file created successfully")
+        except Exception as e:
+            print(f"⚠️ DEBUG: Error creating Italian SRT file: {e}")
+            # Crea file di fallback
+            with open(subtitle_file_it, 'w', encoding='utf-8') as f:
+                f.write("1\n00:00:00,000 --> 00:00:05,000\nSottotitoli non disponibili\n\n")
         
         # 6. Traduci e crea file SRT inglesi
         print("🔧 DEBUG: Translating subtitles...")
