@@ -14,12 +14,30 @@ import glob
 import random
 from google.auth.transport.requests import Request
 
+# === CONFIGURAZIONE ROBUSTA PER STREAMLIT ===
+import os
+
+# Riduci carico memoria e thread per evitare OOM
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+
 # Configurazione ffmpeg robusta
 try:
     import imageio_ffmpeg
     ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
     os.environ["FFMPEG_BINARY"] = ffmpeg_path
     print(f"🔧 DEBUG: FFMPEG_BINARY set to: {ffmpeg_path}")
+    
+    # Verifica se ffprobe è disponibile
+    import shutil
+    ffprobe_path = shutil.which("ffprobe")
+    if ffprobe_path:
+        os.environ["FFPROBE_BINARY"] = ffprobe_path
+        print(f"🔧 DEBUG: FFPROBE_BINARY set to: {ffprobe_path}")
+    else:
+        print("⚠️ DEBUG: ffprobe not found in PATH")
+        
 except Exception as e:
     print(f"⚠️ DEBUG: Could not set FFMPEG_BINARY: {e}")
     # Fallback: usa ffmpeg dal PATH se disponibile
@@ -28,59 +46,45 @@ except Exception as e:
 def get_video_info(input_video):
     """Ottiene informazioni sul video per gestire meglio i codec usando subprocess diretto"""
     try:
-        # Usa subprocess diretto con imageio-ffmpeg
-        ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
-
-        # Prova prima ffprobe, se non funziona usa ffmpeg
-        ffprobe_path = ffmpeg_path.replace('ffmpeg', 'ffprobe')
+        import shutil
         
-        # Verifica se ffprobe esiste
-        if not os.path.exists(ffprobe_path):
-            print(f"⚠️ DEBUG: ffprobe not found at {ffprobe_path}, using ffmpeg fallback")
-            # Fallback: usa ffmpeg per ottenere info reali del video
+        # Forza i binari ffmpeg/ffprobe
+        ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
+        os.environ["FFMPEG_BINARY"] = ffmpeg_path
+        
+        # Prova prima ffprobe di sistema, poi imageio-ffprobe
+        ffprobe_path = shutil.which("ffprobe")
+        if not ffprobe_path:
             try:
-                cmd = [
-                    ffmpeg_path,
-                    '-i', input_video,
-                    '-f', 'null',
-                    '-'
-                ]
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-                
-                # Estrai info dal stderr di ffmpeg
-                stderr_output = result.stderr
-                
-                # Cerca dimensioni video
-                import re
-                size_match = re.search(r'(\d{2,4})x(\d{2,4})', stderr_output)
-                width = int(size_match.group(1)) if size_match else 1920
-                height = int(size_match.group(2)) if size_match else 1080
-                
-                # Cerca durata
-                duration_match = re.search(r'Duration: (\d{2}):(\d{2}):(\d{2})', stderr_output)
-                if duration_match:
-                    hours, minutes, seconds = map(int, duration_match.groups())
-                    duration = hours * 3600 + minutes * 60 + seconds
-                else:
-                    duration = 60.0
-                
-                print(f"✅ DEBUG: ffmpeg fallback successful - size: {width}x{height}, duration: {duration}s")
-                return {
-                    'video_codec': 'unknown',
-                    'audio_codec': 'unknown', 
-                    'width': width,
-                    'height': height,
-                    'duration': duration,
-                }
+                import imageio_ffprobe
+                ffprobe_path = imageio_ffprobe.get_ffprobe_exe()
+                os.environ["FFPROBE_BINARY"] = ffprobe_path
+                print(f"✅ DEBUG: Using imageio-ffprobe: {ffprobe_path}")
+            except ImportError:
+                print("❌ DEBUG: imageio-ffprobe not available")
+                ffprobe_path = None
+        else:
+            os.environ["FFPROBE_BINARY"] = ffprobe_path
+            print(f"✅ DEBUG: Using system ffprobe: {ffprobe_path}")
+        
+        # Debug: verifica versioni
+        try:
+            subprocess.run([ffmpeg_path, "-version"], capture_output=True, text=True, timeout=5)
+            print("✅ DEBUG: ffmpeg version check passed")
+        except Exception as e:
+            print(f"⚠️ DEBUG: ffmpeg version check failed: {e}")
+        
+        if ffprobe_path:
+            try:
+                subprocess.run([ffprobe_path, "-version"], capture_output=True, text=True, timeout=5)
+                print("✅ DEBUG: ffprobe version check passed")
             except Exception as e:
-                print(f"⚠️ DEBUG: ffmpeg fallback failed: {e}, using default values")
-                return {
-                    'video_codec': 'unknown',
-                    'audio_codec': 'unknown', 
-                    'width': 1920,
-                    'height': 1080,
-                    'duration': 60.0,
-                }
+                print(f"⚠️ DEBUG: ffprobe version check failed: {e}")
+        
+        # Se ffprobe non è disponibile, usa ffmpeg fallback
+        if not ffprobe_path:
+            print("⚠️ DEBUG: ffprobe not available, using ffmpeg fallback")
+            return _get_video_info_ffmpeg_fallback(input_video, ffmpeg_path)
 
         # Comando ffprobe per ottenere informazioni sul video
         cmd = [
@@ -92,8 +96,8 @@ def get_video_info(input_video):
             input_video,
         ]
 
-        # Esegui il comando
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        # Esegui il comando con timeout
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
 
         if result.returncode == 0:
             # Parsa il JSON di output
@@ -104,26 +108,86 @@ def get_video_info(input_video):
             audio_stream = next((s for s in probe_data['streams'] if s.get('codec_type') == 'audio'), None)
 
             if video_stream:
-                return {
+                info = {
                     'video_codec': video_stream.get('codec_name', 'unknown'),
                     'audio_codec': audio_stream.get('codec_name', 'unknown') if audio_stream else None,
                     'width': int(video_stream.get('width', 0)),
                     'height': int(video_stream.get('height', 0)),
                     'duration': float(probe_data.get('format', {}).get('duration', 0)),
                 }
+                print(f"✅ DEBUG: Video info extracted successfully: {info}")
+                return info
             else:
                 print(f"❌ DEBUG: No video stream found in {input_video}")
                 return None
         else:
             print(f"❌ DEBUG: ffprobe error: {result.stderr}")
-            return None
+            # Fallback a ffmpeg se ffprobe fallisce
+            return _get_video_info_ffmpeg_fallback(input_video, ffmpeg_path)
 
+    except subprocess.TimeoutExpired:
+        print("❌ DEBUG: ffprobe timeout, using ffmpeg fallback")
+        return _get_video_info_ffmpeg_fallback(input_video, ffmpeg_path)
     except subprocess.CalledProcessError as e:
         print(f"❌ DEBUG: Error in get_video_info subprocess: {e}")
-        return None
+        return _get_video_info_ffmpeg_fallback(input_video, ffmpeg_path)
     except Exception as e:
         print(f"❌ DEBUG: Error in get_video_info: {e}")
-        return None
+        return _get_video_info_ffmpeg_fallback(input_video, ffmpeg_path)
+
+
+def _get_video_info_ffmpeg_fallback(input_video, ffmpeg_path):
+    """Fallback per ottenere info video usando ffmpeg"""
+    try:
+        print("🔧 DEBUG: Using ffmpeg fallback for video info")
+        
+        # Usa ffmpeg per ottenere info reali del video
+        cmd = [
+            ffmpeg_path,
+            '-i', input_video,
+            '-f', 'null',
+            '-'
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+        
+        # Estrai info dal stderr di ffmpeg
+        stderr_output = result.stderr
+        
+        # Cerca dimensioni video
+        import re
+        size_match = re.search(r'(\d{2,4})x(\d{2,4})', stderr_output)
+        width = int(size_match.group(1)) if size_match else 1920
+        height = int(size_match.group(2)) if size_match else 1080
+        
+        # Cerca durata
+        duration_match = re.search(r'Duration: (\d{2}):(\d{2}):(\d{2})', stderr_output)
+        if duration_match:
+            hours, minutes, seconds = map(int, duration_match.groups())
+            duration = hours * 3600 + minutes * 60 + seconds
+        else:
+            duration = 60.0
+        
+        info = {
+            'video_codec': 'unknown',
+            'audio_codec': 'unknown', 
+            'width': width,
+            'height': height,
+            'duration': duration,
+        }
+        
+        print(f"✅ DEBUG: ffmpeg fallback successful - size: {width}x{height}, duration: {duration}s")
+        return info
+        
+    except Exception as e:
+        print(f"⚠️ DEBUG: ffmpeg fallback failed: {e}, using default values")
+        return {
+            'video_codec': 'unknown',
+            'audio_codec': 'unknown', 
+            'width': 1920,
+            'height': 1080,
+            'duration': 60.0,
+        }
 
 # === CONFIG ===
 def get_openai_client(api_key):
