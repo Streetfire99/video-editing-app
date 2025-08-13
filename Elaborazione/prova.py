@@ -25,6 +25,9 @@ os.environ["MKL_NUM_THREADS"] = "1"
 # NOTA: faster-whisper potrebbe non essere disponibile su Python 3.13
 # per problemi di compatibilità con CTranslate2/PyTorch
 # Se fallisce, l'app userà OpenAI Whisper API come fallback
+#
+# IMPORTANTE: ffprobe è OBBLIGATORIO e deve essere disponibile nel PATH
+# (incluso con il pacchetto ffmpeg in packages.txt)
 
 # Configurazione ffmpeg robusta
 try:
@@ -56,20 +59,22 @@ def get_video_info(input_video):
         ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
         os.environ["FFMPEG_BINARY"] = ffmpeg_path
         
-        # Prova prima ffprobe di sistema, poi imageio-ffprobe
+        # DEVE usare ffprobe di sistema (incluso con ffmpeg)
         ffprobe_path = shutil.which("ffprobe")
         if not ffprobe_path:
-            try:
-                import imageio_ffprobe
-                ffprobe_path = imageio_ffprobe.get_ffprobe_exe()
-                os.environ["FFPROBE_BINARY"] = ffprobe_path
-                print(f"✅ DEBUG: Using imageio-ffprobe: {ffprobe_path}")
-            except ImportError:
-                print("❌ DEBUG: imageio-ffprobe not available")
-                ffprobe_path = None
-        else:
-            os.environ["FFPROBE_BINARY"] = ffprobe_path
-            print(f"✅ DEBUG: Using system ffprobe: {ffprobe_path}")
+            # Se ffprobe non è disponibile, è un errore critico
+            error_msg = "❌ CRITICAL: ffprobe non disponibile nel PATH. ffprobe è incluso con ffmpeg e deve essere disponibile."
+            print(error_msg)
+            raise RuntimeError(error_msg)
+        
+        os.environ["FFPROBE_BINARY"] = ffprobe_path
+        print(f"✅ DEBUG: Using system ffprobe: {ffprobe_path}")
+        
+        # Verifica che ffprobe sia eseguibile
+        if not os.access(ffprobe_path, os.X_OK):
+            error_msg = f"❌ CRITICAL: ffprobe non eseguibile: {ffprobe_path}"
+            print(error_msg)
+            raise RuntimeError(error_msg)
         
         # Debug: verifica versioni
         try:
@@ -85,10 +90,7 @@ def get_video_info(input_video):
             except Exception as e:
                 print(f"⚠️ DEBUG: ffprobe version check failed: {e}")
         
-        # Se ffprobe non è disponibile, usa ffmpeg fallback
-        if not ffprobe_path:
-            print("⚠️ DEBUG: ffprobe not available, using ffmpeg fallback")
-            return _get_video_info_ffmpeg_fallback(input_video, ffmpeg_path)
+        # ffprobe è obbligatorio, non ci sono fallback
 
         # Comando ffprobe per ottenere informazioni sul video
         cmd = [
@@ -126,72 +128,20 @@ def get_video_info(input_video):
                 return None
         else:
             print(f"❌ DEBUG: ffprobe error: {result.stderr}")
-            # Fallback a ffmpeg se ffprobe fallisce
-            return _get_video_info_ffmpeg_fallback(input_video, ffmpeg_path)
+            raise RuntimeError(f"ffprobe fallito: {result.stderr}")
 
     except subprocess.TimeoutExpired:
-        print("❌ DEBUG: ffprobe timeout, using ffmpeg fallback")
-        return _get_video_info_ffmpeg_fallback(input_video, ffmpeg_path)
+        print("❌ DEBUG: ffprobe timeout")
+        raise RuntimeError("ffprobe timeout - video troppo grande o corrotto")
     except subprocess.CalledProcessError as e:
         print(f"❌ DEBUG: Error in get_video_info subprocess: {e}")
-        return _get_video_info_ffmpeg_fallback(input_video, ffmpeg_path)
+        raise RuntimeError(f"ffprobe subprocess error: {e}")
     except Exception as e:
         print(f"❌ DEBUG: Error in get_video_info: {e}")
-        return _get_video_info_ffmpeg_fallback(input_video, ffmpeg_path)
+        raise RuntimeError(f"Errore in get_video_info: {e}")
 
 
-def _get_video_info_ffmpeg_fallback(input_video, ffmpeg_path):
-    """Fallback per ottenere info video usando ffmpeg"""
-    try:
-        print("🔧 DEBUG: Using ffmpeg fallback for video info")
-        
-        # Usa ffmpeg per ottenere info reali del video
-        cmd = [
-            ffmpeg_path,
-            '-i', input_video,
-            '-f', 'null',
-            '-'
-        ]
-        
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
-        
-        # Estrai info dal stderr di ffmpeg
-        stderr_output = result.stderr
-        
-        # Cerca dimensioni video
-        import re
-        size_match = re.search(r'(\d{2,4})x(\d{2,4})', stderr_output)
-        width = int(size_match.group(1)) if size_match else 1920
-        height = int(size_match.group(2)) if size_match else 1080
-        
-        # Cerca durata
-        duration_match = re.search(r'Duration: (\d{2}):(\d{2}):(\d{2})', stderr_output)
-        if duration_match:
-            hours, minutes, seconds = map(int, duration_match.groups())
-            duration = hours * 3600 + minutes * 60 + seconds
-        else:
-            duration = 60.0
-        
-        info = {
-            'video_codec': 'unknown',
-            'audio_codec': 'unknown', 
-            'width': width,
-            'height': height,
-            'duration': duration,
-        }
-        
-        print(f"✅ DEBUG: ffmpeg fallback successful - size: {width}x{height}, duration: {duration}s")
-        return info
-        
-    except Exception as e:
-        print(f"⚠️ DEBUG: ffmpeg fallback failed: {e}, using default values")
-        return {
-            'video_codec': 'unknown',
-            'audio_codec': 'unknown', 
-            'width': 1920,
-            'height': 1080,
-            'duration': 60.0,
-        }
+# Funzione di fallback rimossa - ffprobe è obbligatorio
 
 # === CONFIG ===
 def get_openai_client(api_key):
