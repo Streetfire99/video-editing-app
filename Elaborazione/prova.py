@@ -22,6 +22,10 @@ os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
 
+# NOTA: faster-whisper potrebbe non essere disponibile su Python 3.13
+# per problemi di compatibilità con CTranslate2/PyTorch
+# Se fallisce, l'app userà OpenAI Whisper API come fallback
+
 # Configurazione ffmpeg robusta
 try:
     import imageio_ffmpeg

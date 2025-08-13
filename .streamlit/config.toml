@@ -1,34 +1,10 @@
 [server]
-# Aumenta limite upload file (default: 200MB)
-maxUploadSize = 500
-enableXsrfProtection = false
-enableCORS = false
-
-# Configurazioni per file grandi
-maxMessageSize = 1000
-enableStaticServing = true
-
-fileWatcherType = "none"   # stop hot-reload aggressivo
+fileWatcherType = "none"
 headless = true
+maxUploadSize = 200
 
 [client]
-# Abilita upload di file più grandi
 showErrorDetails = true
 
 [browser]
-# Ottimizzazioni per file grandi
 gatherUsageStats = false
-
-# Configurazioni per gestione memoria
-memoryMode = "greedy"
-
-[theme]
-# Tema personalizzato
-primaryColor = "#FF6B6B"
-backgroundColor = "#FFFFFF"
-secondaryBackgroundColor = "#F0F2F6"
-textColor = "#262730"
-font = "sans serif"
-
-[logger]
-level = "info"
