@@ -649,6 +649,43 @@ if current_phase == 'generate_edit':
                             'en': f"English manual for {video['name']}"
                         }
                     
+                    # 🚀 ELABORAZIONE VIDEO IMMEDIATA dopo generazione sottotitoli
+                    try:
+                        st.info(f"🎬 Elaborazione video in corso per {video['name']}...")
+                        
+                        # Crea file SRT temporanei per l'elaborazione
+                        temp_srt_it = tempfile.NamedTemporaryFile(mode='w', suffix='.srt', delete=False)
+                        temp_srt_en = tempfile.NamedTemporaryFile(mode='w', suffix='.srt', delete=False)
+                        
+                        # Scrivi i sottotitoli nei file temporanei
+                        create_srt_file(segments_it, temp_srt_it.name, "IT")
+                        create_srt_file(segments_en, temp_srt_en.name, "EN")
+                        
+                        # Elabora il video con i sottotitoli generati
+                        video_result = finalize_video_processing(
+                            input_video=video['path'],
+                            srt_it_file=temp_srt_it.name,
+                            srt_en_file=temp_srt_en.name,
+                            output_dir=output_dir,
+                            italian_height=120,
+                            english_height=60
+                        )
+                        
+                        # Pulisci i file temporanei
+                        temp_srt_it.close()
+                        temp_srt_en.close()
+                        os.unlink(temp_srt_it.name)
+                        os.unlink(temp_srt_en.name)
+                        
+                        if video_result['success']:
+                            video['processed_video'] = video_result
+                            st.success(f"✅ {video['name']} - Video elaborato con successo!")
+                        else:
+                            st.error(f"❌ {video['name']} - Errore elaborazione video: {video_result.get('error', 'Errore sconosciuto')}")
+                            
+                    except Exception as e:
+                        st.error(f"✅ {video['name']} - Errore elaborazione video: {str(e)}")
+                    
                     st.success(f"✅ {video['name']} - Sottotitoli e manuali generati!")
                 else:
                     st.error(f"❌ {video['name']} - Errore: {result.get('error', 'Errore sconosciuto')}")
