@@ -1,0 +1,38 @@
+Sezione,Descrizione,Colonna,Foglio,Note
+Introduzione,Descrizione breve dell'appartamento,Descrizione Annunci ITA Breve,appartamenti,Descrizione breve in italiano (150-200 parole)
+Introduzione,Descrizione breve dell'appartamento,Descrizione Annunci EN Breve,appartamenti,Descrizione breve in inglese (150-200 parole)
+Introduzione,Descrizione dettagliata dell'appartamento,Descrizione Annunci ITA Medio,appartamenti,Descrizione media in italiano (300-400 parole)
+Introduzione,Descrizione dettagliata dell'appartamento,Descrizione Annunci EN Medio,appartamenti,Descrizione media in inglese (300-400 parole)
+Caratteristiche,Caratteristiche specifiche dell'appartamento,property_specific_task,appartamenti,Caratteristiche uniche dell'appartamento
+Caratteristiche,Numero di camere,camere,appartamenti,Numero di camere da letto
+Caratteristiche,Numero di ospiti,numero_ospiti,appartamenti,Capacità massima
+Caratteristiche,Metratura,metratura,appartamenti,Metri quadrati
+Caratteristiche,Numero di locali,locali,appartamenti,Numero totale di locali
+Caratteristiche,Piano,Piano,appartamenti,Piano dell'appartamento
+Caratteristiche,Ascensore,ascensore,appartamenti,Presenza dell'ascensore
+Caratteristiche,Zona,Zona,appartamenti,Zona della città
+Servizi,Servizi disponibili,Appartamento,servizi,Lista dei servizi disponibili (colonne multiple)
+WiFi,Informazioni WiFi,nome_rete,wi-fi,Nome della rete WiFi
+WiFi,Informazioni WiFi,password,wi-fi,Password della rete WiFi
+WiFi,Informazioni WiFi,posizione_router,wi-fi,Posizione del router
+Elettrodomestici,Lista elettrodomestici,nome_elettrodomestico,elettrodomestici,Nome dell'elettrodomestico
+Elettrodomestici,Lista elettrodomestici,descrizione,elettrodomestici,Descrizione dell'elettrodomestico
+Elettrodomestici,Lista elettrodomestici,modello,elettrodomestici,Modello dell'elettrodomestico
+Elettrodomestici,Lista elettrodomestici,marca_serial,elettrodomestici,Marca e numero seriale
+Elettrodomestici,Lista elettrodomestici,posizione,elettrodomestici,Posizione nell'appartamento
+Climatizzazione,Tipo di sistema,tipologia_sistema,climatizzazione,Tipo di sistema di climatizzazione
+Climatizzazione,Autonomia,autonomo,climatizzazione,Sistema autonomo o centralizzato
+Climatizzazione,Sorgente,sorgente,climatizzazione,Tipo di sorgente (es. pompa di calore)
+Climatizzazione,Diffusore,diffusore,climatizzazione,Tipo di diffusore
+Contatti,Idraulico,Idraulico,contatti,Nome dell'idraulico
+Contatti,Idraulico,Numero Idraulico,contatti,Numero di telefono dell'idraulico
+Contatti,Elettricista,Elettricista,contatti,Nome dell'elettricista
+Contatti,Elettricista,Numero Elettricista,contatti,Numero di telefono dell'elettricista
+Contatti,Tuttofare,Tuttofare,contatti,Nome del tuttofare
+Contatti,Tuttofare,Numero Tuttofare,contatti,Numero di telefono del tuttofare
+Accesso,Come arrivare,Messaggio Come arrivare da MPX/BGY ITA,check-in,Istruzioni per arrivare dall'aeroporto (ITA)
+Accesso,Come arrivare,Messaggio Come arrivare da MPX/BGY EN,check-in,Istruzioni per arrivare dall'aeroporto (EN)
+Accesso,Come arrivare al Duomo,Messaggio Duomo ITA,check-in,Istruzioni per arrivare al Duomo (ITA)
+Accesso,Come arrivare al Duomo,Messaggio Duomo EN,check-in,Istruzioni per arrivare al Duomo (EN)
+Accesso,Parcheggio,Messaggio Parcheggio ITA,check-in,Informazioni sul parcheggio (ITA)
+Accesso,Parcheggio,Messaggio Parcheggio EN,check-in,Informazioni sul parcheggio (EN) 

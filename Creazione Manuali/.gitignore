@@ -1,0 +1,22 @@
+# File sensibili - NON committare mai!
+env.yaml
+openai_config.json
+openai_key.txt
+service_account_key*.txt
+*.key
+*.pem
+*.json
+
+# File temporanei
+*.tmp
+*.temp
+__pycache__/
+*.pyc
+
+# Log e debug
+*.log
+debug_*.txt
+
+# File di output
+output/
+results/

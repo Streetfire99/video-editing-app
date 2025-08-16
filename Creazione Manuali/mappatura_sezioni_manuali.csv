@@ -1,0 +1,34 @@
+Sezione,Descrizione,Contenuto,Note
+Intestazione,Informazioni base,"- Logo e sito web (www.xeniamilano.com)
+- Titolo (MANUALE DELLA CASA)
+- Indirizzo e Città (dai fogli 'appartamenti' e 'contratti')",Intestazione del manuale
+Introduzione,Benvenuto e presentazione,"- Messaggio di benvenuto
+- Descrizione del manuale
+- Contatti di emergenza (+39 351 561 8573)",Introduzione al manuale e contatti principali
+Regole,Regole della casa,"- Divieto di fumo (solo balcone/esterno)
+- Gestione spazzatura (Ce ne occupiamo noi)
+- Orari di silenzio (Rispetta la quiete dei vicini)
+- Check-out (h 10:00, chiavi nella cassetta di sicurezza)",Regole base da rispettare durante il soggiorno
+WiFi,Configurazione della rete WiFi,"- Nome rete (nome_rete)
+- Password (password)
+- Posizione router (posizione_router)",Informazioni per connettersi alla rete WiFi
+Elettrodomestici,Istruzioni per gli elettrodomestici,"- Lavatrice (nome_elettrodomestico + descrizione)
+- Lavastoviglie (nome_elettrodomestico + descrizione)
+- Piano cottura (nome_elettrodomestico + descrizione)
+- Forno (nome_elettrodomestico + descrizione)
+- Asciugatrice (nome_elettrodomestico + descrizione)
+- Microonde (nome_elettrodomestico + descrizione)",Istruzioni per l'uso di ogni elettrodomestico
+Climatizzazione,Sistema di riscaldamento/raffreddamento,"- Tipo sistema (tipologia_sistema)
+- Autonomia (autonomo)
+- Sorgente (sorgente)
+- Diffusore (diffusore)",Informazioni sul sistema di climatizzazione
+Contatti,Contatti per emergenze,"- Idraulico (Idraulico + Numero Idraulico)
+- Elettricista (Elettricista + Numero Elettricista)
+- Tuttofare (Tuttofare + Numero Tuttofare)",Contatti per assistenza tecnica
+Accesso,Istruzioni per raggiungere l'appartamento,"- Da aeroporto (Messaggio Come arrivare da MPX/BGY ITA/EN)
+- Al Duomo (Messaggio Duomo ITA/EN)
+- Parcheggio (Messaggio Parcheggio ITA/EN)",Istruzioni dettagliate per raggiungere l'appartamento
+Footer,Informazioni di contatto,"- Logo e sito web (www.xeniamilano.com)
+- Email (gestione@xeniamilano.com)
+- Telefono (+39 351 561 8573)
+- Messaggio promozionale per prenotazioni future",Contatti per prenotazioni future e assistenza 

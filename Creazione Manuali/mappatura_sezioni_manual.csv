@@ -1,0 +1,6 @@
+Sezione,Foglio,Colonna,Note
+Foto principale,foto,Link Foto,Prendi la prima foto disponibile per l'appartamento
+Descrizione how to reach the flat,Check-in,Messaggio Come arrivare da MPX/BGY,Se non presente, fallback su descrizione in appartamenti o Check-in
+Wi-Fi,wi-fi,nome_rete|password|posizione_router,Unisci nome rete, password e posizione router
+Appliances,elettrodomestici,nome_elettrodomestico|modello|marca_serial|anno|posizione|descrizione,Elenca tutti gli elettrodomestici dell'appartamento
+Imprevisti,climatizzazione|utenze|contatti,tipologia_sistema|nome_utenza|idraulico|elettricista|tuttofare,Contatti e info su climatizzazione, utenze e assistenza; da sintetizzare in istruzioni testuali 
